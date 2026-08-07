@@ -39,7 +39,9 @@ async fn spawn_data_node() -> (String, tempfile::TempDir) {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     tokio::spawn(async move {
-        axum::serve(listener, server::router(node)).await.unwrap();
+        axum::serve(listener, server::router(node, None))
+            .await
+            .unwrap();
     });
     (format!("http://{addr}"), dir)
 }
@@ -74,6 +76,7 @@ async fn create_database_round_robin_placement() {
         data_node: provider,
         nodes: registry.clone(),
         auth_mode: combee_api_server::auth::AuthMode::Off,
+        control_plane_token: None,
     });
 
     // 创建两个 db → 应分别落到节点 A / B(round-robin)
@@ -197,6 +200,7 @@ async fn agent_registers_heartbeats_and_unregisters() {
         data_node: provider,
         nodes: registry.clone(),
         auth_mode: combee_api_server::auth::AuthMode::Off,
+        control_plane_token: None,
     });
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

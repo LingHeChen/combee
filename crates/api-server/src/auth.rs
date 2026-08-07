@@ -55,6 +55,51 @@ impl FromRequestParts<AppState> for AuthContext {
     }
 }
 
+/// 控制面认证:保护 `/internal/*` 端点。
+///
+/// 规则:
+/// 1. 携带租户 `x-api-key` 的请求**永远**拒绝(租户 key 不能触碰控制面);
+/// 2. 配置了 `control_plane_token` 时,必须提供
+///    `Authorization: Bearer <token>` 或 `x-control-token: <token>`;
+/// 3. 未配置 token(dev):无 `x-api-key` 即放行。
+pub async fn internal_auth(State(state): State<AppState>, req: Request, next: Next) -> Response {
+    // 租户 key 永不进入内部接口
+    if req.headers().contains_key("x-api-key") {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(ErrorBody {
+                error: "unauthorized".into(),
+            }),
+        )
+            .into_response();
+    }
+    if let Some(expected) = &state.control_plane_token {
+        let bearer_ok = req
+            .headers()
+            .get("authorization")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.strip_prefix("Bearer "))
+            .map(|t| t == expected)
+            .unwrap_or(false);
+        let header_ok = req
+            .headers()
+            .get("x-control-token")
+            .and_then(|v| v.to_str().ok())
+            .map(|t| t == expected)
+            .unwrap_or(false);
+        if !bearer_ok && !header_ok {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(ErrorBody {
+                    error: "unauthorized".into(),
+                }),
+            )
+                .into_response();
+        }
+    }
+    next.run(req).await
+}
+
 /// 认证中间件:校验 key(若启用)并注入 AuthContext。
 pub async fn auth_middleware(
     State(state): State<AppState>,

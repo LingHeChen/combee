@@ -108,6 +108,34 @@ curl -H 'x-api-key: cmb_sk_...' 127.0.0.1:8080/v1/databases
 - **租户隔离在 repository 层强制**:所有资源操作(`sql` / `transaction` / `kv` / `delete` / `backup` / `restore`)都调用 `get_database(tenant, id)`,跨租户访问一律 404(不泄露 Cell 存在性);
 - 元数据模型:`tenants`(租户)→ `api_keys`(密钥,哈希)→ `databases`(Cell,含 `tenant_id`),天然对接后续计费(usage / balance / budgets)。
 
+### Control Plane
+
+`/internal/nodes/*`(register / heartbeat / unregister / list)与 data-node `/rpc/*` 是控制面接口,
+用 **`COMBEE_CONTROL_PLANE_TOKEN`** 保护(API Server 与 Data Node 共享同一令牌):
+
+```bash
+export COMBEE_CONTROL_PLANE_TOKEN='<random-secret>'
+# data-node 侧同样设置;API Server 发起的 RPC 自动携带该 token
+```
+
+- 未配置(dev):放行,但**携带租户 `x-api-key` 的请求一律 401**——租户 key 永远不能调用内部接口;
+- 已配置:必须提供 `Authorization: Bearer <token>` 或 `x-control-token: <token>`;
+- 租户 key 即使同时带上正确 token 也被拒绝(内部接口优先拒绝 `x-api-key`)。
+
+## V0 范围冻结(v0.1.0-alpha)
+
+**v0.1.0-alpha 不再新增功能**,以下明确排除在 V0 之外:
+
+| 不做 | 说明 / 何时做 |
+|---|---|
+| RESP(Redis 协议) | 现有 HTTP API 保持;等真实客户需求再评估 |
+| PG wire(PostgreSQL 线协议) | 同上,避免协议兼容面拖住发布 |
+| Blob(大对象存储) | V0 存储以 SQL + KV 为准;对象存储仅用于备份/恢复 |
+| 多副本(>1 replica) | 单 replica + failover 已够;multi-replica 是 V1 主题 |
+| 更复杂 scheduler | 当前 `COMBEE_MAX_ACTIVE_DBS` LRU + 空闲休眠;调度器扩展留 V1 |
+
+冻结纪律:V0 阶段只允许修 bug、补测试、做安全加固(如 control-plane auth);
+新增产品能力一律进 backlog(999.x),发布后再评估。
 
 ## 架构速览
 
@@ -144,6 +172,7 @@ KV SET ──→ SQLite(先落盘,权威)→ 更新/失效缓存
 | `COMBEE_API_SERVER_URL` | 空 | Data Node agent 注册/心跳的 API Server 地址(设置后启用 agent) |
 | `COMBEE_NODE_ADVERTISE_URL` | `http://<DATA_NODE_ADDR>` | agent 注册的对外 RPC 地址(容器内用服务名) |
 | `COMBEE_DATABASE_URL` | `postgres://combee:combee@localhost:5432/combee` | PostgreSQL 连接串(`COMBEE_METADATA=postgres` 时使用) |
+| `COMBEE_CONTROL_PLANE_TOKEN` | 空(dev 放行) | 控制面令牌;保护 `/internal/*` 与 data-node `/rpc/*`;租户 `x-api-key` 永不通过 |
 
 ### PostgreSQL 元数据
 

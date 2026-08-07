@@ -88,6 +88,11 @@ pub struct Config {
     pub kv_durability: KvDurability,
     /// 单条 SQL 执行超时(秒);0 = 不限。
     pub sql_timeout_secs: u64,
+    /// 控制面令牌(`COMBEE_CONTROL_PLANE_TOKEN`)。
+    /// `/internal/*` 与 data-node `/rpc/*` 的保护:
+    /// - 未配置(dev):放行,但携带租户 `x-api-key` 的请求一律拒绝;
+    /// - 配置:必须提供 `Authorization: Bearer <token>` 或 `x-control-token: <token>`。
+    pub control_plane_token: Option<String>,
 }
 
 impl Config {
@@ -111,6 +116,10 @@ impl Config {
         };
         let kv_cache_capacity = env_parse("COMBEE_KV_CACHE_CAPACITY", 100_000);
         let sql_timeout_secs = env_parse("COMBEE_SQL_TIMEOUT_SECS", 30);
+        let control_plane_token = {
+            let v = env_str("COMBEE_CONTROL_PLANE_TOKEN", "");
+            if v.is_empty() { None } else { Some(v) }
+        };
         let kv_durability = env_str("COMBEE_KV_DURABILITY", "normal")
             .parse()
             .unwrap_or_default();
@@ -143,6 +152,7 @@ impl Config {
             kv_cache_capacity,
             kv_durability,
             sql_timeout_secs,
+            control_plane_token,
         }
     }
 }

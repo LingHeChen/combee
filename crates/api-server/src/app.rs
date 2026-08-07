@@ -10,7 +10,8 @@ use crate::auth;
 use crate::handlers::{backup, database, failover, internal, keys, kv, replication, sql};
 
 pub fn build_app(state: AppState) -> Router {
-    Router::new()
+    // public 路由:走租户 key 认证(auth_middleware)
+    let public = Router::new()
         .route(
             "/v1/databases",
             get(database::list_databases).post(database::create_database),
@@ -39,9 +40,6 @@ pub fn build_app(state: AppState) -> Router {
         .route("/v1/databases/{id}/kv/ops/ttl", post(kv::kv_ttl))
         .route("/v1/databases/{id}/kv/ops/expire", post(kv::kv_expire))
         .route("/v1/databases/{id}/kv/ops/incr", post(kv::kv_incr))
-        .route("/internal/nodes/register", post(internal::register))
-        .route("/internal/nodes/heartbeat", post(internal::heartbeat))
-        .route("/internal/nodes/unregister", post(internal::unregister))
         .route(
             "/v1/tenants",
             post(keys::create_tenant).get(keys::list_tenants),
@@ -51,19 +49,32 @@ pub fn build_app(state: AppState) -> Router {
             post(keys::create_api_key).get(keys::list_api_keys),
         )
         .route("/v1/api-keys/{id}", delete(keys::revoke_api_key))
-        .route("/internal/nodes", get(internal::list))
-        .route("/internal/nodes/{node}/replicas", get(internal::replicas))
         .route("/v1/databases/{id}/failover", post(failover::failover))
         .route(
             "/v1/databases/{id}/replication",
             get(replication::get_replica)
                 .post(replication::set_replica)
                 .delete(replication::unset_replica),
-        )
+        );
+
+    // internal 控制面路由:独立认证(internal_auth),不经过租户 key 中间件
+    let internal = Router::new()
+        .route("/internal/nodes/register", post(internal::register))
+        .route("/internal/nodes/heartbeat", post(internal::heartbeat))
+        .route("/internal/nodes/unregister", post(internal::unregister))
+        .route("/internal/nodes", get(internal::list))
+        .route("/internal/nodes/{node}/replicas", get(internal::replicas))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth::internal_auth,
+        ));
+
+    public
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::auth_middleware,
         ))
+        .merge(internal)
         .with_state(state)
         .layer(TraceLayer::new_for_http())
 }

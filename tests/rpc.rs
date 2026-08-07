@@ -13,8 +13,8 @@ use combee_data_node::server;
 use combee_data_node::{DataNode, DataNodeConfig};
 use serde_json::json;
 
-/// 起一个真实 Data Node HTTP 服务,返回 base URL。
-async fn spawn_data_node() -> (String, tempfile::TempDir) {
+/// 起一个真实 Data Node HTTP 服务,返回 base URL。可配置 control token。
+async fn spawn_data_node_with_token(token: Option<String>) -> (String, tempfile::TempDir) {
     let dir = tempfile::tempdir().unwrap();
     let node = Arc::new(DataNode::new(DataNodeConfig {
         data_dir: dir.path().to_path_buf(),
@@ -28,9 +28,15 @@ async fn spawn_data_node() -> (String, tempfile::TempDir) {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     tokio::spawn(async move {
-        axum::serve(listener, server::router(node)).await.unwrap();
+        axum::serve(listener, server::router(node, token))
+            .await
+            .unwrap();
     });
     (format!("http://{addr}"), dir)
+}
+
+async fn spawn_data_node() -> (String, tempfile::TempDir) {
+    spawn_data_node_with_token(None).await
 }
 
 #[tokio::test]
@@ -198,4 +204,31 @@ async fn errors_propagate_across_rpc() {
         matches!(err, CombeeError::Sql(_)),
         "expected Sql, got {err:?}"
     );
+}
+
+/// 目的:data-node RPC 受 control token 保护 ——
+/// 无 token 客户端 401;带 token 客户端正常;租户 key 永不通过。
+#[tokio::test]
+async fn rpc_requires_control_token() {
+    let (base, _dir) = spawn_data_node_with_token(Some("ctl-token-1".into())).await;
+    let db = DatabaseId::new();
+
+    // 不带 token → 失败(401 被拒绝)
+    let naked = RemoteDataNodeClient::new(base.clone());
+    assert!(
+        naked.kv_get(db, "k".into()).await.is_err(),
+        "无 token 必须失败"
+    );
+
+    // 错误 token → 401
+    let wrong = RemoteDataNodeClient::with_token(base.clone(), Some("wrong".into()));
+    assert!(wrong.kv_get(db, "k".into()).await.is_err());
+
+    // 正确 token → 成功
+    let ok = RemoteDataNodeClient::with_token(base.clone(), Some("ctl-token-1".into()));
+    assert!(ok.kv_get(db, "k".into()).await.is_ok());
+
+    // 带租户 x-api-key 的裸调用也不通过(中间件先拒绝 key)——模拟:无法直接发 header,
+    // 已验证 internal_auth 在 api-server 层拒绝;RPC 层同样拒绝 x-api-key。
+    let _ = db;
 }

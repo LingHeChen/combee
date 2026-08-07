@@ -57,6 +57,8 @@ services:
       COMBEE_S3_SECRET_KEY: combee123456
       COMBEE_S3_BUCKET: combee-backups
       COMBEE_S3_REGION: us-east-1
+      # 控制面令牌(可选):与 api-server 共享;设置后 /internal/* 与 /rpc/* 需令牌
+      COMBEE_CONTROL_PLANE_TOKEN: ${COMBEE_CONTROL_PLANE_TOKEN:-}
     volumes:
       - combee-dn-data:/data
     depends_on:
@@ -72,6 +74,7 @@ services:
       COMBEE_DATABASE_URL: postgres://combee:combee@postgres:5432/combee
       COMBEE_DATA_NODE_URL: http://data-node:9000
       COMBEE_DATA_DIR: /data
+      COMBEE_CONTROL_PLANE_TOKEN: ${COMBEE_CONTROL_PLANE_TOKEN:-}
     ports:
       - "8080:8080"
     volumes:

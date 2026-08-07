@@ -37,6 +37,7 @@ pub fn test_app(max_active: usize) -> (Router, Arc<LocalDataNodeClient>, tempfil
         data_node: provider,
         nodes: Arc::new(NodeRegistry::new()),
         auth_mode: combee_api_server::auth::AuthMode::Off,
+        control_plane_token: None,
     };
     (build_app(state), client, dir)
 }
@@ -68,6 +69,7 @@ pub async fn test_app_with_keys(keys: &[&str]) -> (Router, tempfile::TempDir) {
         data_node: provider,
         nodes: Arc::new(NodeRegistry::new()),
         auth_mode: combee_api_server::auth::AuthMode::Key,
+        control_plane_token: None,
     };
     (build_app(state), dir)
 }

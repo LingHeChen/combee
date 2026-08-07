@@ -44,7 +44,9 @@ async fn spawn_data_node(os_dir: &std::path::Path) -> String {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     tokio::spawn(async move {
-        axum::serve(listener, server::router(node)).await.unwrap();
+        axum::serve(listener, server::router(node, None))
+            .await
+            .unwrap();
     });
     format!("http://{addr}")
 }
@@ -129,6 +131,7 @@ async fn failover_promotes_replica_and_fences_old_primary() {
         data_node: provider.clone(),
         nodes: registry.clone(),
         auth_mode: combee_api_server::auth::AuthMode::Off,
+        control_plane_token: None,
     };
     let promoted = combee_api_server::failover::failover_cell(&state, DEFAULT_TENANT, db)
         .await

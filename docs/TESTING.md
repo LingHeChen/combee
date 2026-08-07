@@ -440,3 +440,14 @@ p99 1.45ms,写路径(SET/SQL)受 per-db 串行化影响 p99 4-6ms —— 均在�
 | `cross_tenant_access_is_rejected` | 租户 B 无法访问 A 的 Cell | sql / transaction / kv / delete / backup / restore 跨租户一律 404;A 数据完好 |
 | `api_key_lifecycle_and_revocation` | key 明文仅返回一次;撤销即失效;跨租户不能撤销 | 创建 201 含明文(仅此一次);列表只存 64 位 sha256 哈希;A 撤销 B 的 key → 404;B 撤销后该 key 立即 401 |
 | `tenant_a_data_invisible_to_tenant_b` | 无/错误 key 拒绝;资源对他人不可见 | 无 key/错 key → 401(不泄露 Cell 存在性) |
+
+### tests/control_plane.rs —— Control-plane 认证
+
+| 测试 | 目的 | 预期结果 |
+|---|---|---|
+| `dev_mode_rejects_tenant_key_on_internal` | dev 模式内部接口对租户 key 关闭 | 无 key 放行;带 `x-api-key` 一律 401;public 路由不受影响 |
+| `token_protected_internal_endpoints` | 配置 token 后内部接口保护 | 无/错 token 401;`Bearer` 与 `x-control-token` 均可用;租户 key + 正确 token 仍 401 |
+| `all_internal_endpoints_protected` | register / heartbeat / unregister / list / replicas 全覆盖 | 无 token 全 401;正确 token 放行 |
+| `rpc_requires_control_token`(tests/rpc.rs) | data-node `/rpc/*` 同规则 | 无/错 token 失败;正确 token 正常 |
+
+另:`RemoteDataNodeClient::with_token` 在 API Server 访问独立 Data Node 时自动携带 `x-control-token`。

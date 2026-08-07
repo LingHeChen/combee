@@ -88,6 +88,7 @@ async fn make_app() -> (Router, TempDir, TenantId) {
         data_node: provider,
         nodes: Arc::new(NodeRegistry::new()),
         auth_mode: AuthMode::Key,
+        control_plane_token: None,
     };
     (build_app(state), dir, tenant_b)
 }

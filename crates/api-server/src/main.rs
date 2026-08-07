@@ -63,8 +63,10 @@ async fn main() {
     } else {
         tracing::info!("using remote data node: {}", config.data_node_url);
         local_shutdown = None;
-        let remote: Arc<dyn DataNodeClient> =
-            Arc::new(RemoteDataNodeClient::new(config.data_node_url.clone()));
+        let remote: Arc<dyn DataNodeClient> = Arc::new(RemoteDataNodeClient::with_token(
+            config.data_node_url.clone(),
+            config.control_plane_token.clone(),
+        ));
         Arc::new(RoutingProvider::new(
             registry.clone(),
             metadata.clone(),
@@ -85,6 +87,7 @@ async fn main() {
         data_node: provider,
         nodes: registry,
         auth_mode: combee_api_server::auth::AuthMode::from_env(),
+        control_plane_token: config.control_plane_token.clone(),
     };
     let app = build_app(state);
 

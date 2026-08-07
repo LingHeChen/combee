@@ -153,6 +153,7 @@ async fn replication_api_sets_replica() {
         data_node: provider,
         nodes: registry,
         auth_mode: combee_api_server::auth::AuthMode::Off,
+        control_plane_token: None,
     });
 
     // 创建 db

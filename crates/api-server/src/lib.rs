@@ -34,6 +34,8 @@ pub struct AppState {
     pub nodes: Arc<NodeRegistry>,
     /// 认证模式(off = 开发放行;key = 强制 API key 校验)。
     pub auth_mode: crate::auth::AuthMode,
+    /// 控制面令牌;`/internal/*` 端点必须匹配它(未配置时 dev 放行)。
+    pub control_plane_token: Option<String>,
 }
 
 /// 统一的 JSON 错误响应体。

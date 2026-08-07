@@ -17,8 +17,43 @@ use combee_common::rpc::{
 
 use crate::DataNode;
 
-/// 构建内部 RPC 路由(供 bin 与测试复用)。
-pub fn router(node: Arc<DataNode>) -> Router {
+/// 内部 RPC 认证:与 API Server 的 `internal_auth` 同规则。
+///
+/// 1. 携带租户 `x-api-key` 一律拒绝;
+/// 2. 配置 token 时必须提供 `Authorization: Bearer <token>` 或 `x-control-token: <token>`;
+/// 3. 未配置则放行。
+pub(crate) async fn rpc_auth(
+    State(token): State<Option<String>>,
+    req: axum::http::Request<axum::body::Body>,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    use axum::response::IntoResponse;
+    if req.headers().contains_key("x-api-key") {
+        return (axum::http::StatusCode::UNAUTHORIZED, "unauthorized").into_response();
+    }
+    if let Some(expected) = &token {
+        let bearer_ok = req
+            .headers()
+            .get("authorization")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.strip_prefix("Bearer "))
+            .map(|t| t == expected)
+            .unwrap_or(false);
+        let header_ok = req
+            .headers()
+            .get("x-control-token")
+            .and_then(|v| v.to_str().ok())
+            .map(|t| t == expected)
+            .unwrap_or(false);
+        if !bearer_ok && !header_ok {
+            return (axum::http::StatusCode::UNAUTHORIZED, "unauthorized").into_response();
+        }
+    }
+    next.run(req).await
+}
+
+/// 构建内部 RPC 路由(供 bin 与测试复用)。`control_token` 为空表示 dev 放行。
+pub fn router(node: Arc<DataNode>, control_token: Option<String>) -> Router {
     Router::new()
         .route("/rpc/execute_sql", post(rpc_execute_sql))
         .route("/rpc/execute_transaction", post(rpc_execute_transaction))
@@ -37,14 +72,22 @@ pub fn router(node: Arc<DataNode>) -> Router {
         .route("/rpc/backup", post(rpc_backup))
         .route("/rpc/incremental_backup", post(rpc_incremental_backup))
         .route("/rpc/restore", post(rpc_restore))
+        .layer(axum::middleware::from_fn_with_state(
+            control_token.clone(),
+            rpc_auth,
+        ))
         .with_state(node)
 }
 
 /// 启动内部 RPC 服务(阻塞)。
-pub async fn serve(node: Arc<DataNode>, addr: std::net::SocketAddr) -> std::io::Result<()> {
+pub async fn serve(
+    node: Arc<DataNode>,
+    addr: std::net::SocketAddr,
+    control_token: Option<String>,
+) -> std::io::Result<()> {
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!("data node rpc listening on http://{addr}");
-    axum::serve(listener, router(node)).await
+    axum::serve(listener, router(node, control_token)).await
 }
 
 // ---- handlers ----

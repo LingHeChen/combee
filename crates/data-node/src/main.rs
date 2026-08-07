@@ -124,7 +124,11 @@ async fn main() {
         }
     );
 
-    let result = server::serve(node, addr).await;
+    let control_token = {
+        let v = std::env::var("COMBEE_CONTROL_PLANE_TOKEN").unwrap_or_default();
+        if v.is_empty() { None } else { Some(v) }
+    };
+    let result = server::serve(node, addr, control_token).await;
     // 退出前注销节点
     if let Some(agent) = agent {
         agent.unregister().await;

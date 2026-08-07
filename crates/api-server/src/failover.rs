@@ -101,6 +101,7 @@ pub fn spawn_failover_scanner(
                         data_node: provider.clone(),
                         nodes: nodes.clone(),
                         auth_mode: crate::auth::AuthMode::Off,
+                        control_plane_token: None,
                     };
                     match failover_cell(&state, rec.tenant_id, rec.id).await {
                         Ok(promoted) => tracing::info!(

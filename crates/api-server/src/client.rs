@@ -210,16 +210,23 @@ impl DataNodeClient for LocalDataNodeClient {
 pub struct RemoteDataNodeClient {
     http: reqwest::Client,
     base: String,
+    /// 控制面令牌;配置时每次 RPC 附带 `x-control-token`。
+    control_token: Option<String>,
 }
 
 impl RemoteDataNodeClient {
     pub fn new(base_url: String) -> Self {
+        Self::with_token(base_url, None)
+    }
+
+    pub fn with_token(base_url: String, control_token: Option<String>) -> Self {
         Self {
             http: reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(30))
                 .build()
                 .expect("reqwest client"),
             base: base_url.trim_end_matches('/').to_string(),
+            control_token,
         }
     }
 
@@ -229,10 +236,11 @@ impl RemoteDataNodeClient {
         T: Serialize + Sync,
         R: DeserializeOwned,
     {
-        let resp = self
-            .http
-            .post(format!("{}/{}", self.base, path))
-            .json(body)
+        let mut req = self.http.post(format!("{}/{}", self.base, path)).json(body);
+        if let Some(token) = &self.control_token {
+            req = req.header("x-control-token", token);
+        }
+        let resp = req
             .send()
             .await
             .map_err(|e| CombeeError::Internal(format!("data node rpc {path}: {e}")))?;
