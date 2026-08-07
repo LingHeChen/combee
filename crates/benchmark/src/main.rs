@@ -364,6 +364,17 @@ async fn bench_many_dbs() {
 
 // ---- CLI 辅助 ----
 
+/// benchmark 产物统一写到 `artifacts/`(已 gitignore,不入库)。
+/// 可被环境变量 `COMBEE_BENCH_OUT_DIR` 覆盖。
+fn output_path(name: &str) -> std::path::PathBuf {
+    let dir = std::env::var("COMBEE_BENCH_OUT_DIR").unwrap_or_else(|_| "artifacts".into());
+    let p = std::path::Path::new(&dir).join(name);
+    if let Some(parent) = p.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    p
+}
+
 fn has_flag(args: &[String], flag: &str) -> bool {
     args.iter().any(|a| a == flag)
 }

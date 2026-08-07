@@ -16,6 +16,7 @@ use combee_data_node::{DataNode, DataNodeConfig};
 use combee_metadata::{DEFAULT_TENANT, MetadataStore};
 use rand::Rng;
 
+use crate::output_path;
 use crate::proc;
 
 /// 与 active 规模匹配的连接上限(active=5000 时需 ≥5000)。
@@ -177,8 +178,8 @@ fn percentiles(samples: &[std::time::Duration]) -> (f64, f64, f64) {
 }
 
 fn write_outputs(rows: &[CapacityRow]) {
-    let csv_path = Path::new("capacity.csv");
-    let md_path = Path::new("capacity.md");
+    let csv_path = output_path("capacity.csv");
+    let md_path = output_path("capacity.md");
 
     // CSV
     let mut csv = String::from(
@@ -199,7 +200,7 @@ fn write_outputs(rows: &[CapacityRow]) {
             r.active_conns,
         ));
     }
-    std::fs::write(csv_path, &csv).expect("write capacity.csv");
+    std::fs::write(&csv_path, &csv).expect("write capacity.csv");
 
     // Markdown
     let mut md = String::from(
@@ -220,7 +221,7 @@ fn write_outputs(rows: &[CapacityRow]) {
             r.active_conns,
         ));
     }
-    std::fs::write(md_path, &md).expect("write capacity.md");
+    std::fs::write(&md_path, &md).expect("write capacity.md");
 
     // stdout 打印 Markdown 表格
     println!(

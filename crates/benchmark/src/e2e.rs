@@ -5,7 +5,7 @@
 //!
 //! 运行:`combee-benchmark --e2e --url http://127.0.0.1:8080`
 
-use std::path::Path;
+use crate::output_path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -196,8 +196,8 @@ fn percentiles(samples: &[Duration]) -> (f64, f64, f64) {
 }
 
 fn write_outputs(rows: &[E2ERow]) {
-    let csv_path = Path::new("e2e.csv");
-    let md_path = Path::new("e2e.md");
+    let csv_path = output_path("e2e.csv");
+    let md_path = output_path("e2e.md");
 
     let mut csv = String::from("operation,concurrency,throughput_ops,p50_us,p95_us,p99_us\n");
     for r in rows {
@@ -206,7 +206,7 @@ fn write_outputs(rows: &[E2ERow]) {
             r.op, r.concurrency, r.throughput, r.p50_us, r.p95_us, r.p99_us
         ));
     }
-    std::fs::write(csv_path, &csv).expect("write e2e.csv");
+    std::fs::write(&csv_path, &csv).expect("write e2e.csv");
 
     let mut md = String::from(
         "| operation | concurrency | throughput (ops/s) | p50 (µs) | p95 (µs) | p99 (µs) |\n|---|---|---:|---:|---:|---:|\n",
@@ -217,7 +217,7 @@ fn write_outputs(rows: &[E2ERow]) {
             r.op, r.concurrency, r.throughput, r.p50_us, r.p95_us, r.p99_us
         ));
     }
-    std::fs::write(md_path, &md).expect("write e2e.md");
+    std::fs::write(&md_path, &md).expect("write e2e.md");
 
     println!(
         "\n结果:{} / {}(与工作目录)",

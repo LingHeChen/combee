@@ -13,10 +13,10 @@
 //!
 //! 输出:`contention.csv` / `contention.md`(与工作目录)。
 
-use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use crate::output_path;
 use combee_common::DatabaseId;
 use combee_common::config::KvDurability;
 use combee_common::protocol::SqlRequest;
@@ -209,8 +209,8 @@ fn percentiles(samples: &[Duration]) -> (f64, f64, f64) {
 }
 
 fn write_outputs(rows: &[ContentionRow]) {
-    let csv_path = Path::new("contention.csv");
-    let md_path = Path::new("contention.md");
+    let csv_path = output_path("contention.csv");
+    let md_path = output_path("contention.md");
 
     let mut csv = String::from(
         "op,concurrency,throughput_ops,p50_us,p95_us,p99_us,lock_avg_ns,lock_max_ns,queue_max\n",
@@ -229,7 +229,7 @@ fn write_outputs(rows: &[ContentionRow]) {
             r.queue_max,
         ));
     }
-    std::fs::write(csv_path, &csv).expect("write contention.csv");
+    std::fs::write(&csv_path, &csv).expect("write contention.csv");
 
     let mut md = String::from(
         "| operation | concurrency | throughput (ops/s) | p50 (µs) | p95 (µs) | p99 (µs) | lock avg (µs) | lock max (µs) | queue max |\n|---|---|---:|---:|---:|---:|---:|---:|---:|\n",
@@ -248,7 +248,7 @@ fn write_outputs(rows: &[ContentionRow]) {
             r.queue_max,
         ));
     }
-    std::fs::write(md_path, &md).expect("write contention.md");
+    std::fs::write(&md_path, &md).expect("write contention.md");
 
     println!(
         "\n结果:{} / {}(与工作目录)",
