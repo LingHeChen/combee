@@ -1,0 +1,13 @@
+[package]
+name = "combee-metadata"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+combee-common = { path = "../common" }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+sqlx = { workspace = true }
+uuid = { workspace = true }

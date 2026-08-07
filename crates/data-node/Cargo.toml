@@ -1,0 +1,25 @@
+[package]
+name = "combee-data-node"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "combee-data-node"
+path = "src/main.rs"
+
+[dependencies]
+combee-common = { path = "../common" }
+rusqlite = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde_json = { workspace = true }
+moka = { workspace = true }
+axum = { workspace = true }
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
+object_store = { workspace = true }
+uuid = { workspace = true }
+futures = "0.3"
+tempfile = "3"
+

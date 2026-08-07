@@ -1,0 +1,130 @@
+//! Combee API Server 入口。
+
+use std::sync::Arc;
+
+use combee_api_server::AppState;
+use combee_api_server::app::build_app;
+use combee_api_server::client::{
+    DataNodeClient, DataNodeProvider, LocalDataNodeClient, LocalProvider, RemoteDataNodeClient,
+    RoutingProvider,
+};
+use combee_api_server::nodes::NodeRegistry;
+use combee_common::config::{Config, MetadataMode};
+use combee_data_node::{DataNode, DataNodeConfig};
+use combee_metadata::{InMemoryStore, MetadataStore, PostgresStore};
+use tracing_subscriber::EnvFilter;
+
+fn init_tracing() {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| EnvFilter::new("info,combee=debug")),
+        )
+        .init();
+}
+
+#[tokio::main]
+async fn main() {
+    init_tracing();
+    let config = Config::from_env();
+
+    let metadata: Arc<dyn MetadataStore> = match config.metadata_mode {
+        MetadataMode::InMemory => Arc::new(InMemoryStore::new()),
+        MetadataMode::Postgres => {
+            let url = &config.database_url;
+            tracing::info!("connecting metadata postgres: {url}");
+            let store = PostgresStore::connect(url)
+                .await
+                .unwrap_or_else(|e| panic!("failed to connect metadata postgres: {e}"));
+            Arc::new(store)
+        }
+    };
+
+    // Data Node 客户端路由:
+    // - COMBEE_MULTI_NODE=1:多节点模式,Data Node agent 注册 + 心跳,placement 全走 registry;
+    // - COMBEE_DATA_NODE_URL 非空:单远程节点(未注册时兜底该地址);
+    // - 默认:进程内本地 Data Node。
+    let registry = Arc::new(NodeRegistry::new());
+    let local_shutdown: Option<Arc<LocalDataNodeClient>>;
+    let multi_node = std::env::var("COMBEE_MULTI_NODE").as_deref() == Ok("1");
+    let provider: Arc<dyn DataNodeProvider> = if multi_node {
+        tracing::info!("multi-node mode: routing via node registry");
+        local_shutdown = None;
+        Arc::new(RoutingProvider::new(
+            registry.clone(),
+            metadata.clone(),
+            None,
+        ))
+    } else if config.data_node_url.is_empty() {
+        let node = Arc::new(DataNode::new(DataNodeConfig::from_common(&config)));
+        let local = Arc::new(LocalDataNodeClient::new(node));
+        local_shutdown = Some(local.clone());
+        Arc::new(LocalProvider::new(local))
+    } else {
+        tracing::info!("using remote data node: {}", config.data_node_url);
+        local_shutdown = None;
+        let remote: Arc<dyn DataNodeClient> =
+            Arc::new(RemoteDataNodeClient::new(config.data_node_url.clone()));
+        Arc::new(RoutingProvider::new(
+            registry.clone(),
+            metadata.clone(),
+            Some(remote),
+        ))
+    };
+
+    // 自动 failover 扫描(COMBEE_FAILOVER_INTERVAL_SECS > 0 时启用)
+    let _scanner = combee_api_server::failover::spawn_failover_scanner(
+        metadata.clone(),
+        registry.clone(),
+        provider.clone(),
+        &config,
+    );
+
+    let state = AppState {
+        metadata,
+        data_node: provider,
+        nodes: registry,
+        auth_mode: combee_api_server::auth::AuthMode::from_env(),
+    };
+    let app = build_app(state);
+
+    let listener = tokio::net::TcpListener::bind(config.bind_addr)
+        .await
+        .expect("failed to bind address");
+    tracing::info!("combee listening on http://{}", config.bind_addr);
+
+    let serve_result = axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await;
+
+    // 优雅关闭:本地模式 checkpoint 并关闭所有 SQLite 连接;远程模式由 Data Node 进程自行处理。
+    if let Some(local) = local_shutdown {
+        local.shutdown().await;
+    }
+    serve_result.expect("server error");
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install SIGTERM handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+    tracing::info!("shutdown signal received, draining");
+}

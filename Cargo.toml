@@ -1,0 +1,55 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/common",
+    "crates/metadata",
+    "crates/data-node",
+    "crates/api-server",
+    "crates/benchmark",
+]
+
+[package]
+name = "combee"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+# workspace root package:承载仓库根目录下的 tests/ 集成测试
+[dependencies]
+combee-api-server = { path = "crates/api-server" }
+combee-common = { path = "crates/common" }
+combee-data-node = { path = "crates/data-node" }
+combee-metadata = { path = "crates/metadata" }
+axum = { workspace = true }
+tokio = { workspace = true }
+tower = { workspace = true }
+serde_json = { workspace = true }
+tempfile = "3"
+object_store = { workspace = true }
+sha2 = "0.10"
+rand = { workspace = true }
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+
+[workspace.dependencies]
+tokio = { version = "1", features = ["full"] }
+axum = "0.8"
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["trace"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+bytes = "1"
+async-trait = "0.1"
+moka = { version = "0.12", features = ["sync"] }
+rand = "0.8"
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "uuid"] }
+object_store = { version = "0.11", features = ["aws"] }

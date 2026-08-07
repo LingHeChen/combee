@@ -1,0 +1,20 @@
+[package]
+name = "combee-benchmark"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "combee-benchmark"
+path = "src/main.rs"
+
+[dependencies]
+combee-common = { path = "../common" }
+combee-data-node = { path = "../data-node" }
+combee-metadata = { path = "../metadata" }
+tokio = { workspace = true }
+rand = { workspace = true }
+serde_json = { workspace = true }
+tempfile = "3"
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
