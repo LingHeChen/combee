@@ -82,7 +82,7 @@ curl -X PUT 127.0.0.1:8080/v1/databases/<cell-id>/kv/session:1 \
 
 **1M logical Cells**(4 CPU + 8GiB 容器,`--capacity --total 1M --active 5k`):
 p99 ≈ 64µs、缓存命中率 100%、活跃 SQLite 连接数严格 ≤ 上限。
-完整 15 组扫描数据见 `capacity.csv` / `capacity.md`(由 `cargo run --release -p combee-benchmark -- --capacity` 生成)。
+完整 15 组扫描数据见 `artifacts/capacity.csv` / `artifacts/capacity.md`(benchmark 运行产物,本地生成、不入库;`--capacity` 会重新生成)。
 
 ## 核心能力
 
@@ -238,7 +238,7 @@ schema 在连接时自动创建;目录数据与用户数据严格分离(设计�
 cargo run --release -p combee-benchmark            # 默认性能基准(含 mixed workload)
 cargo run --release -p combee-benchmark -- --mixed # cache miss 梯度 + mixed workload
 cargo run --release -p combee-benchmark -- --contention # 热点 Cell 并发(1/8/32/128/512)
-cargo run --release -p combee-benchmark -- --capacity   # 容量扫描 → capacity.csv / capacity.md
+cargo run --release -p combee-benchmark -- --capacity   # 容量扫描 → artifacts/capacity.csv|md(本地产物)
 cargo run --release -p combee-benchmark -- --e2e --url http://127.0.0.1:8080
 ```
 

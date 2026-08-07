@@ -1,2 +1,15 @@
+# Rust 构建产物
 /target
+
+# Docker 本地构建缓存(容器内 cargo build 的缓存目录)
 /.docker-target
+
+# 运行时数据(默认 COMBEE_DATA_DIR,SQLite 文件)
+/data/
+
+# 本地 benchmark 产物(运行 --capacity / --contention / --e2e 时重新生成)
+/artifacts/
+
+# 本地环境文件
+.env
+.env.*

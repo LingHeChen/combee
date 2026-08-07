@@ -186,7 +186,7 @@ README quickstart 可完成部署(本审计按 README 步骤执行);但未使用
 
 ### 16. Performance Regression Gate — PASS(基线已存)
 
-基准已保存(`capacity*.csv/md`、`contention.csv/md`、`e2e.csv/md`),设计目标全部达标(hot GET p99 <5µs 等)。自动对比门禁待 CI 接入(WARN)。
+基准已保存于本地 `artifacts/`(`capacity*.csv/md`、`contention.csv/md`、`e2e.csv/md`,不入库),设计目标全部达标(hot GET p99 <5µs 等)。自动对比门禁待 CI 接入(WARN)。
 
 ---
 
