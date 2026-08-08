@@ -10,12 +10,24 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// 一个逻辑数据库 / Cell 的 ID。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    utoipa::ToSchema,
+)]
 #[serde(transparent)]
 pub struct DatabaseId(pub Uuid);
 
 /// 一个租户(应用所有者)的 ID。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(transparent)]
 pub struct TenantId(pub Uuid);
 

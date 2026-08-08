@@ -81,6 +81,12 @@ CREATE TABLE IF NOT EXISTS credit_vouchers (
     redeemed_by UUID,
     redeemed_at BIGINT
 );
+CREATE TABLE IF NOT EXISTS idempotency_keys (
+    idem_key TEXT PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    payload TEXT NOT NULL,
+    created_at BIGINT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS databases (
     id UUID PRIMARY KEY,
     tenant_id UUID NOT NULL,
@@ -960,6 +966,39 @@ impl MetadataStore for PostgresStore {
                 })
             })
             .collect()
+    }
+
+    async fn save_idempotency(
+        &self,
+        key: &str,
+        tenant: TenantId,
+        payload: String,
+    ) -> Result<Option<String>> {
+        let now = DatabaseRecord::now_unix() as i64;
+        let inserted = sqlx::query(
+            "INSERT INTO idempotency_keys (idem_key, tenant_id, payload, created_at)
+             VALUES ($1, $2, $3, $4) ON CONFLICT (idem_key) DO NOTHING RETURNING payload",
+        )
+        .bind(key)
+        .bind(tenant.0)
+        .bind(&payload)
+        .bind(now)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(PostgresStore::internal)?;
+        if inserted.is_some() {
+            return Ok(None);
+        }
+        // 冲突:返回已存 payload
+        let row = sqlx::query(
+            "SELECT payload FROM idempotency_keys WHERE idem_key = $1 AND tenant_id = $2",
+        )
+        .bind(key)
+        .bind(tenant.0)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(PostgresStore::internal)?;
+        Ok(row.map(|r| r.try_get("payload").unwrap_or_default()))
     }
 }
 

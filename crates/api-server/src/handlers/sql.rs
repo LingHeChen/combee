@@ -21,6 +21,15 @@ pub(crate) async fn require_db(
 }
 
 /// POST /v1/databases/{id}/sql —— 执行单条 SQL。
+/// 执行单条 SQL。
+#[utoipa::path(
+    post,
+    path = "/v1/databases/{id}/sql",
+    params(("id" = DatabaseId, Path, description = "Cell id")),
+    request_body = SqlRequest,
+    responses((status = 200, description = "SQL result", body = SqlResult)),
+    tag = "sql"
+)]
 pub async fn execute_sql(
     State(state): State<AppState>,
     auth: combee_common::AuthContext,
@@ -40,6 +49,15 @@ pub async fn execute_sql(
 }
 
 /// POST /v1/databases/{id}/transaction —— 多条语句在同一个 SQLite 事务中原子执行。
+/// 多条 SQL 原子执行。
+#[utoipa::path(
+    post,
+    path = "/v1/databases/{id}/transaction",
+    params(("id" = DatabaseId, Path, description = "Cell id")),
+    request_body = TransactionRequest,
+    responses((status = 200, description = "results", body = Vec<SqlResult>)),
+    tag = "sql"
+)]
 pub async fn execute_transaction(
     State(state): State<AppState>,
     auth: combee_common::AuthContext,

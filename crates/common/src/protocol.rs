@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 pub type Param = serde_json::Value;
 
 /// 单条 SQL 执行请求。
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(utoipa::ToSchema, Debug, Clone, Serialize, Deserialize)]
 pub struct SqlRequest {
     pub sql: String,
     #[serde(default)]
@@ -15,7 +15,7 @@ pub struct SqlRequest {
 }
 
 /// 单条 SQL 执行结果。
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(utoipa::ToSchema, Debug, Clone, Serialize, Deserialize)]
 pub struct SqlResult {
     /// 查询语句的列名;非查询语句为空数组。
     #[serde(default)]
@@ -28,13 +28,13 @@ pub struct SqlResult {
 }
 
 /// 事务请求:多条语句在同一个 SQLite 事务中原子执行。
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(utoipa::ToSchema, Debug, Clone, Serialize, Deserialize)]
 pub struct TransactionRequest {
     pub statements: Vec<SqlRequest>,
 }
 
 /// KV GET 结果。
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(utoipa::ToSchema, Debug, Clone, Serialize, Deserialize)]
 pub struct KvEntry {
     pub value: String,
     /// 剩余存活秒数;`None` 表示持久 key(无 TTL)。
@@ -42,7 +42,7 @@ pub struct KvEntry {
 }
 
 /// KV SET 请求体。
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(utoipa::ToSchema, Debug, Clone, Serialize, Deserialize)]
 pub struct KvSetRequest {
     pub value: String,
     /// 可选 TTL(秒);缺省为持久 key。
@@ -57,7 +57,7 @@ pub struct KvSetRequest {
 }
 
 /// INCR / DECR 请求体。
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(utoipa::ToSchema, Debug, Clone, Serialize, Deserialize)]
 pub struct KvIncrRequest {
     pub key: String,
     #[serde(default = "default_delta")]

@@ -26,7 +26,7 @@ async fn require_db(
         .map_err(ApiError::from)
 }
 
-#[derive(Serialize)]
+#[derive(utoipa::ToSchema, Serialize)]
 pub struct KvGetResponse {
     pub exists: bool,
     pub value: Option<String>,
@@ -35,6 +35,14 @@ pub struct KvGetResponse {
 }
 
 /// GET /v1/databases/{id}/kv/{key}
+/// GET KV。
+#[utoipa::path(
+    get,
+    path = "/v1/databases/{id}/kv/{key}",
+    params(("id" = DatabaseId, Path, description = "Cell id"), ("key" = String, Path, description = "KV key")),
+    responses((status = 200, description = "value or null", body = KvGetResponse)),
+    tag = "kv"
+)]
 pub async fn kv_get(
     State(state): State<AppState>,
     auth: combee_common::AuthContext,
@@ -59,13 +67,22 @@ pub async fn kv_get(
     }
 }
 
-#[derive(Serialize)]
+#[derive(utoipa::ToSchema, Serialize)]
 pub struct KvSetResponse {
     /// 是否真正写入(NX/XX 条件下可能为 false)。
     pub written: bool,
 }
 
 /// PUT /v1/databases/{id}/kv/{key} body: `{"value": "...", "ttl_seconds": 60, "nx": false, "xx": false}`
+/// PUT KV。
+#[utoipa::path(
+    put,
+    path = "/v1/databases/{id}/kv/{key}",
+    params(("id" = DatabaseId, Path, description = "Cell id"), ("key" = String, Path, description = "KV key")),
+    request_body = KvSetRequest,
+    responses((status = 200, description = "set result", body = KvSetResponse)),
+    tag = "kv"
+)]
 pub async fn kv_set(
     State(state): State<AppState>,
     auth: combee_common::AuthContext,
@@ -81,12 +98,20 @@ pub async fn kv_set(
     Ok(Json(KvSetResponse { written }))
 }
 
-#[derive(Serialize)]
+#[derive(utoipa::ToSchema, Serialize)]
 pub struct KvDelResponse {
     pub deleted: bool,
 }
 
 /// DELETE /v1/databases/{id}/kv/{key}
+/// DELETE KV。
+#[utoipa::path(
+    delete,
+    path = "/v1/databases/{id}/kv/{key}",
+    params(("id" = DatabaseId, Path, description = "Cell id"), ("key" = String, Path, description = "KV key")),
+    responses((status = 200, description = "deleted flag", body = KvDelResponse)),
+    tag = "kv"
+)]
 pub async fn kv_del(
     State(state): State<AppState>,
     auth: combee_common::AuthContext,

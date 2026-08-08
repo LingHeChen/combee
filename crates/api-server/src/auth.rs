@@ -68,6 +68,7 @@ pub async fn internal_auth(State(state): State<AppState>, req: Request, next: Ne
         return (
             StatusCode::UNAUTHORIZED,
             Json(ErrorBody {
+                code: "unauthorized".into(),
                 error: "unauthorized".into(),
             }),
         )
@@ -91,6 +92,7 @@ pub async fn internal_auth(State(state): State<AppState>, req: Request, next: Ne
             return (
                 StatusCode::UNAUTHORIZED,
                 Json(ErrorBody {
+                    code: "unauthorized".into(),
                     error: "unauthorized".into(),
                 }),
             )
@@ -108,6 +110,7 @@ pub async fn admin_auth(State(state): State<AppState>, req: Request, next: Next)
         return (
             StatusCode::UNAUTHORIZED,
             Json(ErrorBody {
+                code: "unauthorized".into(),
                 error: "unauthorized".into(),
             }),
         )
@@ -117,6 +120,7 @@ pub async fn admin_auth(State(state): State<AppState>, req: Request, next: Next)
         return (
             StatusCode::UNAUTHORIZED,
             Json(ErrorBody {
+                code: "unauthorized".into(),
                 error: "COMBEE_ADMIN_TOKEN not configured".into(),
             }),
         )
@@ -139,12 +143,30 @@ pub async fn admin_auth(State(state): State<AppState>, req: Request, next: Next)
         return (
             StatusCode::UNAUTHORIZED,
             Json(ErrorBody {
+                code: "unauthorized".into(),
                 error: "unauthorized".into(),
             }),
         )
             .into_response();
     }
     next.run(req).await
+}
+
+/// request-id 中间件:透传客户端 `x-request-id`,缺失则生成;响应与错误均回显。
+/// SDK 通过它关联请求与日志/支持工单。
+pub async fn request_id(mut req: Request, next: Next) -> Response {
+    let id = req
+        .headers()
+        .get("x-request-id")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+    req.extensions_mut().insert(crate::RequestId(id.clone()));
+    let mut response = next.run(req).await;
+    if let Ok(v) = id.parse() {
+        response.headers_mut().insert("x-request-id", v);
+    }
+    response
 }
 
 /// 认证中间件:校验 key(若启用)并注入 AuthContext。
@@ -163,6 +185,7 @@ pub async fn auth_middleware(
                         return (
                             StatusCode::UNAUTHORIZED,
                             Json(ErrorBody {
+                                code: "unauthorized".into(),
                                 error: "unauthorized".into(),
                             }),
                         )
@@ -174,6 +197,7 @@ pub async fn auth_middleware(
                 return (
                     StatusCode::UNAUTHORIZED,
                     Json(ErrorBody {
+                        code: "unauthorized".into(),
                         error: "unauthorized".into(),
                     }),
                 )

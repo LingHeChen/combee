@@ -799,16 +799,16 @@ OpenAPI 可以生成 DTO / low-level transport，但：
 ## 9.4 API Freeze 验收标准
 
 ```text
-[ ] Public API 列表冻结
-[ ] Internal API 明确标记
-[ ] Error code 稳定
-[ ] Pagination 规范确定
-[ ] request-id 规范确定
-[ ] Idempotency-Key 规范确定
-[ ] Usage API 完成
-[ ] Credits API 完成
-[ ] Voucher API 完成
-[ ] OpenAPI 可生成
+[x] Public API 列表冻结(docs/API.md §1 分层 + 变更流程 §5)
+[x] Internal API 明确标记(/internal/*、/rpc/*、/admin/*;SDK 禁止暴露)
+[x] Error code 稳定({code, error} 响应,code 表见 docs/API.md §3)
+[x] Pagination 规范确定(cursor + limit<=1000,credits/transactions 已实现)
+[x] request-id 规范确定(透传/生成/回显,错误也带)
+[x] Idempotency-Key 规范确定(cell 创建实现;redeem 天然幂等;SDK_SPEC §19)
+[x] Usage API 完成(P0)
+[x] Credits API 完成(P1)
+[x] Voucher API 完成(P1)
+[x] OpenAPI 可生成(GET /openapi.json,utoipa;测试校验无 internal 泄漏)
 ```
 
 ---

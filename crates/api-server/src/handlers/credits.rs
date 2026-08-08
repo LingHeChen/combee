@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use crate::{ApiError, AppState};
 
-#[derive(Debug, Serialize)]
+#[derive(utoipa::ToSchema, Debug, Serialize)]
 pub struct CreditBalanceResponse {
     /// 可用余额(decimal string,microcredits 整数;禁止浮点)。
     pub available: String,
@@ -23,24 +23,24 @@ pub struct CreditBalanceResponse {
     pub updated_at: i64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(utoipa::ToSchema, Debug, Deserialize)]
 pub struct TxnQuery {
     pub limit: Option<i64>,
     pub cursor: Option<Uuid>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(utoipa::ToSchema, Debug, Serialize)]
 pub struct TxnPage {
     pub items: Vec<combee_common::CreditTransaction>,
     pub next_cursor: Option<Uuid>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct RedeemRequest {
     pub code: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct RedeemResponse {
     pub credits_added: String,
     pub balance: String,
@@ -49,6 +49,13 @@ pub struct RedeemResponse {
 }
 
 /// GET /v1/credits/balance
+/// 租户 Credits 余额。
+#[utoipa::path(
+    get,
+    path = "/v1/credits/balance",
+    responses((status = 200, description = "balance", body = CreditBalanceResponse)),
+    tag = "credits"
+)]
 pub async fn credits_balance(
     State(state): State<AppState>,
     auth: AuthContext,
@@ -84,6 +91,14 @@ pub async fn credits_transactions(
 }
 
 /// POST /v1/credits/redeem —— 单次兑换,幂等重试不重复加钱。
+/// 兑换 voucher(幂等)。
+#[utoipa::path(
+    post,
+    path = "/v1/credits/redeem",
+    request_body = RedeemRequest,
+    responses((status = 200, description = "redeemed", body = RedeemResponse)),
+    tag = "credits"
+)]
 pub async fn credits_redeem(
     State(state): State<AppState>,
     auth: AuthContext,

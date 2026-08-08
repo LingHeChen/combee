@@ -92,6 +92,7 @@ p99 ≈ 64µs、缓存命中率 100%、活跃 SQLite 连接数严格 ≤ 上限�
 - **单 replica + 自动 failover**:复制通道复用 WAL 归档;主节点心跳超时自动提升副本,generation fencing 防脑裂。
 - **多租户**:API key(仅存 sha256 哈希)绑定 tenant;隔离在 repository 层强制,跨租户一律 404。
 - **Usage Metering**:按 (tenant, cell, metric, 分钟桶) 统计 KV/SQL read/write、requests、bytes in/out、storage bytes;内存聚合 + 周期 flush(不进入热路径),`GET /v1/usage/summary` / `/v1/usage/timeseries` / `/v1/cells/{id}/usage`。
+- **Public API 契约**:`GET /openapi.json` 机器契约 + [docs/API.md](docs/API.md) 冻结规范(request-id / 稳定错误 code / Idempotency-Key / 游标分页)。
 - **Credits + Pricing**:整数 microcredits 账本(append-only,余额可从账本重建)、admin grant、voucher 兑换(哈希存库、单次/幂等/并发安全)、pricing 版本热更新(5s 生效,无效配置拒绝);settlement 周期把 usage → credits(记录 pricing_version,soft limit 告警不切断)。
 - **Control plane**:`/internal/*` 与 data-node `/rpc/*` 由 `COMBEE_CONTROL_PLANE_TOKEN` 保护,租户 key 永不进入内部接口。
 
@@ -112,6 +113,7 @@ p99 ≈ 64µs、缓存命中率 100%、活跃 SQLite 连接数严格 ≤ 上限�
 | [docs/RELEASE_READINESS.md](docs/RELEASE_READINESS.md) | Public Alpha 审计:Release Gate + 缺陷清单(BLOCKER=0 / HIGH=0) |
 | [docs/TESTING.md](docs/TESTING.md) | 全部测试的目的与预期结果 |
 | [docs/COMBEE_RELEASE_READINESS_TEST_PLAN.md](docs/COMBEE_RELEASE_READINESS_TEST_PLAN.md) | Release Gate 测试计划 |
+| [docs/API.md](docs/API.md) | **Public API 冻结契约**(分层 / 错误模型 / request-id / Idempotency / Pagination) |
 | [CHANGELOG.md](CHANGELOG.md) / [SECURITY.md](SECURITY.md) / [CONTRIBUTING.md](CONTRIBUTING.md) | 变更记录 / 安全 / 贡献 |
 
 ---

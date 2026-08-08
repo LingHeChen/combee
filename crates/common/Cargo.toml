@@ -10,4 +10,5 @@ serde_json = { workspace = true }
 uuid = { workspace = true }
 sha2 = "0.10"
 rand = { workspace = true }
+utoipa = "4"
 thiserror = { workspace = true }

@@ -17,7 +17,7 @@ use uuid::Uuid;
 use crate::ApiError;
 use crate::AppState;
 
-#[derive(Serialize)]
+#[derive(utoipa::ToSchema, Serialize)]
 pub struct CreateApiKeyResponse {
     /// 明文密钥,仅此一次返回(后续只能通过哈希校验)。
     pub key: String,
@@ -30,6 +30,13 @@ pub struct CreateTenantResponse {
 }
 
 /// POST /v1/api-keys —— 创建密钥(明文仅返回一次,库中只存 sha256)。
+/// 创建 API key(明文仅返回一次)。
+#[utoipa::path(
+    post,
+    path = "/v1/api-keys",
+    responses((status = 201, description = "created (plaintext once)", body = CreateApiKeyResponse)),
+    tag = "api-keys"
+)]
 pub async fn create_api_key(
     State(state): State<AppState>,
     auth: AuthContext,

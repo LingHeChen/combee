@@ -61,6 +61,7 @@ pub fn build_app(state: AppState) -> Router {
         )
         .route("/v1/credits/redeem", post(credits::credits_redeem))
         .route("/v1/pricing", get(credits::get_pricing))
+        .route("/openapi.json", get(crate::api_doc::openapi_json))
         .route("/v1/databases/{id}/failover", post(failover::failover))
         .route(
             "/v1/databases/{id}/replication",
@@ -117,5 +118,6 @@ pub fn build_app(state: AppState) -> Router {
         .merge(admin_routes)
         .merge(internal)
         .with_state(state)
+        .layer(middleware::from_fn(auth::request_id))
         .layer(TraceLayer::new_for_http())
 }

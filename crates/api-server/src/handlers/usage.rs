@@ -26,13 +26,13 @@ pub struct UsageQuery {
     pub interval: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(utoipa::ToSchema, Debug, Serialize)]
 pub struct UsagePeriod {
     pub from: String,
     pub to: String,
 }
 
-#[derive(Debug, Default, Serialize)]
+#[derive(utoipa::ToSchema, Debug, Default, Serialize)]
 pub struct UsageOperations {
     pub kv_reads: u64,
     pub kv_writes: u64,
@@ -40,7 +40,7 @@ pub struct UsageOperations {
     pub sql_writes: u64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(utoipa::ToSchema, Debug, Serialize)]
 pub struct UsageSummary {
     pub period: UsagePeriod,
     pub operations: UsageOperations,
@@ -116,6 +116,13 @@ fn fmt_bucket(bucket: i64) -> String {
 }
 
 /// GET /v1/usage/summary —— 租户整体汇总(跨所有 Cell)。
+/// 租户用量汇总。
+#[utoipa::path(
+    get,
+    path = "/v1/usage/summary",
+    responses((status = 200, description = "usage summary", body = UsageSummary)),
+    tag = "usage"
+)]
 pub async fn usage_summary(
     State(state): State<AppState>,
     auth: AuthContext,
@@ -201,6 +208,14 @@ pub async fn usage_timeseries(
 }
 
 /// GET /v1/cells/{id}/usage —— 单 Cell 汇总 + 当前存储字节。
+/// 单 Cell 用量 + 当前存储。
+#[utoipa::path(
+    get,
+    path = "/v1/cells/{id}/usage",
+    params(("id" = DatabaseId, Path, description = "Cell id")),
+    responses((status = 200, description = "cell usage", body = UsageSummary)),
+    tag = "usage"
+)]
 pub async fn cell_usage(
     State(state): State<AppState>,
     auth: AuthContext,

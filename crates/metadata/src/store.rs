@@ -11,7 +11,7 @@ use combee_common::credit::{
 };
 use combee_common::usage::{UsageBucket, UsageKey, UsageMetric};
 use combee_common::{CombeeError, DatabaseId, NodeId, Result, TenantId};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// V0 尚未接入真实认证,所有数据库归属这一个内置租户。
@@ -19,7 +19,7 @@ use uuid::Uuid;
 pub const DEFAULT_TENANT: TenantId = TenantId::from_u128(0x0000_0000_0000_0000_0000_0000_0000_0001);
 
 /// Cell 生命周期状态。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum DatabaseState {
     /// 已在目录中创建,但磁盘文件尚未生成(lazy create)。
@@ -53,7 +53,7 @@ impl DatabaseState {
 }
 
 /// 一个租户(应用所有者)。
-#[derive(Debug, Clone, Serialize)]
+#[derive(utoipa::ToSchema, Debug, Clone, Serialize)]
 pub struct TenantRecord {
     pub id: TenantId,
     /// 创建时间(unix 秒)。
@@ -62,7 +62,7 @@ pub struct TenantRecord {
 }
 
 /// 一条 API key(只存哈希,不存明文)。
-#[derive(Debug, Clone, Serialize)]
+#[derive(utoipa::ToSchema, Debug, Clone, Serialize)]
 pub struct ApiKeyRecord {
     pub id: Uuid,
     pub tenant_id: TenantId,
@@ -73,7 +73,7 @@ pub struct ApiKeyRecord {
 }
 
 /// 一条 Cell 目录记录。
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DatabaseRecord {
     pub id: DatabaseId,
     pub tenant_id: TenantId,
@@ -224,6 +224,16 @@ pub trait MetadataStore: Send + Sync {
     /// 全部兑换券(管理用,不含明文)。
     async fn list_vouchers(&self, limit: i64) -> Result<Vec<CreditVoucher>>;
 
+    // ---- Idempotency ----
+
+    /// Idempotency-Key 原子保存:插入成功返回 `None`;键已存在返回已存 payload(重放)。
+    async fn save_idempotency(
+        &self,
+        key: &str,
+        tenant: TenantId,
+        payload: String,
+    ) -> Result<Option<String>>;
+
     /// 批量创建目录记录(默认实现为逐条循环;PostgreSQL 后端会覆盖为批量 INSERT)。
     /// 已存在的记录静默跳过。
     async fn create_databases_batch(&self, tenant: TenantId, ids: &[DatabaseId]) -> Result<()> {
@@ -252,6 +262,7 @@ struct InMemoryInner {
     credit_txn_by_ref: HashMap<String, uuid::Uuid>,
     vouchers: HashMap<uuid::Uuid, CreditVoucher>,
     voucher_by_hash: HashMap<String, uuid::Uuid>,
+    idempotency: HashMap<String, (TenantId, String)>,
 }
 
 impl Default for InMemoryStore {
@@ -699,6 +710,20 @@ impl MetadataStore for InMemoryStore {
         vs.sort_by_key(|v| v.created_at);
         vs.truncate(limit.clamp(1, 1000) as usize);
         Ok(vs)
+    }
+
+    async fn save_idempotency(
+        &self,
+        key: &str,
+        tenant: TenantId,
+        payload: String,
+    ) -> Result<Option<String>> {
+        let mut inner = self.inner.lock().unwrap();
+        if let Some((_, existing)) = inner.idempotency.get(key) {
+            return Ok(Some(existing.clone()));
+        }
+        inner.idempotency.insert(key.to_string(), (tenant, payload));
+        Ok(None)
     }
 }
 

@@ -5,6 +5,7 @@
 //! 通过 [`client::DataNodeClient`] trait 与 Data Node 解耦,
 //! 当前使用 [`client::LocalDataNodeClient`],后续可替换为 gRPC 客户端。
 
+pub mod api_doc;
 pub mod app;
 pub mod auth;
 pub mod client;
@@ -48,10 +49,20 @@ pub struct AppState {
 }
 
 /// 统一的 JSON 错误响应体。
+///
+/// - `code`:稳定错误码(跨版本不变,SDK 据此映射异常类型);
+/// - `error`:人类可读描述。
+///
+/// 与 [`CombeeError::kind`] 一一对应(见 docs/API.md 错误模型)。
 #[derive(Serialize)]
 pub struct ErrorBody {
+    pub code: String,
     pub error: String,
 }
+
+/// 请求扩展中携带的 request id(由 `auth::request_id` 注入)。
+#[derive(Clone, Debug)]
+pub struct RequestId(pub String);
 
 /// 把 [`CombeeError`] 映射为 HTTP 响应。
 pub struct ApiError(pub CombeeError);
@@ -83,6 +94,7 @@ impl IntoResponse for ApiError {
             CombeeError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
         let body = Json(ErrorBody {
+            code: self.0.kind().to_string(),
             error: self.0.to_string(),
         });
         (status, body).into_response()
