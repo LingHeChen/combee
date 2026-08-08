@@ -36,6 +36,10 @@ pub fn test_app(max_active: usize) -> (Router, Arc<LocalDataNodeClient>, tempfil
         metadata.clone(),
         std::time::Duration::from_secs(3600),
     );
+    let pricing_meter = combee_api_server::pricing::PricingManager::new(
+        metadata.clone(),
+        std::time::Duration::from_secs(3600),
+    );
     let state = AppState {
         metadata,
         data_node: provider,
@@ -43,6 +47,8 @@ pub fn test_app(max_active: usize) -> (Router, Arc<LocalDataNodeClient>, tempfil
         auth_mode: combee_api_server::auth::AuthMode::Off,
         control_plane_token: None,
         usage: usage_meter,
+        pricing: pricing_meter,
+        admin_token: None,
     };
     (build_app(state), client, dir)
 }
@@ -73,6 +79,10 @@ pub async fn test_app_with_keys(keys: &[&str]) -> (Router, tempfile::TempDir) {
         metadata.clone(),
         std::time::Duration::from_secs(3600),
     );
+    let pricing_meter = combee_api_server::pricing::PricingManager::new(
+        metadata.clone(),
+        std::time::Duration::from_secs(3600),
+    );
     let state = AppState {
         metadata,
         data_node: provider,
@@ -80,6 +90,8 @@ pub async fn test_app_with_keys(keys: &[&str]) -> (Router, tempfile::TempDir) {
         auth_mode: combee_api_server::auth::AuthMode::Key,
         control_plane_token: None,
         usage: usage_meter,
+        pricing: pricing_meter,
+        admin_token: None,
     };
     (build_app(state), dir)
 }

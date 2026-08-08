@@ -158,6 +158,11 @@ async fn replication_api_sets_replica() {
             metadata.clone(),
             std::time::Duration::from_secs(3600),
         ),
+        pricing: combee_api_server::pricing::PricingManager::new(
+            metadata.clone(),
+            std::time::Duration::from_secs(3600),
+        ),
+        admin_token: None,
     });
 
     // 创建 db

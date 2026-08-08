@@ -5,6 +5,10 @@
 //! 等接入独立 Data Node 时再补充。
 
 use async_trait::async_trait;
+use combee_common::credit::{
+    CreditAccount, CreditTransaction, CreditTransactionType, CreditVoucher, PricingRule,
+    PricingStatus, PricingVersion, VoucherStatus,
+};
 use combee_common::usage::{UsageBucket, UsageKey, UsageMetric};
 use combee_common::{CombeeError, DatabaseId, NodeId, Result, TenantId};
 use sqlx::Row;
@@ -33,6 +37,49 @@ CREATE TABLE IF NOT EXISTS usage_buckets (
     bucket_start BIGINT NOT NULL,
     value BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (tenant_id, cell_id, metric, bucket_start)
+);
+CREATE TABLE IF NOT EXISTS pricing_versions (
+    version BIGINT PRIMARY KEY,
+    status TEXT NOT NULL,
+    effective_at BIGINT NOT NULL,
+    created_at BIGINT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS pricing_rules (
+    pricing_version BIGINT NOT NULL,
+    metric TEXT NOT NULL,
+    unit_size BIGINT NOT NULL,
+    price_units BIGINT NOT NULL,
+    PRIMARY KEY (pricing_version, metric)
+);
+CREATE TABLE IF NOT EXISTS credit_accounts (
+    tenant_id UUID PRIMARY KEY,
+    balance_units BIGINT NOT NULL DEFAULT 0,
+    reserved_units BIGINT NOT NULL DEFAULT 0,
+    updated_at BIGINT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS credit_transactions (
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    txn_type TEXT NOT NULL,
+    amount_units BIGINT NOT NULL,
+    pricing_version BIGINT,
+    reference_id TEXT UNIQUE,
+    description TEXT,
+    created_at BIGINT NOT NULL,
+    balance_after BIGINT
+);
+CREATE INDEX IF NOT EXISTS idx_credit_txns_tenant_created
+    ON credit_transactions (tenant_id, created_at DESC);
+CREATE TABLE IF NOT EXISTS credit_vouchers (
+    id UUID PRIMARY KEY,
+    code_hash TEXT NOT NULL UNIQUE,
+    amount_units BIGINT NOT NULL,
+    status TEXT NOT NULL,
+    campaign TEXT,
+    created_at BIGINT NOT NULL,
+    expires_at BIGINT,
+    redeemed_by UUID,
+    redeemed_at BIGINT
 );
 CREATE TABLE IF NOT EXISTS databases (
     id UUID PRIMARY KEY,
@@ -521,4 +568,426 @@ impl MetadataStore for PostgresStore {
             })
             .collect()
     }
+
+    async fn create_pricing_version(&self, rules: Vec<PricingRule>) -> Result<PricingVersion> {
+        let now = DatabaseRecord::now_unix() as i64;
+        let mut tx = self.pool.begin().await.map_err(PostgresStore::internal)?;
+        let version: i64 =
+            sqlx::query_scalar("SELECT COALESCE(MAX(version), 0) + 1 FROM pricing_versions")
+                .fetch_one(&mut *tx)
+                .await
+                .map_err(PostgresStore::internal)?;
+        sqlx::query("UPDATE pricing_versions SET status = 'inactive' WHERE status = 'active'")
+            .execute(&mut *tx)
+            .await
+            .map_err(PostgresStore::internal)?;
+        sqlx::query(
+            "INSERT INTO pricing_versions (version, status, effective_at, created_at) VALUES ($1, 'active', $2, $2)",
+        )
+        .bind(version)
+        .bind(now)
+        .execute(&mut *tx)
+        .await
+        .map_err(PostgresStore::internal)?;
+        for r in &rules {
+            sqlx::query(
+                "INSERT INTO pricing_rules (pricing_version, metric, unit_size, price_units) VALUES ($1, $2, $3, $4)",
+            )
+            .bind(version)
+            .bind(r.metric.as_str())
+            .bind(r.unit_size)
+            .bind(r.price_units)
+            .execute(&mut *tx)
+            .await
+            .map_err(PostgresStore::internal)?;
+        }
+        tx.commit().await.map_err(PostgresStore::internal)?;
+        Ok(PricingVersion {
+            version,
+            status: PricingStatus::Active,
+            effective_at: now,
+            created_at: now,
+        })
+    }
+
+    async fn get_active_pricing(&self) -> Result<(PricingVersion, Vec<PricingRule>)> {
+        let row = sqlx::query(
+            "SELECT version, status, effective_at, created_at FROM pricing_versions WHERE status = 'active'",
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(PostgresStore::internal)?;
+        let Some(row) = row else {
+            return Ok((
+                PricingVersion {
+                    version: 0,
+                    status: PricingStatus::Active,
+                    effective_at: 0,
+                    created_at: 0,
+                },
+                vec![],
+            ));
+        };
+        let version: i64 = row.try_get("version").map_err(PostgresStore::internal)?;
+        let rules = sqlx::query(
+            "SELECT pricing_version, metric, unit_size, price_units FROM pricing_rules WHERE pricing_version = $1",
+        )
+        .bind(version)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(PostgresStore::internal)?;
+        let rules = rules
+            .iter()
+            .map(|r| {
+                Ok(PricingRule {
+                    pricing_version: r
+                        .try_get("pricing_version")
+                        .map_err(PostgresStore::internal)?,
+                    metric: UsageMetric::parse(
+                        &r.try_get::<String, _>("metric")
+                            .map_err(PostgresStore::internal)?,
+                    )
+                    .ok_or_else(|| CombeeError::Internal("unknown metric".into()))?,
+                    unit_size: r.try_get("unit_size").map_err(PostgresStore::internal)?,
+                    price_units: r.try_get("price_units").map_err(PostgresStore::internal)?,
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok((
+            PricingVersion {
+                version,
+                status: PricingStatus::Active,
+                effective_at: row
+                    .try_get("effective_at")
+                    .map_err(PostgresStore::internal)?,
+                created_at: row.try_get("created_at").map_err(PostgresStore::internal)?,
+            },
+            rules,
+        ))
+    }
+
+    async fn list_pricing_versions(&self) -> Result<Vec<PricingVersion>> {
+        let rows = sqlx::query(
+            "SELECT version, status, effective_at, created_at FROM pricing_versions ORDER BY version",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(PostgresStore::internal)?;
+        rows.iter()
+            .map(|row| {
+                Ok(PricingVersion {
+                    version: row.try_get("version").map_err(PostgresStore::internal)?,
+                    status: if row
+                        .try_get::<String, _>("status")
+                        .map_err(PostgresStore::internal)?
+                        == "active"
+                    {
+                        PricingStatus::Active
+                    } else {
+                        PricingStatus::Inactive
+                    },
+                    effective_at: row
+                        .try_get("effective_at")
+                        .map_err(PostgresStore::internal)?,
+                    created_at: row.try_get("created_at").map_err(PostgresStore::internal)?,
+                })
+            })
+            .collect()
+    }
+
+    async fn get_credit_account(&self, tenant: TenantId) -> Result<CreditAccount> {
+        let row = sqlx::query(
+            "SELECT tenant_id, balance_units, reserved_units, updated_at FROM credit_accounts WHERE tenant_id = $1",
+        )
+        .bind(tenant.0)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(PostgresStore::internal)?;
+        if let Some(row) = row {
+            return Ok(CreditAccount {
+                tenant_id: TenantId(row.try_get("tenant_id").map_err(PostgresStore::internal)?),
+                balance_units: row
+                    .try_get("balance_units")
+                    .map_err(PostgresStore::internal)?,
+                reserved_units: row
+                    .try_get("reserved_units")
+                    .map_err(PostgresStore::internal)?,
+                updated_at: row.try_get("updated_at").map_err(PostgresStore::internal)?,
+            });
+        }
+        let now = DatabaseRecord::now_unix() as i64;
+        sqlx::query(
+            "INSERT INTO credit_accounts (tenant_id, balance_units, reserved_units, updated_at) VALUES ($1, 0, 0, $2)",
+        )
+        .bind(tenant.0)
+        .bind(now)
+        .execute(&self.pool)
+        .await
+        .map_err(PostgresStore::internal)?;
+        Ok(CreditAccount {
+            tenant_id: tenant,
+            balance_units: 0,
+            reserved_units: 0,
+            updated_at: now,
+        })
+    }
+
+    async fn list_credit_transactions(
+        &self,
+        tenant: TenantId,
+        limit: i64,
+        before: Option<Uuid>,
+    ) -> Result<Vec<CreditTransaction>> {
+        let rows = match before {
+            Some(b) => sqlx::query(
+                "SELECT id, tenant_id, txn_type, amount_units, pricing_version, reference_id, description, created_at, balance_after
+                 FROM credit_transactions WHERE tenant_id = $1 AND id < $2 ORDER BY created_at DESC, id DESC LIMIT $3",
+            )
+            .bind(tenant.0)
+            .bind(b)
+            .bind(limit.clamp(1, 1000))
+            .fetch_all(&self.pool)
+            .await
+            .map_err(PostgresStore::internal)?,
+            None => sqlx::query(
+                "SELECT id, tenant_id, txn_type, amount_units, pricing_version, reference_id, description, created_at, balance_after
+                 FROM credit_transactions WHERE tenant_id = $1 ORDER BY created_at DESC, id DESC LIMIT $2",
+            )
+            .bind(tenant.0)
+            .bind(limit.clamp(1, 1000))
+            .fetch_all(&self.pool)
+            .await
+            .map_err(PostgresStore::internal)?,
+        };
+        rows.iter().map(row_to_txn).collect()
+    }
+
+    async fn find_transaction_by_reference(
+        &self,
+        reference_id: &str,
+    ) -> Result<Option<CreditTransaction>> {
+        let row = sqlx::query(
+            "SELECT id, tenant_id, txn_type, amount_units, pricing_version, reference_id, description, created_at, balance_after
+             FROM credit_transactions WHERE reference_id = $1",
+        )
+        .bind(reference_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(PostgresStore::internal)?;
+        match row {
+            Some(r) => Ok(Some(row_to_txn(&r)?)),
+            None => Ok(None),
+        }
+    }
+
+    async fn append_credit_transaction(
+        &self,
+        mut txn: CreditTransaction,
+    ) -> Result<CreditTransaction> {
+        if let Some(ref_id) = &txn.reference_id
+            && let Some(existing) = self.find_transaction_by_reference(ref_id).await?
+        {
+            return Ok(existing);
+        }
+        let mut tx = self.pool.begin().await.map_err(PostgresStore::internal)?;
+        sqlx::query(
+            "INSERT INTO credit_transactions (id, tenant_id, txn_type, amount_units, pricing_version, reference_id, description, created_at, balance_after)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULL)
+             ON CONFLICT (reference_id) DO NOTHING",
+        )
+        .bind(txn.id)
+        .bind(txn.tenant_id.0)
+        .bind(txn.txn_type.as_str())
+        .bind(txn.amount_units)
+        .bind(txn.pricing_version)
+        .bind(&txn.reference_id)
+        .bind(&txn.description)
+        .bind(txn.created_at)
+        .execute(&mut *tx)
+        .await
+        .map_err(PostgresStore::internal)?;
+        let balance: i64 = sqlx::query_scalar(
+            "UPDATE credit_accounts SET balance_units = balance_units + $2, updated_at = $3
+             WHERE tenant_id = $1 RETURNING balance_units",
+        )
+        .bind(txn.tenant_id.0)
+        .bind(txn.amount_units)
+        .bind(txn.created_at)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(PostgresStore::internal)?;
+        tx.commit().await.map_err(PostgresStore::internal)?;
+        txn.balance_after = Some(balance);
+        Ok(txn)
+    }
+
+    async fn create_vouchers(
+        &self,
+        amount_units: i64,
+        count: u32,
+        campaign: Option<String>,
+        expires_at: Option<i64>,
+    ) -> Result<Vec<(String, CreditVoucher)>> {
+        let now = DatabaseRecord::now_unix() as i64;
+        let mut out = Vec::new();
+        for _ in 0..count {
+            let code = combee_common::credit::generate_voucher_code();
+            let code_hash = combee_common::credit::hash_voucher_code(&code);
+            let id = Uuid::new_v4();
+            sqlx::query(
+                "INSERT INTO credit_vouchers (id, code_hash, amount_units, status, campaign, created_at, expires_at)
+                 VALUES ($1, $2, $3, 'active', $4, $5, $6)",
+            )
+            .bind(id)
+            .bind(&code_hash)
+            .bind(amount_units)
+            .bind(&campaign)
+            .bind(now)
+            .bind(expires_at)
+            .execute(&self.pool)
+            .await
+            .map_err(PostgresStore::internal)?;
+            out.push((
+                code,
+                CreditVoucher {
+                    id,
+                    code_hash,
+                    amount_units,
+                    status: VoucherStatus::Active,
+                    campaign: campaign.clone(),
+                    created_at: now,
+                    expires_at,
+                    redeemed_by: None,
+                    redeemed_at: None,
+                },
+            ));
+        }
+        Ok(out)
+    }
+
+    async fn redeem_voucher(&self, code_hash: &str, tenant: TenantId, now: i64) -> Result<i64> {
+        let mut tx = self.pool.begin().await.map_err(PostgresStore::internal)?;
+        let row = sqlx::query(
+            "UPDATE credit_vouchers SET status = 'used', redeemed_by = $2, redeemed_at = $3
+             WHERE code_hash = $1 AND status = 'active' AND (expires_at IS NULL OR expires_at > $3)
+             RETURNING id, amount_units",
+        )
+        .bind(code_hash)
+        .bind(tenant.0)
+        .bind(now)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(PostgresStore::internal)?;
+        let Some(row) = row else {
+            return Err(CombeeError::InvalidRequest(
+                "voucher invalid, expired or already used".into(),
+            ));
+        };
+        let amount: i64 = row
+            .try_get("amount_units")
+            .map_err(PostgresStore::internal)?;
+        let txn = CreditTransaction {
+            id: Uuid::new_v4(),
+            tenant_id: tenant,
+            txn_type: CreditTransactionType::Voucher,
+            amount_units: amount,
+            pricing_version: None,
+            reference_id: Some(format!("voucher:{code_hash}")),
+            description: Some("voucher redemption".into()),
+            created_at: now,
+            balance_after: None,
+        };
+        sqlx::query(
+            "INSERT INTO credit_transactions (id, tenant_id, txn_type, amount_units, pricing_version, reference_id, description, created_at, balance_after)
+             VALUES ($1, $2, $3, $4, NULL, $5, $6, $7, NULL)",
+        )
+        .bind(txn.id)
+        .bind(tenant.0)
+        .bind("voucher")
+        .bind(amount)
+        .bind(&txn.reference_id)
+        .bind("voucher redemption")
+        .bind(now)
+        .execute(&mut *tx)
+        .await
+        .map_err(PostgresStore::internal)?;
+        sqlx::query_scalar::<_, i64>(
+            "UPDATE credit_accounts SET balance_units = balance_units + $2, updated_at = $3
+             WHERE tenant_id = $1 RETURNING balance_units",
+        )
+        .bind(tenant.0)
+        .bind(amount)
+        .bind(now)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(PostgresStore::internal)?;
+        tx.commit().await.map_err(PostgresStore::internal)?;
+        Ok(amount)
+    }
+
+    async fn list_vouchers(&self, limit: i64) -> Result<Vec<CreditVoucher>> {
+        let rows = sqlx::query(
+            "SELECT id, code_hash, amount_units, status, campaign, created_at, expires_at, redeemed_by, redeemed_at
+             FROM credit_vouchers ORDER BY created_at DESC LIMIT $1",
+        )
+        .bind(limit.clamp(1, 1000))
+        .fetch_all(&self.pool)
+        .await
+        .map_err(PostgresStore::internal)?;
+        rows.iter()
+            .map(|row| {
+                Ok(CreditVoucher {
+                    id: row.try_get("id").map_err(PostgresStore::internal)?,
+                    code_hash: row.try_get("code_hash").map_err(PostgresStore::internal)?,
+                    amount_units: row
+                        .try_get("amount_units")
+                        .map_err(PostgresStore::internal)?,
+                    status: VoucherStatus::parse(
+                        &row.try_get::<String, _>("status")
+                            .map_err(PostgresStore::internal)?,
+                    )
+                    .ok_or_else(|| CombeeError::Internal("bad voucher status".into()))?,
+                    campaign: row.try_get("campaign").map_err(PostgresStore::internal)?,
+                    created_at: row.try_get("created_at").map_err(PostgresStore::internal)?,
+                    expires_at: row.try_get("expires_at").map_err(PostgresStore::internal)?,
+                    redeemed_by: row
+                        .try_get::<Option<Uuid>, _>("redeemed_by")
+                        .map_err(PostgresStore::internal)?
+                        .map(TenantId),
+                    redeemed_at: row
+                        .try_get("redeemed_at")
+                        .map_err(PostgresStore::internal)?,
+                })
+            })
+            .collect()
+    }
+}
+
+/// sqlx 行 → CreditTransaction。
+fn row_to_txn(row: &sqlx::postgres::PgRow) -> Result<CreditTransaction> {
+    Ok(CreditTransaction {
+        id: row.try_get("id").map_err(PostgresStore::internal)?,
+        tenant_id: TenantId(row.try_get("tenant_id").map_err(PostgresStore::internal)?),
+        txn_type: CreditTransactionType::parse(
+            &row.try_get::<String, _>("txn_type")
+                .map_err(PostgresStore::internal)?,
+        )
+        .ok_or_else(|| CombeeError::Internal("bad txn type".into()))?,
+        amount_units: row
+            .try_get("amount_units")
+            .map_err(PostgresStore::internal)?,
+        pricing_version: row
+            .try_get("pricing_version")
+            .map_err(PostgresStore::internal)?,
+        reference_id: row
+            .try_get("reference_id")
+            .map_err(PostgresStore::internal)?,
+        description: row
+            .try_get("description")
+            .map_err(PostgresStore::internal)?,
+        created_at: row.try_get("created_at").map_err(PostgresStore::internal)?,
+        balance_after: row
+            .try_get("balance_after")
+            .map_err(PostgresStore::internal)?,
+    })
 }

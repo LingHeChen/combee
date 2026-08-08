@@ -7,7 +7,9 @@ use tower_http::trace::TraceLayer;
 
 use crate::AppState;
 use crate::auth;
-use crate::handlers::{backup, database, failover, internal, keys, kv, replication, sql, usage};
+use crate::handlers::{
+    admin, backup, credits, database, failover, internal, keys, kv, replication, sql, usage,
+};
 
 pub fn build_app(state: AppState) -> Router {
     // public 路由:走租户 key 认证(auth_middleware)
@@ -52,6 +54,13 @@ pub fn build_app(state: AppState) -> Router {
         .route("/v1/usage/summary", get(usage::usage_summary))
         .route("/v1/usage/timeseries", get(usage::usage_timeseries))
         .route("/v1/cells/{id}/usage", get(usage::cell_usage))
+        .route("/v1/credits/balance", get(credits::credits_balance))
+        .route(
+            "/v1/credits/transactions",
+            get(credits::credits_transactions),
+        )
+        .route("/v1/credits/redeem", post(credits::credits_redeem))
+        .route("/v1/pricing", get(credits::get_pricing))
         .route("/v1/databases/{id}/failover", post(failover::failover))
         .route(
             "/v1/databases/{id}/replication",
@@ -59,6 +68,30 @@ pub fn build_app(state: AppState) -> Router {
                 .post(replication::set_replica)
                 .delete(replication::unset_replica),
         );
+
+    // admin 路由:COMBEE_ADMIN_TOKEN(与租户 key / control-plane token 分离)
+    let admin_routes = Router::new()
+        .route(
+            "/admin/tenants/{tenant}/credits/grant",
+            post(admin::admin_grant_credits),
+        )
+        .route(
+            "/admin/vouchers/generate",
+            post(admin::admin_generate_vouchers),
+        )
+        .route("/admin/vouchers", get(admin::admin_list_vouchers))
+        .route(
+            "/admin/pricing/versions",
+            post(admin::admin_create_pricing_version),
+        )
+        .route(
+            "/admin/pricing/versions",
+            get(admin::admin_list_pricing_versions),
+        )
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth::admin_auth,
+        ));
 
     // internal 控制面路由:独立认证(internal_auth),不经过租户 key 中间件
     let internal = Router::new()
@@ -81,6 +114,7 @@ pub fn build_app(state: AppState) -> Router {
             state.clone(),
             auth::auth_middleware,
         ))
+        .merge(admin_routes)
         .merge(internal)
         .with_state(state)
         .layer(TraceLayer::new_for_http())

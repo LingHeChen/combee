@@ -50,6 +50,10 @@ async fn make_app(control_token: Option<&str>) -> (Router, TempDir) {
         metadata.clone(),
         std::time::Duration::from_secs(3600),
     );
+    let pricing_meter = combee_api_server::pricing::PricingManager::new(
+        metadata.clone(),
+        std::time::Duration::from_secs(3600),
+    );
     let state = AppState {
         metadata,
         data_node: provider,
@@ -57,6 +61,8 @@ async fn make_app(control_token: Option<&str>) -> (Router, TempDir) {
         auth_mode: AuthMode::Key,
         control_plane_token: control_token.map(str::to_string),
         usage: usage_meter,
+        pricing: pricing_meter,
+        admin_token: None,
     };
     (build_app(state), dir)
 }

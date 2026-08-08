@@ -137,6 +137,11 @@ async fn failover_promotes_replica_and_fences_old_primary() {
         auth_mode: combee_api_server::auth::AuthMode::Off,
         control_plane_token: None,
         usage: usage_meter,
+        pricing: combee_api_server::pricing::PricingManager::new(
+            metadata.clone(),
+            std::time::Duration::from_secs(3600),
+        ),
+        admin_token: None,
     };
     let promoted = combee_api_server::failover::failover_cell(&state, DEFAULT_TENANT, db)
         .await

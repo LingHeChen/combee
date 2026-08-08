@@ -100,6 +100,53 @@ pub async fn internal_auth(State(state): State<AppState>, req: Request, next: Ne
     next.run(req).await
 }
 
+/// Operator/Admin 认证:`COMBEE_ADMIN_TOKEN`(与租户 key、control-plane token 三者互不相同)。
+/// 未配置 token 时 admin 接口一律 401(必须显式配置)。
+pub async fn admin_auth(State(state): State<AppState>, req: Request, next: Next) -> Response {
+    // 租户 key 永远不能调用 admin 接口
+    if req.headers().contains_key("x-api-key") {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(ErrorBody {
+                error: "unauthorized".into(),
+            }),
+        )
+            .into_response();
+    }
+    let Some(expected) = &state.admin_token else {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(ErrorBody {
+                error: "COMBEE_ADMIN_TOKEN not configured".into(),
+            }),
+        )
+            .into_response();
+    };
+    let bearer_ok = req
+        .headers()
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .map(|t| t == expected)
+        .unwrap_or(false);
+    let header_ok = req
+        .headers()
+        .get("x-admin-token")
+        .and_then(|v| v.to_str().ok())
+        .map(|t| t == expected)
+        .unwrap_or(false);
+    if !bearer_ok && !header_ok {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(ErrorBody {
+                error: "unauthorized".into(),
+            }),
+        )
+            .into_response();
+    }
+    next.run(req).await
+}
+
 /// 认证中间件:校验 key(若启用)并注入 AuthContext。
 pub async fn auth_middleware(
     State(state): State<AppState>,

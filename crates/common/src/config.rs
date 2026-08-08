@@ -95,6 +95,12 @@ pub struct Config {
     pub control_plane_token: Option<String>,
     /// Usage 聚合 flush 周期。
     pub usage_flush_interval: Duration,
+    /// Pricing 热更新轮询周期。
+    pub pricing_refresh_interval: Duration,
+    /// Credits 结算周期。
+    pub settlement_interval: Duration,
+    /// Operator/Admin 令牌(`COMBEE_ADMIN_TOKEN`);未配置时 admin 接口 401。
+    pub admin_token: Option<String>,
 }
 
 impl Config {
@@ -124,6 +130,14 @@ impl Config {
         };
         let usage_flush_interval =
             Duration::from_secs(env_parse("COMBEE_USAGE_FLUSH_INTERVAL_SECS", 5));
+        let pricing_refresh_interval =
+            Duration::from_secs(env_parse("COMBEE_PRICING_REFRESH_INTERVAL_SECS", 5));
+        let settlement_interval =
+            Duration::from_secs(env_parse("COMBEE_SETTLEMENT_INTERVAL_SECS", 60));
+        let admin_token = {
+            let v = env_str("COMBEE_ADMIN_TOKEN", "");
+            if v.is_empty() { None } else { Some(v) }
+        };
         let kv_durability = env_str("COMBEE_KV_DURABILITY", "normal")
             .parse()
             .unwrap_or_default();
@@ -158,6 +172,9 @@ impl Config {
             sql_timeout_secs,
             control_plane_token,
             usage_flush_interval,
+            pricing_refresh_interval,
+            settlement_interval,
+            admin_token,
         }
     }
 }

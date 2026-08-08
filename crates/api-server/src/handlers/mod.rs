@@ -6,5 +6,7 @@ pub mod kv;
 pub mod replication;
 pub mod sql;
 
+pub mod admin;
+pub mod credits;
 pub mod keys;
 pub mod usage;

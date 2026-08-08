@@ -460,3 +460,12 @@ p99 1.45ms,写路径(SET/SQL)受 per-db 串行化影响 p99 4-6ms —— 均在�
 | `usage_summary_and_timeseries` | 租户级汇总与时序 | summary 跨 Cell 聚合;timeseries 按 minute 合并;非法 metric/interval → 400 |
 | `usage_flush_accumulates_without_double_count_on_retry` | flush 不重复不丢失 | 两次 flush(5+7)同键累加为 12,单桶 |
 | `usage_concurrent_records_are_accurate` | 并发计数准确 | 8 并发 × 250 全部记录(2000) |
+
+### tests/credits.rs —— Credits / Pricing / Voucher / Settlement(P1)
+
+| 测试 | 目的 | 预期结果 |
+|---|---|---|
+| `grant_balance_and_ledger_integer_accounting` | 整数账本与 admin 权限 | 未配置/错 token 401;grant 500M microcredits → balance 一致;负数拒绝;账本 append-only 且可重建余额 |
+| `voucher_single_use_idempotent_and_concurrent_safe` | voucher 单次/幂等/并发/过期 | 生成 CMB- 码(库中仅哈希);兑换加钱;重试 already_redeemed 不重复;8 并发不超加;过期 400 |
+| `pricing_version_hot_reload_and_invalid_rejected` | pricing 热生效与校验 | v1 创建→refresh→GET /v1/pricing 反映;非法 metric/无效规则 400;admin 无 token 401 |
+| `settlement_rates_usage_and_is_idempotent` | usage→credits 结算幂等 | 2500 kv_read+1000 kv_write → -70 microcredits(ceil);重复 settle 0 条;pricing_version 记录;余额 99999930 |

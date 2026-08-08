@@ -11,6 +11,8 @@ pub mod client;
 pub mod failover;
 pub mod handlers;
 pub mod nodes;
+pub mod pricing;
+pub mod settlement;
 pub mod usage;
 
 use std::sync::Arc;
@@ -39,6 +41,10 @@ pub struct AppState {
     pub control_plane_token: Option<String>,
     /// Usage Metering:内存聚合 + 周期 flush 到 metadata。
     pub usage: Arc<crate::usage::UsageMeter>,
+    /// Pricing:active 版本热切换。
+    pub pricing: Arc<crate::pricing::PricingManager>,
+    /// Operator/Admin 令牌(`COMBEE_ADMIN_TOKEN`);未配置时 admin 接口 401。
+    pub admin_token: Option<String>,
 }
 
 /// 统一的 JSON 错误响应体。

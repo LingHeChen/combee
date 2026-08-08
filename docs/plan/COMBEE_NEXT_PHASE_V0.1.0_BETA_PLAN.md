@@ -394,14 +394,14 @@ pricing_version
 ## 5.5 Pricing 验收标准
 
 ```text
-[ ] Pricing 存于 PostgreSQL
-[ ] 支持多个 Pricing Version
-[ ] active version 可切换
-[ ] 热更新无需重启
-[ ] usage rating 记录 pricing_version
-[ ] 历史账单不受新价格覆盖
-[ ] invalid pricing config 不会替换当前有效配置
-[ ] pricing 变更有 audit metadata
+[x] Pricing 存于 PostgreSQL(pricing_versions + pricing_rules;InMemory 同步)
+[x] 支持多个 Pricing Version(create 自动 max+1,旧 active → inactive)
+[x] active version 可切换(创建新版本即激活)
+[x] 热更新无需重启(PricingManager 5s 轮询,Arc 原子替换;COMBEE_PRICING_REFRESH_INTERVAL_SECS)
+[x] usage rating 记录 pricing_version(settlement 每条 usage 账本带版本)
+[x] 历史账单不受新价格覆盖(账本 append-only,reference 幂等)
+[x] invalid pricing config 不会替换当前有效配置(unit_size/price_units<=0 拒绝;admin API 直接 400)
+[ ] pricing 变更有 audit metadata(admin_audit_log 待 P1 后续 §17)
 ```
 
 ---
@@ -632,13 +632,13 @@ concurrency safe
 ## 7.3 Voucher 验收标准
 
 ```text
-[ ] voucher code 存 hash
-[ ] 过期 voucher 不可使用
-[ ] 同一 voucher 无法并发重复兑换
-[ ] redeem 同一请求重试不会重复加 Credits
-[ ] 兑换成功写 Credits Ledger
-[ ] 可以记录 campaign
-[ ] admin 可批量生成 voucher
+[x] voucher code 存 hash(CMB-XXXX-XXXX-XXXX → sha256 hex 前 16 字节)
+[x] 过期 voucher 不可使用(redeem 校验 expires_at)
+[x] 同一 voucher 无法并发重复兑换(原子 UPDATE status='active'→'used';InMemory 单锁 / Postgres 事务)
+[x] redeem 同一请求重试不会重复加 Credits(reference_id=voucher:{hash} 幂等,重试返回 already_redeemed)
+[x] 兑换成功写 Credits Ledger(type=voucher)
+[x] 可以记录 campaign(create_vouchers campaign 字段)
+[x] admin 可批量生成 voucher(POST /admin/vouchers/generate,count<=1000)
 ```
 
 ---

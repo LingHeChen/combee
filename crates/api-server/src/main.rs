@@ -86,6 +86,17 @@ async fn main() {
     let usage_meter =
         combee_api_server::usage::UsageMeter::new(metadata.clone(), config.usage_flush_interval);
     let _usage_flusher = usage_meter.spawn_flusher();
+    let pricing_manager = combee_api_server::pricing::PricingManager::new(
+        metadata.clone(),
+        config.pricing_refresh_interval,
+    );
+    let _pricing_refresher = pricing_manager.spawn_refresher();
+    let settlement = combee_api_server::settlement::Settlement::new(
+        metadata.clone(),
+        pricing_manager.clone(),
+        config.settlement_interval,
+    );
+    let _settler = settlement.spawn();
 
     let state = AppState {
         metadata,
@@ -94,6 +105,8 @@ async fn main() {
         auth_mode: combee_api_server::auth::AuthMode::from_env(),
         control_plane_token: config.control_plane_token.clone(),
         usage: usage_meter,
+        pricing: pricing_manager,
+        admin_token: None,
     };
     let app = build_app(state);
 

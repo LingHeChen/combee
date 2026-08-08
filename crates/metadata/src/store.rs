@@ -5,6 +5,10 @@ use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
+use combee_common::credit::{
+    CreditAccount, CreditTransaction, CreditTransactionType, CreditVoucher, PricingRule,
+    PricingStatus, PricingVersion, VoucherStatus,
+};
 use combee_common::usage::{UsageBucket, UsageKey, UsageMetric};
 use combee_common::{CombeeError, DatabaseId, NodeId, Result, TenantId};
 use serde::Serialize;
@@ -169,6 +173,57 @@ pub trait MetadataStore: Send + Sync {
         to_bucket: i64,
     ) -> Result<Vec<UsageBucket>>;
 
+    // ---- Pricing ----
+
+    /// 创建新定价版本并激活(旧 active 自动置 inactive)。返回版本号。
+    async fn create_pricing_version(&self, rules: Vec<PricingRule>) -> Result<PricingVersion>;
+
+    /// 当前 active 定价;无配置时返回 (version 0, 空规则)。
+    async fn get_active_pricing(&self) -> Result<(PricingVersion, Vec<PricingRule>)>;
+
+    /// 全部定价版本(管理用)。
+    async fn list_pricing_versions(&self) -> Result<Vec<PricingVersion>>;
+
+    // ---- Credits ----
+
+    /// 租户余额账户(不存在则创建 0 余额)。
+    async fn get_credit_account(&self, tenant: TenantId) -> Result<CreditAccount>;
+
+    /// 账本(倒序,limit;before 用于游标分页,取 id < before 的记录)。
+    async fn list_credit_transactions(
+        &self,
+        tenant: TenantId,
+        limit: i64,
+        before: Option<uuid::Uuid>,
+    ) -> Result<Vec<CreditTransaction>>;
+
+    /// 按幂等引用查找(usage 结算 / voucher 兑换判重)。
+    async fn find_transaction_by_reference(
+        &self,
+        reference_id: &str,
+    ) -> Result<Option<CreditTransaction>>;
+
+    /// 追加账本条目并更新余额(原子)。reference_id 冲突(已存在)时不重复入账,
+    /// 返回已存在条目。返回值为入账后的完整条目(含 balance_after)。
+    async fn append_credit_transaction(&self, txn: CreditTransaction) -> Result<CreditTransaction>;
+
+    // ---- Voucher ----
+
+    /// 批量生成兑换券(存哈希),返回含明文 code 的列表(明文仅生成时可见)。
+    async fn create_vouchers(
+        &self,
+        amount_units: i64,
+        count: u32,
+        campaign: Option<String>,
+        expires_at: Option<i64>,
+    ) -> Result<Vec<(String, CreditVoucher)>>;
+
+    /// 原子兑换:active 且未过期 → 置 used + 入账 + 返回金额;否则 Err。
+    async fn redeem_voucher(&self, code_hash: &str, tenant: TenantId, now: i64) -> Result<i64>;
+
+    /// 全部兑换券(管理用,不含明文)。
+    async fn list_vouchers(&self, limit: i64) -> Result<Vec<CreditVoucher>>;
+
     /// 批量创建目录记录(默认实现为逐条循环;PostgreSQL 后端会覆盖为批量 INSERT)。
     /// 已存在的记录静默跳过。
     async fn create_databases_batch(&self, tenant: TenantId, ids: &[DatabaseId]) -> Result<()> {
@@ -190,6 +245,13 @@ struct InMemoryInner {
     tenants: HashMap<TenantId, TenantRecord>,
     api_keys: HashMap<Uuid, ApiKeyRecord>,
     usage: HashMap<UsageKey, u64>,
+    pricing_versions: HashMap<i64, PricingVersion>,
+    pricing_rules: HashMap<i64, Vec<PricingRule>>,
+    credit_accounts: HashMap<TenantId, CreditAccount>,
+    credit_transactions: HashMap<uuid::Uuid, CreditTransaction>,
+    credit_txn_by_ref: HashMap<String, uuid::Uuid>,
+    vouchers: HashMap<uuid::Uuid, CreditVoucher>,
+    voucher_by_hash: HashMap<String, uuid::Uuid>,
 }
 
 impl Default for InMemoryStore {
@@ -419,11 +481,234 @@ impl MetadataStore for InMemoryStore {
         out.sort_by_key(|b| (b.bucket_start, b.metric.as_str().to_string(), b.cell_id));
         Ok(out)
     }
+
+    async fn create_pricing_version(&self, rules: Vec<PricingRule>) -> Result<PricingVersion> {
+        let mut inner = self.inner.lock().unwrap();
+        let version = inner.pricing_versions.keys().max().copied().unwrap_or(0) + 1;
+        let now = DatabaseRecord::now_unix() as i64;
+        // 旧 active → inactive
+        for v in inner.pricing_versions.values_mut() {
+            v.status = PricingStatus::Inactive;
+        }
+        let rec = PricingVersion {
+            version,
+            status: PricingStatus::Active,
+            effective_at: now,
+            created_at: now,
+        };
+        inner.pricing_versions.insert(version, rec.clone());
+        inner.pricing_rules.insert(version, rules);
+        Ok(rec)
+    }
+
+    async fn get_active_pricing(&self) -> Result<(PricingVersion, Vec<PricingRule>)> {
+        let inner = self.inner.lock().unwrap();
+        if let Some((v, rec)) = inner
+            .pricing_versions
+            .iter()
+            .find(|(_, r)| r.status == PricingStatus::Active)
+            .map(|(v, r)| (*v, r.clone()))
+        {
+            Ok((
+                rec,
+                inner.pricing_rules.get(&v).cloned().unwrap_or_default(),
+            ))
+        } else {
+            Ok((
+                PricingVersion {
+                    version: 0,
+                    status: PricingStatus::Active,
+                    effective_at: 0,
+                    created_at: 0,
+                },
+                vec![],
+            ))
+        }
+    }
+
+    async fn list_pricing_versions(&self) -> Result<Vec<PricingVersion>> {
+        let inner = self.inner.lock().unwrap();
+        let mut vs: Vec<_> = inner.pricing_versions.values().cloned().collect();
+        vs.sort_by_key(|v| v.version);
+        Ok(vs)
+    }
+
+    async fn get_credit_account(&self, tenant: TenantId) -> Result<CreditAccount> {
+        let mut inner = self.inner.lock().unwrap();
+        Ok(inner
+            .credit_accounts
+            .entry(tenant)
+            .or_insert_with(|| CreditAccount {
+                tenant_id: tenant,
+                balance_units: 0,
+                reserved_units: 0,
+                updated_at: DatabaseRecord::now_unix() as i64,
+            })
+            .clone())
+    }
+
+    async fn list_credit_transactions(
+        &self,
+        tenant: TenantId,
+        limit: i64,
+        before: Option<uuid::Uuid>,
+    ) -> Result<Vec<CreditTransaction>> {
+        let inner = self.inner.lock().unwrap();
+        let mut txns: Vec<_> = inner
+            .credit_transactions
+            .values()
+            .filter(|t| t.tenant_id == tenant && before.map(|b| t.id < b).unwrap_or(true))
+            .cloned()
+            .collect();
+        txns.sort_by(|a, b| b.created_at.cmp(&a.created_at).then(b.id.cmp(&a.id)));
+        txns.truncate(limit.clamp(1, 1000) as usize);
+        Ok(txns)
+    }
+
+    async fn find_transaction_by_reference(
+        &self,
+        reference_id: &str,
+    ) -> Result<Option<CreditTransaction>> {
+        let inner = self.inner.lock().unwrap();
+        Ok(inner
+            .credit_txn_by_ref
+            .get(reference_id)
+            .and_then(|id| inner.credit_transactions.get(id))
+            .cloned())
+    }
+
+    async fn append_credit_transaction(
+        &self,
+        mut txn: CreditTransaction,
+    ) -> Result<CreditTransaction> {
+        let mut inner = self.inner.lock().unwrap();
+        if let Some(ref_id) = &txn.reference_id
+            && let Some(existing) = inner
+                .credit_txn_by_ref
+                .get(ref_id)
+                .and_then(|id| inner.credit_transactions.get(id))
+                .cloned()
+        {
+            return Ok(existing); // 幂等:已入账
+        }
+        let account = inner
+            .credit_accounts
+            .entry(txn.tenant_id)
+            .or_insert_with(|| CreditAccount {
+                tenant_id: txn.tenant_id,
+                balance_units: 0,
+                reserved_units: 0,
+                updated_at: DatabaseRecord::now_unix() as i64,
+            });
+        account.balance_units = account.balance_units.saturating_add(txn.amount_units);
+        account.updated_at = DatabaseRecord::now_unix() as i64;
+        txn.balance_after = Some(account.balance_units);
+        let id = txn.id;
+        if let Some(ref_id) = txn.reference_id.clone() {
+            inner.credit_txn_by_ref.insert(ref_id, id);
+        }
+        inner.credit_transactions.insert(id, txn.clone());
+        Ok(txn)
+    }
+
+    async fn create_vouchers(
+        &self,
+        amount_units: i64,
+        count: u32,
+        campaign: Option<String>,
+        expires_at: Option<i64>,
+    ) -> Result<Vec<(String, CreditVoucher)>> {
+        let mut inner = self.inner.lock().unwrap();
+        let mut out = Vec::new();
+        for _ in 0..count {
+            let code = combee_common::credit::generate_voucher_code();
+            let code_hash = combee_common::credit::hash_voucher_code(&code);
+            let v = CreditVoucher {
+                id: uuid::Uuid::new_v4(),
+                code_hash: code_hash.clone(),
+                amount_units,
+                status: VoucherStatus::Active,
+                campaign: campaign.clone(),
+                created_at: DatabaseRecord::now_unix() as i64,
+                expires_at,
+                redeemed_by: None,
+                redeemed_at: None,
+            };
+            inner.voucher_by_hash.insert(code_hash, v.id);
+            inner.vouchers.insert(v.id, v.clone());
+            out.push((code, v));
+        }
+        Ok(out)
+    }
+
+    async fn redeem_voucher(&self, code_hash: &str, tenant: TenantId, now: i64) -> Result<i64> {
+        let mut inner = self.inner.lock().unwrap();
+        let id = inner
+            .voucher_by_hash
+            .get(code_hash)
+            .cloned()
+            .ok_or(CombeeError::InvalidRequest("voucher not found".into()))?;
+        let voucher = inner
+            .vouchers
+            .get_mut(&id)
+            .ok_or(CombeeError::InvalidRequest("voucher not found".into()))?;
+        if voucher.status != VoucherStatus::Active {
+            return Err(CombeeError::InvalidRequest(
+                "voucher already used or revoked".into(),
+            ));
+        }
+        if voucher.expires_at.map(|e| e < now).unwrap_or(false) {
+            return Err(CombeeError::InvalidRequest("voucher expired".into()));
+        }
+        let amount = voucher.amount_units;
+        voucher.status = VoucherStatus::Used;
+        voucher.redeemed_by = Some(tenant);
+        voucher.redeemed_at = Some(now);
+        let account = inner
+            .credit_accounts
+            .entry(tenant)
+            .or_insert_with(|| CreditAccount {
+                tenant_id: tenant,
+                balance_units: 0,
+                reserved_units: 0,
+                updated_at: DatabaseRecord::now_unix() as i64,
+            });
+        account.balance_units = account.balance_units.saturating_add(amount);
+        account.updated_at = now;
+        let txn = CreditTransaction {
+            id: uuid::Uuid::new_v4(),
+            tenant_id: tenant,
+            txn_type: CreditTransactionType::Voucher,
+            amount_units: amount,
+            pricing_version: None,
+            reference_id: Some(format!("voucher:{code_hash}")),
+            description: Some("voucher redemption".into()),
+            created_at: now,
+            balance_after: Some(account.balance_units),
+        };
+        inner
+            .credit_txn_by_ref
+            .insert("voucher:".to_string() + code_hash, txn.id);
+        inner.credit_transactions.insert(txn.id, txn);
+        Ok(amount)
+    }
+
+    async fn list_vouchers(&self, limit: i64) -> Result<Vec<CreditVoucher>> {
+        let inner = self.inner.lock().unwrap();
+        let mut vs: Vec<_> = inner.vouchers.values().cloned().collect();
+        vs.sort_by_key(|v| v.created_at);
+        vs.truncate(limit.clamp(1, 1000) as usize);
+        Ok(vs)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use combee_common::credit::{
+        CREDIT_UNITS_PER_CREDIT, CreditTransaction, CreditTransactionType, PricingRule,
+        PricingStatus,
+    };
 
     fn tenant(n: u128) -> TenantId {
         TenantId::from_u128(n)
@@ -551,5 +836,135 @@ mod tests {
         let ids: Vec<DatabaseId> = list.iter().map(|r| r.id).collect();
         assert_eq!(ids, sorted, "deterministic (created_at, id) ordering");
         assert!(list[0].created_at <= list[1].created_at);
+    }
+
+    #[test]
+    fn credits_ledger_append_only_and_idempotent() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let store = InMemoryStore::new();
+            let t = TenantId::new();
+
+            let g = CreditTransaction {
+                id: uuid::Uuid::new_v4(),
+                tenant_id: t,
+                txn_type: CreditTransactionType::Grant,
+                amount_units: 500 * CREDIT_UNITS_PER_CREDIT,
+                pricing_version: None,
+                reference_id: Some("grant:alpha".into()),
+                description: Some("alpha tester".into()),
+                created_at: 100,
+                balance_after: None,
+            };
+            let entry = store.append_credit_transaction(g.clone()).await.unwrap();
+            assert_eq!(entry.balance_after, Some(500 * CREDIT_UNITS_PER_CREDIT));
+
+            // 同 reference 重复入账 → 幂等返回已有,不重复
+            let again = store.append_credit_transaction(g).await.unwrap();
+            assert_eq!(again.balance_after, Some(500 * CREDIT_UNITS_PER_CREDIT));
+            let account = store.get_credit_account(t).await.unwrap();
+            assert_eq!(account.balance_units, 500 * CREDIT_UNITS_PER_CREDIT);
+
+            // usage 扣费(负金额)
+            let u = CreditTransaction {
+                id: uuid::Uuid::new_v4(),
+                tenant_id: t,
+                txn_type: CreditTransactionType::Usage,
+                amount_units: -10_000_000,
+                pricing_version: Some(7),
+                reference_id: Some("usage:cell:kv_read:1700000040".into()),
+                description: None,
+                created_at: 200,
+                balance_after: None,
+            };
+            let e2 = store.append_credit_transaction(u).await.unwrap();
+            assert_eq!(e2.balance_after, Some(490 * CREDIT_UNITS_PER_CREDIT));
+
+            let txns = store.list_credit_transactions(t, 10, None).await.unwrap();
+            assert_eq!(txns.len(), 2);
+            assert_eq!(txns[0].txn_type, CreditTransactionType::Usage);
+
+            // 余额重建 = sum(amount)
+            let sum: i64 = store
+                .list_credit_transactions(t, 1000, None)
+                .await
+                .unwrap()
+                .iter()
+                .map(|x| x.amount_units)
+                .sum();
+            assert_eq!(sum, 490 * CREDIT_UNITS_PER_CREDIT, "余额可从账本重建");
+        });
+    }
+
+    #[test]
+    fn voucher_redeem_single_use_and_expired() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let store = InMemoryStore::new();
+            let t = TenantId::new();
+            let (code, _) = store
+                .create_vouchers(
+                    50 * CREDIT_UNITS_PER_CREDIT,
+                    1,
+                    Some("alpha".into()),
+                    Some(1_000_000),
+                )
+                .await
+                .unwrap()
+                .into_iter()
+                .next()
+                .unwrap();
+            let hash = combee_common::credit::hash_voucher_code(&code);
+
+            assert!(
+                store.redeem_voucher(&hash, t, 2_000_000).await.is_err(),
+                "过期不可用"
+            );
+
+            let amount = store.redeem_voucher(&hash, t, 500_000).await.unwrap();
+            assert_eq!(amount, 50 * CREDIT_UNITS_PER_CREDIT);
+            assert_eq!(
+                store.get_credit_account(t).await.unwrap().balance_units,
+                50 * CREDIT_UNITS_PER_CREDIT
+            );
+
+            assert!(
+                store.redeem_voucher(&hash, t, 600_000).await.is_err(),
+                "不可二次兑换"
+            );
+            assert_eq!(
+                store.get_credit_account(t).await.unwrap().balance_units,
+                50 * CREDIT_UNITS_PER_CREDIT
+            );
+        });
+    }
+
+    #[test]
+    fn pricing_version_activation_and_rules() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let store = InMemoryStore::new();
+            let rules = vec![PricingRule {
+                pricing_version: 0,
+                metric: UsageMetric::KvRead,
+                unit_size: 1_000,
+                price_units: 10,
+            }];
+            let v1 = store.create_pricing_version(rules).await.unwrap();
+            assert_eq!(v1.version, 1);
+            assert_eq!(v1.status, PricingStatus::Active);
+
+            let (active, rules) = store.get_active_pricing().await.unwrap();
+            assert_eq!(active.version, 1);
+            assert_eq!(rules.len(), 1);
+
+            let v2 = store.create_pricing_version(vec![]).await.unwrap();
+            assert_eq!(v2.version, 2);
+            let (active, _) = store.get_active_pricing().await.unwrap();
+            assert_eq!(active.version, 2);
+            let versions = store.list_pricing_versions().await.unwrap();
+            assert_eq!(versions.len(), 2);
+            assert_eq!(versions[0].status, PricingStatus::Inactive);
+        });
     }
 }

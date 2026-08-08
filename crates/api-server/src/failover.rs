@@ -106,6 +106,11 @@ pub fn spawn_failover_scanner(
                             metadata.clone(),
                             std::time::Duration::from_secs(3600),
                         ),
+                        pricing: crate::pricing::PricingManager::new(
+                            metadata.clone(),
+                            std::time::Duration::from_secs(3600),
+                        ),
+                        admin_token: None,
                     };
                     match failover_cell(&state, rec.tenant_id, rec.id).await {
                         Ok(promoted) => tracing::info!(

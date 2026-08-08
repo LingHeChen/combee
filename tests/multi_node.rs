@@ -81,6 +81,11 @@ async fn create_database_round_robin_placement() {
             metadata.clone(),
             std::time::Duration::from_secs(3600),
         ),
+        pricing: combee_api_server::pricing::PricingManager::new(
+            metadata.clone(),
+            std::time::Duration::from_secs(3600),
+        ),
+        admin_token: None,
     });
 
     // 创建两个 db → 应分别落到节点 A / B(round-robin)
@@ -203,6 +208,10 @@ async fn agent_registers_heartbeats_and_unregisters() {
         metadata.clone(),
         std::time::Duration::from_secs(3600),
     );
+    let pricing_meter = combee_api_server::pricing::PricingManager::new(
+        metadata.clone(),
+        std::time::Duration::from_secs(3600),
+    );
     let app = build_app(AppState {
         metadata,
         data_node: provider,
@@ -210,6 +219,8 @@ async fn agent_registers_heartbeats_and_unregisters() {
         auth_mode: combee_api_server::auth::AuthMode::Off,
         control_plane_token: None,
         usage: usage_meter,
+        pricing: pricing_meter,
+        admin_token: None,
     });
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
