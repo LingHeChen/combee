@@ -32,12 +32,16 @@ CREATE TABLE IF NOT EXISTS api_keys (
 );
 CREATE TABLE IF NOT EXISTS usage_buckets (
     tenant_id UUID NOT NULL,
-    cell_id UUID,
+    cell_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
     metric TEXT NOT NULL,
     bucket_start BIGINT NOT NULL,
     value BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (tenant_id, cell_id, metric, bucket_start)
 );
+-- 迁移:旧表(可空 cell_id)升级为 NOT NULL + nil 哨兵
+ALTER TABLE usage_buckets ALTER COLUMN cell_id SET DEFAULT '00000000-0000-0000-0000-000000000000';
+UPDATE usage_buckets SET cell_id = '00000000-0000-0000-0000-000000000000' WHERE cell_id IS NULL;
+ALTER TABLE usage_buckets ALTER COLUMN cell_id SET NOT NULL;
 CREATE TABLE IF NOT EXISTS pricing_versions (
     version BIGINT PRIMARY KEY,
     status TEXT NOT NULL,
@@ -216,7 +220,7 @@ impl MetadataStore for PostgresStore {
 
     async fn list_databases(&self, tenant: TenantId) -> Result<Vec<DatabaseRecord>> {
         let rows = sqlx::query(
-            "SELECT id, tenant_id, state, created_at, storage_node_id, replica_node_id FROM databases
+            "SELECT id, tenant_id, state, created_at, storage_node_id, replica_node_id, generation FROM databases
              WHERE tenant_id = $1 ORDER BY created_at, id",
         )
         .bind(tenant.0)
@@ -459,7 +463,7 @@ impl MetadataStore for PostgresStore {
              DO UPDATE SET value = usage_buckets.value + EXCLUDED.value",
         )
         .bind(key.tenant_id.0)
-        .bind(key.cell_id.map(|c| c.0))
+        .bind(key.cell_id.map(|c| c.0).unwrap_or_else(Uuid::nil))
         .bind(key.metric.as_str())
         .bind(key.bucket_start)
         .bind(delta as i64)
@@ -477,7 +481,7 @@ impl MetadataStore for PostgresStore {
              DO UPDATE SET value = EXCLUDED.value",
         )
         .bind(key.tenant_id.0)
-        .bind(key.cell_id.map(|c| c.0))
+        .bind(key.cell_id.map(|c| c.0).unwrap_or_else(Uuid::nil))
         .bind(key.metric.as_str())
         .bind(key.bucket_start)
         .bind(value as i64)

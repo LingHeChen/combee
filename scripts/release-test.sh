@@ -4,12 +4,6 @@
 # 覆盖:全部单元/集成测试(含 tests/release/*)、docker 场景
 # (fresh install、重启持久性、kill -9 崩溃恢复 + integrity_check、删卷仅对象存储恢复)。
 
-  docker compose restart postgres minio >/dev/null 2>&1
-  sleep 10
-  for i in $(seq 1 20); do
-    code=$(curl -s -o /dev/null -w "%{http_code}" $API/v1/databases 2>/dev/null || true)
-    [ "$code" = "200" ] && break; sleep 2
-  done
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
