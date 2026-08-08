@@ -22,3 +22,7 @@
 /sdk/python/**/__pycache__/
 /sdk/typescript/node_modules/
 /sdk/typescript/dist/
+
+# 独立 SDK 仓库(combee-js / combee-python,各自 git + GitHub 独立)
+/combee-js/
+/combee-python/

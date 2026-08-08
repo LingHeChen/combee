@@ -25,12 +25,12 @@ The SDK MUST use the product term `Cell`. Avoid exposing the historical internal
 
 ## 2. Repository strategy
 
-Recommended:
+Implemented(2026-08-08):
 
 ```text
-combee/          Core Rust server/runtime
-combee-js/       TypeScript / JavaScript SDK
-combee-python/   Python SDK
+combee/          Core Rust server/runtime(本仓库)
+combee-js/       TypeScript SDK → github.com/LingHeChen/combee-js(@combee/sdk)
+combee-python/   Python SDK → github.com/LingHeChen/combee-python(pip: combee)
 ```
 
 Packages:
