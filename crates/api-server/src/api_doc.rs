@@ -74,9 +74,12 @@ pub fn to_json() -> String {
         .unwrap_or_else(|_| "{}".into())
 }
 
-/// GET /openapi.json —— 机器可读 API 契约。
-pub async fn openapi_json() -> axum::Json<String> {
-    axum::Json(to_json())
+/// GET /openapi.json —— 机器可读 API 契约(原始 JSON body)。
+pub async fn openapi_json() -> impl axum::response::IntoResponse {
+    (
+        [(axum::http::header::CONTENT_TYPE, "application/json")],
+        to_json(),
+    )
 }
 
 #[cfg(test)]
