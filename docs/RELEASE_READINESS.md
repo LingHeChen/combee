@@ -231,3 +231,16 @@ cargo run --release -p combee-benchmark -- --e2e --url http://127.0.0.1:8080
 2. 建立 `tests/fixtures/v0/` 升级 fixture;
 3. 按差距清单 #1(配额)实现 max value / max rows / 并发上限;
 4. 按差距清单 #2(ENOSPC)容器小文件系统测试。
+
+## 2026-08-08 Release Gate 复跑(174 tests + docker 场景)
+
+`./scripts/release-test.sh`: **14 PASS / 0 FAIL / 1 WARN → RELEASEABLE**。
+
+Gate 发现并修复 2 个真实缺陷(首次运行 5 FAIL 后修复复跑全绿):
+
+| # | 缺陷 | 影响 | 修复 |
+|---|---|---|---|
+| 1 | Postgres `list_databases` / `list_all_databases` 查询缺 `generation` 列,`row_to_record` 读取失败 | `GET /v1/databases` 500(级联:重启持久性 / restore 全挂) | 查询补 `generation` 列 |
+| 2 | `usage_buckets` 复合主键使 `cell_id` 隐式 NOT NULL;租户级用量(NULL cell)插入失败 | usage flush 持续失败(告警循环) | `cell_id NOT NULL DEFAULT 全零 UUID` 哨兵 + 幂等 ALTER 迁移;`usage_add/set` 绑定 `Uuid::nil()` |
+
+WARN:docker build 不可用(buildx 环境问题)→ 回退容器内 cargo build(单测 / 场景全部通过)。
