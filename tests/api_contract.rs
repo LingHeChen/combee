@@ -3,7 +3,6 @@
 //! 覆盖:request-id 透传与生成、稳定错误 code、Idempotency-Key 幂等创建、
 //! /openapi.json 可访问且无内部端点泄漏。
 
-use axum::Router;
 use axum::http::{Method, StatusCode};
 use serde_json::{Value, json};
 use tower::ServiceExt;
@@ -50,15 +49,6 @@ async fn request_id_echo_and_error_code() {
 
     // 错误响应:404 带稳定 code
     let id = create_db(&app).await;
-    let (status, body) = send(
-        &app,
-        Method::GET,
-        &format!("/v1/databases/{id}/sql"),
-        Some(json!({"sql": "SELECT 1"})),
-        None,
-    )
-    .await;
-    let _ = status;
     // 访问不存在的 Cell → 404 + code
     let (status, body) = send(
         &app,
