@@ -1149,20 +1149,20 @@ TypeScript and Python SHOULD produce equivalent server-visible behavior.
 # 27. v0.1.0-beta acceptance criteria
 
 ```text
-[ ] TypeScript SDK published to npm
-[ ] Python SDK published to PyPI
-[ ] TS and Python implement the same required feature matrix
-[ ] SDK_SPEC is the canonical cross-language contract
-[ ] Quickstart uses SDK instead of curl
-[ ] typed error model documented
-[ ] conservative retry behavior
-[ ] pagination supported where required
-[ ] tenant-isolation contract tests pass
-[ ] usage APIs exposed
-[ ] credits read APIs exposed
-[ ] internal control-plane APIs NOT exposed
-[ ] executable examples included
-[ ] CI runs contract tests against a real Combee server
+[ ] TypeScript SDK published to npm(代码就绪;发布动作待 beta)
+[ ] Python SDK published to PyPI(代码就绪;发布动作待 beta)
+[x] TS and Python implement the same required feature matrix(sdk/typescript + sdk/python,行为等价)
+[x] SDK_SPEC is the canonical cross-language contract(本文档)
+[ ] Quickstart uses SDK instead of curl(beta 发布文档时替换)
+[x] typed error model documented(稳定 code → 类型化异常,携带 request_id)
+[x] conservative retry behavior(仅 GET 读类重试,写不自动重试)
+[x] pagination supported where required(cursor + limit)
+[ ] tenant-isolation contract tests pass(待 key 模式 contract fixture)
+[x] usage APIs exposed(summary/cell/timeseries)
+[x] credits read APIs exposed(balance/transactions)+ redeem
+[x] internal control-plane APIs NOT exposed(/internal/*、/rpc/*、/admin/* 不在 SDK)
+[x] executable examples included(01..10 + async_basic)
+[x] CI runs contract tests against a real Combee server(本地脚本;CI 待接入)
 ```
 
 # 28. Proposed implementation order

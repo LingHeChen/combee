@@ -1,0 +1,30 @@
+{
+  "name": "@combee/sdk",
+  "version": "0.1.0-alpha.1",
+  "description": "Combee SDK — One app, one Cell. SQL + KV included.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:unit": "node --test test/unit.test.mjs",
+    "test:contract": "node --test test/contract.test.mjs",
+    "test": "npm run typecheck && npm run test:unit && npm run test:contract"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0"
+  },
+  "license": "Apache-2.0"
+}

@@ -114,6 +114,7 @@ p99 ≈ 64µs、缓存命中率 100%、活跃 SQLite 连接数严格 ≤ 上限�
 | [docs/TESTING.md](docs/TESTING.md) | 全部测试的目的与预期结果 |
 | [docs/COMBEE_RELEASE_READINESS_TEST_PLAN.md](docs/COMBEE_RELEASE_READINESS_TEST_PLAN.md) | Release Gate 测试计划 |
 | [docs/API.md](docs/API.md) | **Public API 冻结契约**(分层 / 错误模型 / request-id / Idempotency / Pagination) |
+| [sdk/typescript](sdk/typescript) / [sdk/python](sdk/python) | **官方 SDK**:`@combee/sdk`(TS)与 `combee`(Python),contract tests 跑真实 server |
 | [CHANGELOG.md](CHANGELOG.md) / [SECURITY.md](SECURITY.md) / [CONTRIBUTING.md](CONTRIBUTING.md) | 变更记录 / 安全 / 贡献 |
 
 ---
