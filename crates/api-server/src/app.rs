@@ -7,7 +7,7 @@ use tower_http::trace::TraceLayer;
 
 use crate::AppState;
 use crate::auth;
-use crate::handlers::{backup, database, failover, internal, keys, kv, replication, sql};
+use crate::handlers::{backup, database, failover, internal, keys, kv, replication, sql, usage};
 
 pub fn build_app(state: AppState) -> Router {
     // public 路由:走租户 key 认证(auth_middleware)
@@ -49,6 +49,9 @@ pub fn build_app(state: AppState) -> Router {
             post(keys::create_api_key).get(keys::list_api_keys),
         )
         .route("/v1/api-keys/{id}", delete(keys::revoke_api_key))
+        .route("/v1/usage/summary", get(usage::usage_summary))
+        .route("/v1/usage/timeseries", get(usage::usage_timeseries))
+        .route("/v1/cells/{id}/usage", get(usage::cell_usage))
         .route("/v1/databases/{id}/failover", post(failover::failover))
         .route(
             "/v1/databases/{id}/replication",
@@ -70,6 +73,10 @@ pub fn build_app(state: AppState) -> Router {
         ));
 
     public
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::usage::usage_tracking,
+        ))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::auth_middleware,

@@ -5,6 +5,7 @@
 //! 等接入独立 Data Node 时再补充。
 
 use async_trait::async_trait;
+use combee_common::usage::{UsageBucket, UsageKey, UsageMetric};
 use combee_common::{CombeeError, DatabaseId, NodeId, Result, TenantId};
 use sqlx::Row;
 use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
@@ -24,6 +25,14 @@ CREATE TABLE IF NOT EXISTS api_keys (
     key_hash TEXT NOT NULL UNIQUE,
     created_at BIGINT NOT NULL,
     revoked_at BIGINT
+);
+CREATE TABLE IF NOT EXISTS usage_buckets (
+    tenant_id UUID NOT NULL,
+    cell_id UUID,
+    metric TEXT NOT NULL,
+    bucket_start BIGINT NOT NULL,
+    value BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (tenant_id, cell_id, metric, bucket_start)
 );
 CREATE TABLE IF NOT EXISTS databases (
     id UUID PRIMARY KEY,
@@ -388,5 +397,128 @@ impl MetadataStore for PostgresStore {
             .map_err(PostgresStore::internal)?;
         }
         Ok(())
+    }
+    async fn usage_add(&self, key: &UsageKey, delta: u64) -> Result<()> {
+        sqlx::query(
+            "INSERT INTO usage_buckets (tenant_id, cell_id, metric, bucket_start, value)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (tenant_id, cell_id, metric, bucket_start)
+             DO UPDATE SET value = usage_buckets.value + EXCLUDED.value",
+        )
+        .bind(key.tenant_id.0)
+        .bind(key.cell_id.map(|c| c.0))
+        .bind(key.metric.as_str())
+        .bind(key.bucket_start)
+        .bind(delta as i64)
+        .execute(&self.pool)
+        .await
+        .map_err(PostgresStore::internal)?;
+        Ok(())
+    }
+
+    async fn usage_set(&self, key: &UsageKey, value: u64) -> Result<()> {
+        sqlx::query(
+            "INSERT INTO usage_buckets (tenant_id, cell_id, metric, bucket_start, value)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (tenant_id, cell_id, metric, bucket_start)
+             DO UPDATE SET value = EXCLUDED.value",
+        )
+        .bind(key.tenant_id.0)
+        .bind(key.cell_id.map(|c| c.0))
+        .bind(key.metric.as_str())
+        .bind(key.bucket_start)
+        .bind(value as i64)
+        .execute(&self.pool)
+        .await
+        .map_err(PostgresStore::internal)?;
+        Ok(())
+    }
+
+    async fn query_usage(
+        &self,
+        tenant: TenantId,
+        cell: Option<DatabaseId>,
+        metric: Option<UsageMetric>,
+        from_bucket: i64,
+        to_bucket: i64,
+    ) -> Result<Vec<UsageBucket>> {
+        // 四种过滤组合分开构造,避免动态 SQL 绑定类型体操
+        let rows = match (cell, metric) {
+            (Some(c), Some(m)) => {
+                sqlx::query(
+                    "SELECT tenant_id, cell_id, metric, bucket_start, value FROM usage_buckets
+                     WHERE tenant_id = $1 AND bucket_start >= $2 AND bucket_start <= $3
+                       AND cell_id = $4 AND metric = $5",
+                )
+                .bind(tenant.0)
+                .bind(from_bucket)
+                .bind(to_bucket)
+                .bind(c.0)
+                .bind(m.as_str())
+                .fetch_all(&self.pool)
+                .await
+                .map_err(PostgresStore::internal)?
+            }
+            (Some(c), None) => {
+                sqlx::query(
+                    "SELECT tenant_id, cell_id, metric, bucket_start, value FROM usage_buckets
+                     WHERE tenant_id = $1 AND bucket_start >= $2 AND bucket_start <= $3 AND cell_id = $4",
+                )
+                .bind(tenant.0)
+                .bind(from_bucket)
+                .bind(to_bucket)
+                .bind(c.0)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(PostgresStore::internal)?
+            }
+            (None, Some(m)) => {
+                sqlx::query(
+                    "SELECT tenant_id, cell_id, metric, bucket_start, value FROM usage_buckets
+                     WHERE tenant_id = $1 AND bucket_start >= $2 AND bucket_start <= $3 AND metric = $4",
+                )
+                .bind(tenant.0)
+                .bind(from_bucket)
+                .bind(to_bucket)
+                .bind(m.as_str())
+                .fetch_all(&self.pool)
+                .await
+                .map_err(PostgresStore::internal)?
+            }
+            (None, None) => {
+                sqlx::query(
+                    "SELECT tenant_id, cell_id, metric, bucket_start, value FROM usage_buckets
+                     WHERE tenant_id = $1 AND bucket_start >= $2 AND bucket_start <= $3",
+                )
+                .bind(tenant.0)
+                .bind(from_bucket)
+                .bind(to_bucket)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(PostgresStore::internal)?
+            }
+        };
+        rows.iter()
+            .map(|row| {
+                Ok(UsageBucket {
+                    tenant_id: TenantId(row.try_get("tenant_id").map_err(PostgresStore::internal)?),
+                    cell_id: row
+                        .try_get::<Option<Uuid>, _>("cell_id")
+                        .map_err(PostgresStore::internal)?
+                        .map(DatabaseId),
+                    metric: UsageMetric::parse(
+                        &row.try_get::<String, _>("metric")
+                            .map_err(PostgresStore::internal)?,
+                    )
+                    .ok_or_else(|| CombeeError::Internal("unknown usage metric".into()))?,
+                    bucket_start: row
+                        .try_get("bucket_start")
+                        .map_err(PostgresStore::internal)?,
+                    value: row
+                        .try_get::<i64, _>("value")
+                        .map_err(PostgresStore::internal)? as u64,
+                })
+            })
+            .collect()
     }
 }

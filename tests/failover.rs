@@ -126,12 +126,17 @@ async fn failover_promotes_replica_and_fences_old_primary() {
     pc.kv_set(db, "k".into(), set_req("v1"), 0).await.unwrap();
 
     // 手动 failover(主节点可视为已失效)
+    let usage_meter = combee_api_server::usage::UsageMeter::new(
+        metadata.clone(),
+        std::time::Duration::from_secs(3600),
+    );
     let state = AppState {
         metadata: metadata.clone(),
         data_node: provider.clone(),
         nodes: registry.clone(),
         auth_mode: combee_api_server::auth::AuthMode::Off,
         control_plane_token: None,
+        usage: usage_meter,
     };
     let promoted = combee_api_server::failover::failover_cell(&state, DEFAULT_TENANT, db)
         .await

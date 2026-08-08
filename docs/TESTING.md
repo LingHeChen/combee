@@ -451,3 +451,12 @@ p99 1.45ms,写路径(SET/SQL)受 per-db 串行化影响 p99 4-6ms —— 均在�
 | `rpc_requires_control_token`(tests/rpc.rs) | data-node `/rpc/*` 同规则 | 无/错 token 失败;正确 token 正常 |
 
 另:`RemoteDataNodeClient::with_token` 在 API Server 访问独立 Data Node 时自动携带 `x-control-token`。
+
+### tests/usage.rs —— Usage Metering(P0)
+
+| 测试 | 目的 | 预期结果 |
+|---|---|---|
+| `usage_tracks_ops_by_type_and_storage` | 计数按操作类型区分 + storage bytes | sql_writes≥2(sql 写)/sql_reads≥1/kv_writes≥1/kv_reads≥1/request_count≥5/bytes in+out>0/current_storage_bytes>0 |
+| `usage_summary_and_timeseries` | 租户级汇总与时序 | summary 跨 Cell 聚合;timeseries 按 minute 合并;非法 metric/interval → 400 |
+| `usage_flush_accumulates_without_double_count_on_retry` | flush 不重复不丢失 | 两次 flush(5+7)同键累加为 12,单桶 |
+| `usage_concurrent_records_are_accurate` | 并发计数准确 | 8 并发 × 250 全部记录(2000) |

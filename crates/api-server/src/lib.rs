@@ -11,6 +11,7 @@ pub mod client;
 pub mod failover;
 pub mod handlers;
 pub mod nodes;
+pub mod usage;
 
 use std::sync::Arc;
 
@@ -36,6 +37,8 @@ pub struct AppState {
     pub auth_mode: crate::auth::AuthMode,
     /// 控制面令牌;`/internal/*` 端点必须匹配它(未配置时 dev 放行)。
     pub control_plane_token: Option<String>,
+    /// Usage Metering:内存聚合 + 周期 flush 到 metadata。
+    pub usage: Arc<crate::usage::UsageMeter>,
 }
 
 /// 统一的 JSON 错误响应体。

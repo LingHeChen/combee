@@ -4,6 +4,7 @@ use axum::Json;
 use axum::extract::{Path, State};
 use combee_common::DatabaseId;
 use combee_common::protocol::{SqlRequest, SqlResult, TransactionRequest};
+use combee_common::usage::UsageMetric;
 
 use crate::{ApiError, AppState};
 
@@ -28,6 +29,12 @@ pub async fn execute_sql(
 ) -> Result<Json<SqlResult>, ApiError> {
     let record = require_db(&state, auth.tenant_id, id).await?;
     let client = state.data_node.client_for(id).await?;
+    let metric = if crate::usage::is_read_sql(&req.sql) {
+        UsageMetric::SqlRead
+    } else {
+        UsageMetric::SqlWrite
+    };
+    state.usage.record(auth.tenant_id, Some(id), metric, 1);
     let result = client.execute_sql(id, req, record.generation).await?;
     Ok(Json(result))
 }
@@ -41,6 +48,14 @@ pub async fn execute_transaction(
 ) -> Result<Json<Vec<SqlResult>>, ApiError> {
     let record = require_db(&state, auth.tenant_id, id).await?;
     let client = state.data_node.client_for(id).await?;
+    for stmt in &req.statements {
+        let metric = if crate::usage::is_read_sql(&stmt.sql) {
+            UsageMetric::SqlRead
+        } else {
+            UsageMetric::SqlWrite
+        };
+        state.usage.record(auth.tenant_id, Some(id), metric, 1);
+    }
     let results = client
         .execute_transaction(id, req, record.generation)
         .await?;

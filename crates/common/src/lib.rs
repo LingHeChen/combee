@@ -6,7 +6,9 @@ pub mod errors;
 pub mod ids;
 pub mod protocol;
 pub mod rpc;
+pub mod usage;
 
 pub use api_key::AuthContext;
 pub use errors::{CombeeError, Result};
 pub use ids::{DatabaseId, NodeId, TenantId};
+pub use usage::{UsageBucket, UsageKey, UsageMetric};

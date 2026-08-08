@@ -5,6 +5,7 @@ use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
+use combee_common::usage::{UsageBucket, UsageKey, UsageMetric};
 use combee_common::{CombeeError, DatabaseId, NodeId, Result, TenantId};
 use serde::Serialize;
 use uuid::Uuid;
@@ -150,6 +151,24 @@ pub trait MetadataStore: Send + Sync {
     /// 撤销 API key。不存在报 NotFound。
     async fn revoke_api_key(&self, tenant: TenantId, key_id: Uuid) -> Result<()>;
 
+    // ---- Usage Metering ----
+
+    /// 累加用量(幂等键:(tenant, cell, metric, bucket));同一键的多次 add 正确累加。
+    async fn usage_add(&self, key: &UsageKey, delta: u64) -> Result<()>;
+
+    /// 覆盖快照类指标(如 storage_bytes):同键写入新值。
+    async fn usage_set(&self, key: &UsageKey, value: u64) -> Result<()>;
+
+    /// 查询用量桶(时间闭区间,按 bucket_start 升序)。
+    async fn query_usage(
+        &self,
+        tenant: TenantId,
+        cell: Option<DatabaseId>,
+        metric: Option<UsageMetric>,
+        from_bucket: i64,
+        to_bucket: i64,
+    ) -> Result<Vec<UsageBucket>>;
+
     /// 批量创建目录记录(默认实现为逐条循环;PostgreSQL 后端会覆盖为批量 INSERT)。
     /// 已存在的记录静默跳过。
     async fn create_databases_batch(&self, tenant: TenantId, ids: &[DatabaseId]) -> Result<()> {
@@ -170,6 +189,7 @@ struct InMemoryInner {
     databases: HashMap<(TenantId, DatabaseId), DatabaseRecord>,
     tenants: HashMap<TenantId, TenantRecord>,
     api_keys: HashMap<Uuid, ApiKeyRecord>,
+    usage: HashMap<UsageKey, u64>,
 }
 
 impl Default for InMemoryStore {
@@ -355,6 +375,49 @@ impl MetadataStore for InMemoryStore {
         }
         k.revoked_at = Some(DatabaseRecord::now_unix());
         Ok(())
+    }
+
+    async fn usage_add(&self, key: &UsageKey, delta: u64) -> Result<()> {
+        let mut inner = self.inner.lock().unwrap();
+        *inner.usage.entry(key.clone()).or_insert(0) += delta;
+        Ok(())
+    }
+
+    async fn usage_set(&self, key: &UsageKey, value: u64) -> Result<()> {
+        let mut inner = self.inner.lock().unwrap();
+        inner.usage.insert(key.clone(), value);
+        Ok(())
+    }
+
+    async fn query_usage(
+        &self,
+        tenant: TenantId,
+        cell: Option<DatabaseId>,
+        metric: Option<UsageMetric>,
+        from_bucket: i64,
+        to_bucket: i64,
+    ) -> Result<Vec<UsageBucket>> {
+        let inner = self.inner.lock().unwrap();
+        let mut out: Vec<UsageBucket> = inner
+            .usage
+            .iter()
+            .filter(|(k, _)| {
+                k.tenant_id == tenant
+                    && cell.map(|c| k.cell_id == Some(c)).unwrap_or(true)
+                    && metric.map(|m| k.metric == m).unwrap_or(true)
+                    && k.bucket_start >= from_bucket
+                    && k.bucket_start <= to_bucket
+            })
+            .map(|(k, v)| UsageBucket {
+                tenant_id: k.tenant_id,
+                cell_id: k.cell_id,
+                metric: k.metric,
+                bucket_start: k.bucket_start,
+                value: *v,
+            })
+            .collect();
+        out.sort_by_key(|b| (b.bucket_start, b.metric.as_str().to_string(), b.cell_id));
+        Ok(out)
     }
 }
 

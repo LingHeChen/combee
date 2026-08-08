@@ -8,6 +8,7 @@ use combee_common::protocol::{
     KvExpireRequest, KvIncrRequest, KvKeysRequest, KvMultiGetResponse, KvMultiSetRequest,
     KvSetRequest,
 };
+use combee_common::usage::UsageMetric;
 
 use serde::Serialize;
 
@@ -40,6 +41,9 @@ pub async fn kv_get(
     Path((id, key)): Path<(DatabaseId, String)>,
 ) -> Result<Json<KvGetResponse>, ApiError> {
     require_db(&state, auth.tenant_id, id).await?;
+    state
+        .usage
+        .record(auth.tenant_id, Some(id), UsageMetric::KvRead, 1);
     let client = state.data_node.client_for(id).await?;
     match client.kv_get(id, key).await? {
         Some(entry) => Ok(Json(KvGetResponse {
@@ -69,6 +73,9 @@ pub async fn kv_set(
     Json(req): Json<KvSetRequest>,
 ) -> Result<Json<KvSetResponse>, ApiError> {
     let record = require_db(&state, auth.tenant_id, id).await?;
+    state
+        .usage
+        .record(auth.tenant_id, Some(id), UsageMetric::KvWrite, 1);
     let client = state.data_node.client_for(id).await?;
     let written = client.kv_set(id, key, req, record.generation).await?;
     Ok(Json(KvSetResponse { written }))
@@ -86,6 +93,9 @@ pub async fn kv_del(
     Path((id, key)): Path<(DatabaseId, String)>,
 ) -> Result<Json<KvDelResponse>, ApiError> {
     let record = require_db(&state, auth.tenant_id, id).await?;
+    state
+        .usage
+        .record(auth.tenant_id, Some(id), UsageMetric::KvWrite, 1);
     let client = state.data_node.client_for(id).await?;
     let deleted = client.kv_del(id, key, record.generation).await?;
     Ok(Json(KvDelResponse { deleted }))
@@ -99,6 +109,9 @@ pub async fn kv_exists(
     Json(req): Json<KvKeysRequest>,
 ) -> Result<Json<Vec<bool>>, ApiError> {
     require_db(&state, auth.tenant_id, id).await?;
+    state
+        .usage
+        .record(auth.tenant_id, Some(id), UsageMetric::KvRead, 1);
     let client = state.data_node.client_for(id).await?;
     let mut out = Vec::with_capacity(req.keys.len());
     for k in &req.keys {
@@ -115,6 +128,9 @@ pub async fn kv_mget(
     Json(req): Json<KvKeysRequest>,
 ) -> Result<Json<KvMultiGetResponse>, ApiError> {
     let _record = require_db(&state, auth.tenant_id, id).await?;
+    state
+        .usage
+        .record(auth.tenant_id, Some(id), UsageMetric::KvRead, 1);
     let client = state.data_node.client_for(id).await?;
     let values = client.kv_mget(id, req.keys).await?;
     Ok(Json(KvMultiGetResponse { values }))
@@ -128,6 +144,9 @@ pub async fn kv_mset(
     Json(req): Json<KvMultiSetRequest>,
 ) -> Result<StatusCode, ApiError> {
     let record = require_db(&state, auth.tenant_id, id).await?;
+    state
+        .usage
+        .record(auth.tenant_id, Some(id), UsageMetric::KvWrite, 1);
     let client = state.data_node.client_for(id).await?;
     client.kv_mset(id, req.items, record.generation).await?;
     Ok(StatusCode::NO_CONTENT)
@@ -141,6 +160,9 @@ pub async fn kv_ttl(
     Json(req): Json<KvKeysRequest>,
 ) -> Result<Json<Vec<Option<i64>>>, ApiError> {
     require_db(&state, auth.tenant_id, id).await?;
+    state
+        .usage
+        .record(auth.tenant_id, Some(id), UsageMetric::KvRead, 1);
     let client = state.data_node.client_for(id).await?;
     let mut out = Vec::with_capacity(req.keys.len());
     for k in &req.keys {
@@ -163,6 +185,9 @@ pub async fn kv_expire(
     Json(req): Json<KvExpireRequest>,
 ) -> Result<Json<KvExpireResponse>, ApiError> {
     let record = require_db(&state, auth.tenant_id, id).await?;
+    state
+        .usage
+        .record(auth.tenant_id, Some(id), UsageMetric::KvWrite, 1);
     let client = state.data_node.client_for(id).await?;
     let updated = client.kv_expire(id, req, record.generation).await?;
     Ok(Json(KvExpireResponse { updated }))
@@ -181,6 +206,9 @@ pub async fn kv_incr(
     Json(req): Json<KvIncrRequest>,
 ) -> Result<Json<KvIncrResponse>, ApiError> {
     let record = require_db(&state, auth.tenant_id, id).await?;
+    state
+        .usage
+        .record(auth.tenant_id, Some(id), UsageMetric::KvWrite, 1);
     let client = state.data_node.client_for(id).await?;
     let value = client.kv_incr(id, req, record.generation).await?;
     Ok(Json(KvIncrResponse { value }))

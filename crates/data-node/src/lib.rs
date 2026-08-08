@@ -552,6 +552,16 @@ impl DataNode {
         self.manager.active_count()
     }
 
+    /// Cell 磁盘占用(主库 + WAL,字节)。从未落盘的 Cell 返回 0。
+    pub async fn storage_bytes(&self, db: DatabaseId) -> Result<u64> {
+        let data_dir = self.manager.data_dir();
+        Ok(
+            tokio::task::spawn_blocking(move || storage::storage_bytes(&data_dir, db))
+                .await
+                .unwrap_or(0),
+        )
+    }
+
     /// 缓存命中/未命中统计。
     pub fn cache_stats(&self) -> (u64, u64) {
         self.cache.stats()

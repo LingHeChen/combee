@@ -13,3 +13,6 @@
 # 本地环境文件
 .env
 .env.*
+
+# Reasonix 本地会话附件
+/.reasonix/

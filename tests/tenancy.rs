@@ -83,12 +83,17 @@ async fn make_app() -> (Router, TempDir, TenantId) {
     }));
     let client = Arc::new(LocalDataNodeClient::new(node));
     let provider: Arc<dyn DataNodeProvider> = Arc::new(LocalProvider::new(client));
+    let usage_meter = combee_api_server::usage::UsageMeter::new(
+        metadata.clone(),
+        std::time::Duration::from_secs(3600),
+    );
     let state = AppState {
         metadata,
         data_node: provider,
         nodes: Arc::new(NodeRegistry::new()),
         auth_mode: AuthMode::Key,
         control_plane_token: None,
+        usage: usage_meter,
     };
     (build_app(state), dir, tenant_b)
 }

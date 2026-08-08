@@ -72,6 +72,7 @@ pub fn router(node: Arc<DataNode>, control_token: Option<String>) -> Router {
         .route("/rpc/backup", post(rpc_backup))
         .route("/rpc/incremental_backup", post(rpc_incremental_backup))
         .route("/rpc/restore", post(rpc_restore))
+        .route("/rpc/storage_bytes", post(rpc_storage_bytes))
         .layer(axum::middleware::from_fn_with_state(
             control_token.clone(),
             rpc_auth,
@@ -247,5 +248,14 @@ async fn rpc_restore(
     Json(rpc): Json<RpcRestore>,
 ) -> Json<RpcResponse<()>> {
     let r = node.restore(rpc.db, rpc.version).await;
+    Json(RpcResponse::from_result(r))
+}
+
+/// RPC:Cell 磁盘占用。
+async fn rpc_storage_bytes(
+    State(node): State<Arc<DataNode>>,
+    Json(rpc): Json<combee_common::rpc::RpcDb>,
+) -> Json<RpcResponse<u64>> {
+    let r = node.storage_bytes(rpc.db).await;
     Json(RpcResponse::from_result(r))
 }

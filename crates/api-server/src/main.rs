@@ -82,12 +82,18 @@ async fn main() {
         &config,
     );
 
+    // Usage Metering:内存聚合 + 周期 flush(不进入请求热路径)
+    let usage_meter =
+        combee_api_server::usage::UsageMeter::new(metadata.clone(), config.usage_flush_interval);
+    let _usage_flusher = usage_meter.spawn_flusher();
+
     let state = AppState {
         metadata,
         data_node: provider,
         nodes: registry,
         auth_mode: combee_api_server::auth::AuthMode::from_env(),
         control_plane_token: config.control_plane_token.clone(),
+        usage: usage_meter,
     };
     let app = build_app(state);
 

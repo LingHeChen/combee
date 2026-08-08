@@ -42,6 +42,18 @@ pub fn db_path(data_dir: &Path, db: DatabaseId) -> PathBuf {
     data_dir.join(bucket).join(format!("{hex}.sqlite"))
 }
 
+/// Cell 磁盘占用(主库 + WAL,字节)。文件不存在返回 0。
+pub fn storage_bytes(data_dir: &Path, db: DatabaseId) -> u64 {
+    let mut total = 0u64;
+    for suffix in ["", "-wal", "-shm"] {
+        let p = PathBuf::from(format!("{}{}", db_path(data_dir, db).display(), suffix));
+        if let Ok(md) = std::fs::metadata(&p) {
+            total += md.len();
+        }
+    }
+    total
+}
+
 /// 打开(必要时创建)一个 Cell 的 SQLite 连接,并初始化 schema。
 /// `durability` 决定 `synchronous` pragma(设计文档第 14 节)。
 pub fn open(path: &Path, durability: KvDurability) -> Result<Connection> {

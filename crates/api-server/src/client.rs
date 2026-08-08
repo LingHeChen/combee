@@ -75,6 +75,8 @@ pub trait DataNodeClient: Send + Sync {
     async fn restore(&self, db: DatabaseId, version: Option<String>) -> Result<()>;
     /// WAL 增量备份(主库 + WAL 周期归档)。
     async fn incremental_backup(&self, db: DatabaseId) -> Result<combee_common::rpc::BackupInfo>;
+    /// Cell 磁盘占用(主库 + WAL,字节)。
+    async fn storage_bytes(&self, db: DatabaseId) -> Result<u64>;
     /// 当前打开的 SQLite 连接数(仅 Local 有意义;远程返回 0)。
     fn active_count(&self) -> usize;
 }
@@ -199,6 +201,10 @@ impl DataNodeClient for LocalDataNodeClient {
 
     async fn replicate(&self, db: DatabaseId) -> Result<bool> {
         self.node.replicate_from_primary(db).await
+    }
+
+    async fn storage_bytes(&self, db: DatabaseId) -> Result<u64> {
+        self.node.storage_bytes(db).await
     }
 
     fn active_count(&self) -> usize {
@@ -399,6 +405,10 @@ impl DataNodeClient for RemoteDataNodeClient {
 
     async fn replicate(&self, db: DatabaseId) -> Result<bool> {
         self.call("rpc/replicate", &RpcDb { db }).await
+    }
+
+    async fn storage_bytes(&self, db: DatabaseId) -> Result<u64> {
+        self.call("rpc/storage_bytes", &RpcDb { db }).await
     }
 
     fn active_count(&self) -> usize {

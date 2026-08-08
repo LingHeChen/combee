@@ -91,6 +91,7 @@ p99 ≈ 64µs、缓存命中率 100%、活跃 SQLite 连接数严格 ≤ 上限�
 - **备份/恢复**:一致性快照(`VACUUM INTO`)+ WAL 增量归档 → S3/MinIO;节点炸毁后可恢复。
 - **单 replica + 自动 failover**:复制通道复用 WAL 归档;主节点心跳超时自动提升副本,generation fencing 防脑裂。
 - **多租户**:API key(仅存 sha256 哈希)绑定 tenant;隔离在 repository 层强制,跨租户一律 404。
+- **Usage Metering**:按 (tenant, cell, metric, 分钟桶) 统计 KV/SQL read/write、requests、bytes in/out、storage bytes;内存聚合 + 周期 flush(不进入热路径),`GET /v1/usage/summary` / `/v1/usage/timeseries` / `/v1/cells/{id}/usage`。
 - **Control plane**:`/internal/*` 与 data-node `/rpc/*` 由 `COMBEE_CONTROL_PLANE_TOKEN` 保护,租户 key 永不进入内部接口。
 
 ## Known Limitations
@@ -210,6 +211,7 @@ curl -X POST 127.0.0.1:8080/v1/databases/<id>/failover         # 手动提升副
 | `COMBEE_KV_CACHE_CAPACITY` | `100000` | KV 共享缓存条目上限 |
 | `COMBEE_KV_DURABILITY` | `normal` | fast(OFF)/normal(WAL fsync)/strict(FULL fsync) |
 | `COMBEE_SQL_TIMEOUT_SECS` | `30` | 单条 SQL 超时(0=不限);超时中断 |
+| `COMBEE_USAGE_FLUSH_INTERVAL_SECS` | `5` | Usage 聚合 flush 周期(内存 → metadata) |
 | `COMBEE_METADATA` | `in-memory` | 元数据后端:`in-memory` 或 `postgres` |
 | `COMBEE_DATABASE_URL` | `postgres://combee:combee@localhost:5432/combee` | PostgreSQL 连接串 |
 | `COMBEE_DATA_NODE_URL` | 空(单进程) | Data Node RPC 地址;设置后走独立进程 |

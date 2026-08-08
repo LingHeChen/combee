@@ -7,3 +7,4 @@ pub mod replication;
 pub mod sql;
 
 pub mod keys;
+pub mod usage;

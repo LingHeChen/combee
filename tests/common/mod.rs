@@ -32,12 +32,17 @@ pub fn test_app(max_active: usize) -> (Router, Arc<LocalDataNodeClient>, tempfil
     }));
     let client = Arc::new(LocalDataNodeClient::new(node));
     let provider: Arc<dyn DataNodeProvider> = Arc::new(LocalProvider::new(client.clone()));
+    let usage_meter = combee_api_server::usage::UsageMeter::new(
+        metadata.clone(),
+        std::time::Duration::from_secs(3600),
+    );
     let state = AppState {
         metadata,
         data_node: provider,
         nodes: Arc::new(NodeRegistry::new()),
         auth_mode: combee_api_server::auth::AuthMode::Off,
         control_plane_token: None,
+        usage: usage_meter,
     };
     (build_app(state), client, dir)
 }
@@ -64,12 +69,17 @@ pub async fn test_app_with_keys(keys: &[&str]) -> (Router, tempfile::TempDir) {
     }));
     let client = Arc::new(LocalDataNodeClient::new(node));
     let provider: Arc<dyn DataNodeProvider> = Arc::new(LocalProvider::new(client));
+    let usage_meter = combee_api_server::usage::UsageMeter::new(
+        metadata.clone(),
+        std::time::Duration::from_secs(3600),
+    );
     let state = AppState {
         metadata,
         data_node: provider,
         nodes: Arc::new(NodeRegistry::new()),
         auth_mode: combee_api_server::auth::AuthMode::Key,
         control_plane_token: None,
+        usage: usage_meter,
     };
     (build_app(state), dir)
 }
