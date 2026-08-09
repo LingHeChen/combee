@@ -58,7 +58,7 @@ REST API 是接口的事实来源。下面每个端点都由机器可读的 Open
   </Tab>
   <Tab value="TypeScript">
     ```ts
-    import { Combee } from '@combee/sdk';
+    import { Combee } from 'combee-js';
 
     const combee = new Combee({
       baseUrl: 'https://api.combee.cloud',
@@ -567,7 +567,7 @@ key 不存在时 `deleted` 为 `false`。
   </Tab>
   <Tab value="TypeScript">
     ```ts
-    // @combee/sdk 尚未暴露,直接调用端点:
+    // combee-js 尚未暴露,直接调用端点:
     const res = await fetch(
       `https://api.combee.cloud/v1/databases/${cell.id}/kv?prefix=greet&limit=100`,
       { headers: { 'x-api-key': process.env.COMBEE_API_KEY! } },
@@ -1392,7 +1392,7 @@ SDK 尚未封装——请直接调用。
   </Tab>
   <Tab value="TypeScript">
     ```ts
-    // @combee/sdk 尚未暴露,直接调用端点:
+    // combee-js 尚未暴露,直接调用端点:
     const res = await fetch(
       `https://api.combee.cloud/v1/databases/${cell.id}/failover`,
       { method: 'POST', headers: { 'x-api-key': process.env.COMBEE_API_KEY! } },
@@ -1438,7 +1438,7 @@ Public Beta 登记。这是唯一**不需要** `x-api-key` 的端点(CORS 全放
   </Tab>
   <Tab value="TypeScript">
     ```ts
-    // @combee/sdk 尚未暴露,直接调用端点:
+    // combee-js 尚未暴露,直接调用端点:
     const res = await fetch('https://api.combee.cloud/v1/waitlist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

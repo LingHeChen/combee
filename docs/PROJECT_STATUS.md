@@ -13,7 +13,7 @@ Combee = **Serverless Data Runtime**(一个应用一个 Cell,SQL + KV,无数据�
 | 仓库 | 内容 | 状态 |
 |---|---|---|
 | `LingHeChen/combee`(本仓库) | 核心 Rust runtime + Console(web/)+ 文档/设计稿 | v0.1.0-alpha,tag `v0.1.0-alpha.1` |
-| `LingHeChen/combee-js` | TypeScript SDK(`@combee/sdk`) | 独立仓库,代码就绪(未发布 npm) |
+| `LingHeChen/combee-js` | TypeScript SDK(`combee-js`) | 独立仓库,代码就绪(未发布 npm) |
 | `LingHeChen/combee-python` | Python SDK(`combee`,同步+异步) | 独立仓库,代码就绪(未发布 PyPI) |
 
 ## 3. 核心能力(Combee Rust runtime)
@@ -112,7 +112,7 @@ COMBEE_API_URL=http://127.0.0.1:8080 npx next start -p 3100
 ✅ P3 TypeScript + Python SDK(独立仓库,发布动作待做)
 ✅ P4 Web Console(Next.js BFF + 设计稿还原)← 当前
 ⬜ P5 Cloud Alpha 部署(三件套 + TLS + Linux 验证)
-⬜ SDK 发布:npm `@combee/sdk` / PyPI `combee`
+⬜ SDK 发布:npm `combee-js` / PyPI `combee`
 ⬜ CI 接入(gate 本地脚本就绪:web/e2e-qa.mjs、scripts/release-test.sh)
 ⬜ Beta 发布条件:SDK_SPEC §27 剩余 5 项、v0.1.0-beta 发布清单(见 docs/plan/)
 ```

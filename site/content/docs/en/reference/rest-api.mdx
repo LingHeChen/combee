@@ -59,7 +59,7 @@ Errors: `409 cell_already_exists` (name taken), `400 invalid_cell_name`.
   </Tab>
   <Tab value="TypeScript">
     ```ts
-    import { Combee } from '@combee/sdk';
+    import { Combee } from 'combee-js';
 
     const combee = new Combee({
       baseUrl: 'https://api.combee.cloud',
@@ -570,7 +570,7 @@ Response `200 OK`:
   </Tab>
   <Tab value="TypeScript">
     ```ts
-    // Not exposed in @combee/sdk yet — call the endpoint directly:
+    // Not exposed in combee-js yet — call the endpoint directly:
     const res = await fetch(
       `https://api.combee.cloud/v1/databases/${cell.id}/kv?prefix=greet&limit=100`,
       { headers: { 'x-api-key': process.env.COMBEE_API_KEY! } },
@@ -1396,7 +1396,7 @@ Response `200 OK` — the updated Cell record.
   </Tab>
   <Tab value="TypeScript">
     ```ts
-    // Not exposed in @combee/sdk yet — call the endpoint directly:
+    // Not exposed in combee-js yet — call the endpoint directly:
     const res = await fetch(
       `https://api.combee.cloud/v1/databases/${cell.id}/failover`,
       { method: 'POST', headers: { 'x-api-key': process.env.COMBEE_API_KEY! } },
@@ -1443,7 +1443,7 @@ Body: `{ "email": "ada@example.com" }` → Response `200 OK`:
   </Tab>
   <Tab value="TypeScript">
     ```ts
-    // Not exposed in @combee/sdk — call the endpoint directly:
+    // Not exposed in combee-js — call the endpoint directly:
     const res = await fetch('https://api.combee.cloud/v1/waitlist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
