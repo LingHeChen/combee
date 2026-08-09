@@ -64,11 +64,11 @@ async fn make_app() -> (Router, TempDir, TenantId) {
     let metadata: Arc<dyn MetadataStore> = Arc::new(InMemoryStore::new());
     metadata.create_tenant(tenant_b).await.unwrap();
     metadata
-        .create_api_key(DEFAULT_TENANT, combee_common::api_key::hash(KEY_A))
+        .create_api_key(DEFAULT_TENANT, combee_common::api_key::hash(KEY_A), "default")
         .await
         .unwrap();
     metadata
-        .create_api_key(tenant_b, combee_common::api_key::hash(KEY_B))
+        .create_api_key(tenant_b, combee_common::api_key::hash(KEY_B), "default")
         .await
         .unwrap();
 
@@ -80,6 +80,7 @@ async fn make_app() -> (Router, TempDir, TenantId) {
         kv_cache_capacity: 100_000,
         kv_durability: KvDurability::Normal,
         sql_timeout: Some(Duration::from_secs(5)),
+        quota: Default::default(),
     }));
     let client = Arc::new(LocalDataNodeClient::new(node));
     let provider: Arc<dyn DataNodeProvider> = Arc::new(LocalProvider::new(client));
@@ -100,6 +101,8 @@ async fn make_app() -> (Router, TempDir, TenantId) {
         usage: usage_meter,
         pricing: pricing_meter,
         admin_token: None,
+        quota: Default::default(),
+        concurrency: Default::default(),
     };
     (build_app(state), dir, tenant_b)
 }

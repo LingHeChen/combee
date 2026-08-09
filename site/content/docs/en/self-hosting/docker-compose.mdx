@@ -1,0 +1,37 @@
+---
+title: Docker Compose
+description: Run the full Combee stack with one command.
+since: 0.1.0-beta
+status: stable
+---
+
+The repository ships a `docker-compose.yml` with four services:
+
+| Service | Role |
+|---|---|
+| `postgres` | Metadata store (Cells, API keys, usage, credits) |
+| `minio` (+ `minio-init`) | S3-compatible object storage for backups |
+| `data-node` | SQLite / KV runtime (RPC on `:9000`) |
+| `api-server` | Public HTTP API (on `:8080`) |
+
+## Start
+
+```bash
+docker compose up -d --build
+```
+
+## Smoke test
+
+```bash
+curl http://127.0.0.1:8080/openapi.json   # machine-readable API
+```
+
+Then create an API key (`cmb_sk_...`) via the admin or local configuration, and use the SDK with
+`baseUrl: 'http://127.0.0.1:8080'`.
+
+## Containers to the side
+
+- PostgreSQL runs on its internal network only (no host port published).
+- MinIO exposes `9000` (S3 API) and `9001` (console).
+- The API Server publishes `8080`.
+- Data volumes persist under Docker named volumes (`combee-pg-data`, `combee-minio-data`).

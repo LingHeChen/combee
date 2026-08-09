@@ -1,0 +1,106 @@
+---
+title: 创建你的第一个 Cell
+description: 用 SDK 创建、列出与删除 Cell。
+since: 0.1.0-beta
+status: stable
+---
+
+Cell 是你应用的数据空间。创建它几乎免费——没有容器、没有连接串。
+
+## 创建
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -H "Idempotency-Key: cell:blog-prod" \
+      -d '{}'
+    # → {"id": "2f1c4a0e-..."}
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const cell = await combee.cells.create({ name: 'blog-prod' });
+    console.log(cell.id); // uuid
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell = combee.cells.create(name="blog-prod")
+    ```
+  </Tab>
+</Tabs>
+
+用相同的 `name` 创建 Cell 是**严格**的:对已占用的名称再次 `create` 会抛出
+`CellAlreadyExistsError`(409)。需要幂等的“存在即创建,否则复用”时,用
+`combee.cells.ensure(name)`——需要时创建,否则复用已有 Cell。
+
+## 列出
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl https://api.combee.cloud/v1/databases \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const { items } = await combee.cells.list();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    items = combee.cells.list()
+    ```
+  </Tab>
+</Tabs>
+
+## 重新打开
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # SDK 的 get 通过 list 端点实现;REST 等价:
+    curl "https://api.combee.cloud/v1/databases?limit=1000" \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const cell = combee.cells.get('2f1c4a0e-...'); // 延迟绑定;首次调用时才校验
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell = combee.cell('2f1c4a0e-...')
+    ```
+  </Tab>
+</Tabs>
+
+## 删除
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X DELETE https://api.combee.cloud/v1/databases/2f1c4a0e-... \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.delete();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.delete()
+    ```
+  </Tab>
+</Tabs>
+
+<Callout type="warn" title="不可逆">
+  删除 Cell 会清除其中的数据。如果需要保留,先创建[备份](../reliability/backups)。
+</Callout>

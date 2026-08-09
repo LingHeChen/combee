@@ -1,0 +1,279 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Combee Cloud - Welcome to Combee</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=JetBrains+Mono:wght@100..800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary-fixed-variant": "#3d4756",
+                      "surface-container-highest": "#333535",
+                      "on-surface": "#e2e2e2",
+                      "inverse-on-surface": "#2f3130",
+                      "primary-container": "#0a0a0a",
+                      "on-primary": "#313030",
+                      "primary-fixed-dim": "#c9c6c5",
+                      "tertiary-fixed": "#ffddb8",
+                      "surface-container-low": "#1a1c1c",
+                      "surface-bright": "#383939",
+                      "on-tertiary-fixed-variant": "#653e00",
+                      "tertiary": "#ffb95f",
+                      "background": "#121414",
+                      "surface-dim": "#121414",
+                      "inverse-primary": "#5f5e5e",
+                      "on-primary-fixed-variant": "#474646",
+                      "error": "#ffb4ab",
+                      "primary": "#c9c6c5",
+                      "on-background": "#e2e2e2",
+                      "on-tertiary-container": "#aa6c00",
+                      "on-error": "#690005",
+                      "on-primary-fixed": "#1c1b1b",
+                      "on-surface-variant": "#c4c7c7",
+                      "error-container": "#93000a",
+                      "surface-container-lowest": "#0c0f0e",
+                      "outline-variant": "#444748",
+                      "secondary-container": "#404a59",
+                      "surface-variant": "#333535",
+                      "surface": "#121414",
+                      "surface-tint": "#c9c6c5",
+                      "tertiary-container": "#130800",
+                      "on-error-container": "#ffdad6",
+                      "surface-container": "#1e2020",
+                      "inverse-surface": "#e2e2e2",
+                      "on-secondary-fixed": "#121c2a",
+                      "secondary-fixed": "#d9e3f6",
+                      "on-tertiary": "#472a00",
+                      "secondary": "#bdc7d9",
+                      "on-primary-container": "#7b7979",
+                      "outline": "#8e9192",
+                      "primary-fixed": "#e5e2e1",
+                      "tertiary-fixed-dim": "#ffb95f",
+                      "secondary-fixed-dim": "#bdc7d9",
+                      "on-tertiary-fixed": "#2a1700",
+                      "surface-container-high": "#282a2a",
+                      "on-secondary-container": "#afb9cb",
+                      "on-secondary": "#27313f"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "margin-desktop": "32px",
+                      "container-max": "1280px",
+                      "unit": "4px",
+                      "gutter": "16px",
+                      "margin-mobile": "16px"
+              },
+              "fontFamily": {
+                      "body-lg": [
+                              "Geist"
+                      ],
+                      "display-lg": [
+                              "Geist"
+                      ],
+                      "body-sm": [
+                              "Geist"
+                      ],
+                      "headline-md": [
+                              "Geist"
+                      ],
+                      "headline-lg": [
+                              "Geist"
+                      ],
+                      "mono-code": [
+                              "JetBrains Mono"
+                      ],
+                      "headline-lg-mobile": [
+                              "Geist"
+                      ],
+                      "mono-label": [
+                              "JetBrains Mono"
+                      ]
+              },
+              "fontSize": {
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "letterSpacing": "0em",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "display-lg": [
+                              "48px",
+                              {
+                                      "lineHeight": "56px",
+                                      "letterSpacing": "-0.04em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-sm": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "letterSpacing": "0em",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-md": [
+                              "20px",
+                              {
+                                      "lineHeight": "28px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "mono-code": [
+                              "14px",
+                              {
+                                      "lineHeight": "22px",
+                                      "letterSpacing": "0em",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "mono-label": [
+                              "13px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.02em",
+                                      "fontWeight": "500"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+</head>
+<body class="bg-background text-on-surface font-body-sm min-h-screen flex flex-col items-center justify-center py-margin-desktop px-gutter selection:bg-tertiary/30">
+<!-- Top nav is suppressed as this is a transactional/onboarding flow -->
+<main class="w-full max-w-4xl mx-auto flex flex-col gap-12">
+<!-- Header -->
+<header class="text-center flex flex-col items-center gap-4">
+<div class="w-16 h-16 bg-surface-container-high border border-outline-variant rounded-full flex items-center justify-center mb-4"><img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDEHh2zmptvMBY53K4HWBkPfVQnIQ2tXKA0_bXyIUX9F9dchk9CFEnc2_wHq9PRtI05MTUm5ZjrlWYyqOaSnl_QVG38TB_yOuk-vXIERqJ04dcf_J6sL38KiyekXHo-ufBhZY417RSB4XwpFs9fJdQ5AS98leyOmJXtrkxvo0CkZFKhEE4D4MDRm4pabhLW-Og7g8xaxSO0sI6Ee7yifyg_oOWkYFORv6TbK0mES63u1cGcE6JSq0RZkKB3Thb5zaRVK-Q" alt="Combee Logo" class="w-16 h-16 object-contain"></div>
+<h1 class="font-display-lg text-display-lg md:text-5xl text-on-surface tracking-tight">Welcome to Combee</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-lg mx-auto">Create your first Cell and make your first request. You'll be up and running in under 5 minutes.</p>
+</header>
+<!-- Bento Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter w-full">
+<!-- Left Column: Guide -->
+<section class="lg:col-span-5 bg-surface-container-low border border-outline-variant rounded-xl p-8 flex flex-col gap-6 relative overflow-hidden">
+<h2 class="font-headline-md text-headline-md text-on-surface">Quick Start Guide</h2>
+<ul class="flex flex-col gap-6 relative z-10">
+<li class="flex gap-4 items-start group">
+<div class="w-8 h-8 rounded-full bg-tertiary/10 border border-tertiary text-tertiary flex items-center justify-center shrink-0 font-mono-label text-mono-label relative">
+                            1
+                            <div class="absolute w-px h-8 bg-outline-variant -bottom-9 left-1/2 -translate-x-1/2 hidden group-last:hidden"></div>
+</div>
+<div class="flex flex-col mt-1">
+<span class="font-headline-sm text-headline-sm text-on-surface">Create your first Cell</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant mt-1">Provision a secure environment.</span>
+</div>
+</li>
+<li class="flex gap-4 items-start group">
+<div class="w-8 h-8 rounded-full bg-surface border border-outline-variant text-on-surface-variant flex items-center justify-center shrink-0 font-mono-label text-mono-label relative transition-colors duration-300 group-hover:border-tertiary group-hover:text-tertiary">
+                            2
+                            <div class="absolute w-px h-8 bg-outline-variant -bottom-9 left-1/2 -translate-x-1/2 hidden group-last:hidden"></div>
+</div>
+<div class="flex flex-col mt-1">
+<span class="font-headline-sm text-headline-sm text-on-surface">Create an API Key</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant mt-1">Authenticate your application.</span>
+</div>
+</li>
+<li class="flex gap-4 items-start group">
+<div class="w-8 h-8 rounded-full bg-surface border border-outline-variant text-on-surface-variant flex items-center justify-center shrink-0 font-mono-label text-mono-label relative transition-colors duration-300 group-hover:border-tertiary group-hover:text-tertiary">
+                            3
+                        </div>
+<div class="flex flex-col mt-1">
+<span class="font-headline-sm text-headline-sm text-on-surface">Install the SDK</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant mt-1">Add Combee to your project.</span>
+</div>
+</li>
+<li class="flex gap-4 items-start group">
+<div class="w-8 h-8 rounded-full bg-surface border border-outline-variant text-on-surface-variant flex items-center justify-center shrink-0 font-mono-label text-mono-label relative transition-colors duration-300 group-hover:border-tertiary group-hover:text-tertiary">
+                            4
+                        </div>
+<div class="flex flex-col mt-1">
+<span class="font-headline-sm text-headline-sm text-on-surface">Run a SQL or KV request</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant mt-1">Execute queries securely.</span>
+</div>
+</li>
+</ul>
+</section>
+<!-- Right Column: Code & Actions -->
+<section class="lg:col-span-7 flex flex-col gap-gutter">
+<!-- Code Snippet Card -->
+<div class="bg-surface border border-outline-variant rounded-xl flex flex-col overflow-hidden h-full flex-grow">
+<div class="bg-surface-container-high border-b border-outline-variant px-4 py-3 flex gap-4 items-center justify-between">
+<div class="flex gap-6">
+<button class="font-mono-label text-mono-label text-tertiary border-b-2 border-tertiary pb-1 -mb-[13px]">TypeScript</button>
+<button class="font-mono-label text-mono-label text-on-surface-variant hover:text-on-surface pb-1 -mb-[13px] transition-colors">Python</button>
+</div>
+<div class="flex gap-2">
+<div class="w-2.5 h-2.5 rounded-full bg-surface-variant"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-surface-variant"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-surface-variant"></div>
+</div>
+</div>
+<div class="p-6 bg-surface-container-low flex-grow font-mono-code text-mono-code text-on-surface/80 overflow-x-auto">
+<pre><code><span class="text-on-surface-variant opacity-50">// 1. Install</span>
+<span class="text-tertiary">npm install</span> @combee/sdk
+
+<span class="text-on-surface-variant opacity-50">// 2. Initialize</span>
+<span class="text-tertiary">import</span> { Combee } <span class="text-tertiary">from</span> <span class="text-secondary-fixed-dim">'@combee/sdk'</span>;
+
+<span class="text-tertiary">const</span> combee = <span class="text-tertiary">new</span> Combee({
+  apiKey: process.env.COMBEE_API_KEY
+});
+
+<span class="text-on-surface-variant opacity-50">// 3. Create your first Cell</span>
+<span class="text-tertiary">const</span> cell = <span class="text-tertiary">await</span> combee.cells.create({
+  name: <span class="text-secondary-fixed-dim">"my-first-app"</span>
+});
+</code></pre>
+</div>
+</div>
+<!-- Actions -->
+<div class="flex flex-col sm:flex-row gap-4 w-full">
+<button class="flex-1 py-3 px-6 bg-surface border border-outline-variant rounded-lg font-headline-sm text-headline-sm text-on-surface hover:bg-surface-container-high transition-colors focus:ring-1 focus:ring-tertiary outline-none flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[20px]">menu_book</span>
+                        Open Docs
+                    </button>
+<button class="flex-1 py-3 px-6 bg-tertiary text-primary-container rounded-lg font-headline-sm text-headline-sm hover:bg-tertiary-fixed focus:ring-2 focus:ring-tertiary/50 outline-none transition-colors flex items-center justify-center gap-2 font-medium">
+                        Continue to Cell
+                         <span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+</button>
+</div>
+</section>
+</div>
+</main>
+
+
+</body></html>

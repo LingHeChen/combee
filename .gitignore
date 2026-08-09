@@ -8,7 +8,15 @@
 /data/
 
 # 本地 benchmark 产物(运行 --capacity / --contention / --e2e 时重新生成)
-/artifacts/
+# 只忽略自动生成的 benchmark 文件;artifacts/ 下的人工文件(指令、FACTS、工程文档)入库。
+/artifacts/capacity.csv
+/artifacts/capacity.md
+/artifacts/capacity-inmemory.csv
+/artifacts/capacity-inmemory.md
+/artifacts/contention.csv
+/artifacts/contention.md
+/artifacts/e2e.csv
+/artifacts/e2e.md
 
 # 本地环境文件
 .env
@@ -26,3 +34,10 @@
 # 独立 SDK 仓库(combee-js / combee-python,各自 git + GitHub 独立)
 /combee-js/
 /combee-python/
+.gstack/
+
+# macOS
+.DS_Store
+
+# pnpm 本地缓存(误提交过大对象,移除跟踪)
+/.pnpm-store/

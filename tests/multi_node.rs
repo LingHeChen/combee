@@ -35,6 +35,7 @@ async fn spawn_data_node() -> (String, tempfile::TempDir) {
         kv_cache_capacity: 100_000,
         kv_durability: KvDurability::Normal,
         sql_timeout: Some(std::time::Duration::from_secs(30)),
+        quota: Default::default(),
     }));
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -86,6 +87,8 @@ async fn create_database_round_robin_placement() {
             std::time::Duration::from_secs(3600),
         ),
         admin_token: None,
+        quota: Default::default(),
+        concurrency: Default::default(),
     });
 
     // 创建两个 db → 应分别落到节点 A / B(round-robin)
@@ -131,11 +134,11 @@ async fn routing_isolates_data_per_node() {
     let db_a = DatabaseId::new();
     let db_b = DatabaseId::new();
     metadata
-        .create_database(DEFAULT_TENANT, db_a, Some(node_a))
+        .create_database(DEFAULT_TENANT, db_a, Some(node_a), None)
         .await
         .unwrap();
     metadata
-        .create_database(DEFAULT_TENANT, db_b, Some(node_b))
+        .create_database(DEFAULT_TENANT, db_b, Some(node_b), None)
         .await
         .unwrap();
 
@@ -221,6 +224,8 @@ async fn agent_registers_heartbeats_and_unregisters() {
         usage: usage_meter,
         pricing: pricing_meter,
         admin_token: None,
+        quota: Default::default(),
+        concurrency: Default::default(),
     });
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

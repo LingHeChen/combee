@@ -1,0 +1,162 @@
+---
+title: 快速上手
+description: 几分钟内创建一个 Cell,并跑通第一个 SQL 查询与 KV 操作。
+since: 0.1.0-beta
+status: stable
+---
+
+<Callout type="info" title="前置条件">
+  你需要一个 Combee 账号和 API key(`cmb_sk_...`)。
+  参见[认证](./authentication)。
+</Callout>
+
+## 1. 安装 SDK
+
+<Tabs items={['TypeScript', 'Python']}>
+  <Tab value="TypeScript">
+    ```bash
+    npm install @combee/sdk
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```bash
+    pip install combee
+    ```
+  </Tab>
+</Tabs>
+
+## 2. 创建客户端
+
+<Tabs items={['TypeScript', 'Python']}>
+  <Tab value="TypeScript">
+    ```ts
+    import { Combee } from '@combee/sdk';
+
+    const combee = new Combee({
+      baseUrl: 'https://api.combee.cloud',
+      apiKey: process.env.COMBEE_API_KEY!, // cmb_sk_...
+    });
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    from combee import Combee
+
+    combee = Combee(
+        base_url="https://api.combee.cloud",
+        api_key="cmb_sk_...",
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## 3. 创建 Cell
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -H "Idempotency-Key: cell:blog-prod" \
+      -d '{}'
+    # → {"id": "2f1c4a0e-..."} 保存 id,之后用它打开 Cell
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const cell = await combee.cells.create({ name: 'blog-prod' });
+    // cell.id 是 UUID —— 之后可以用它重新打开这个 Cell。
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell = combee.cells.create(name="blog-prod")
+    # cell 可立即使用;之后可用 cell_id 重新打开:combee.cell(cell_id)
+    ```
+  </Tab>
+</Tabs>
+
+## 4. 执行 SQL
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-.../sql \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"sql": "CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT NOT NULL)"}'
+
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-.../sql \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"sql": "INSERT INTO posts (title) VALUES (?)", "params": ["Hello"]}'
+
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-.../sql \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"sql": "SELECT * FROM posts WHERE id = ?", "params": [1]}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.sql.execute(
+      `CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT NOT NULL)`,
+    );
+    await cell.sql.execute(`INSERT INTO posts (title) VALUES (?)`, ['Hello']);
+
+    const { rows } = await cell.sql.query(`SELECT * FROM posts WHERE id = ?`, [1]);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.sql.execute(
+        "CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT NOT NULL)"
+    )
+    cell.sql.execute("INSERT INTO posts (title) VALUES (?)", ["Hello"])
+
+    result = cell.sql.query("SELECT * FROM posts WHERE id = ?", [1])
+    ```
+  </Tab>
+</Tabs>
+
+## 5. 使用 KV
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X PUT https://api.combee.cloud/v1/databases/2f1c4a0e-.../kv/session:user:1 \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"value": "{\"name\": \"Ada\"}", "ttl_seconds": 300}'
+
+    curl https://api.combee.cloud/v1/databases/2f1c4a0e-.../kv/session:user:1 \
+      -H "x-api-key: $COMBEE_API_KEY"
+
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-.../kv/ops/incr \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"key": "pageviews"}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.kv.set('session:user:1', JSON.stringify({ name: 'Ada' }), { ttl: 300 });
+    const session = await cell.kv.get('session:user:1'); // string | null
+    const views = await cell.kv.incr('pageviews'); // 1, 2, 3 ...
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.kv.set("session:user:1", '{"name": "Ada"}', ttl=300)
+    session = cell.kv.get("session:user:1")
+    views = cell.kv.incr("pageviews")  # 1, 2, 3 ...
+    ```
+  </Tab>
+</Tabs>
+
+## 接下来
+
+- [认证](./authentication)—— API key 安全。
+- [Cell](../core-concepts/cells)—— Cell 的底层是什么。
+- [KV TTL](../kv/ttl)—— 自动过期键。

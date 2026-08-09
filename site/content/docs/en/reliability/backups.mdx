@@ -1,0 +1,42 @@
+---
+title: Backups
+description: Snapshot and incremental backups to object storage.
+since: 0.1.0-beta
+status: stable
+---
+
+Combee backs up Cell data to S3-compatible object storage.
+
+- **Snapshot**: a consistent point-in-time image of the Cell.
+- **Incremental**: archives the database plus the current WAL, shortening recovery time to seconds.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # 全量快照
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/backup \
+      -H "x-api-key: $COMBEE_API_KEY"
+
+    # WAL 增量
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/backup/incr \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const backup = await cell.backups.create();           // full snapshot
+    const incr = await cell.backups.createIncremental();  // WAL incremental
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    backup = cell.backups.create()             # 全量快照
+    incr = cell.backups.create_incremental()   # WAL 增量
+    ```
+  </Tab>
+</Tabs>
+
+- Backups live outside the Cell — deleting the Cell keeps existing backups.
+- See [Restore](./restore) to recover from a backup.
+- In the managed cloud, backups run automatically; on self-hosted setups they are configured in
+  [Object Storage](../self-hosting/object-storage).

@@ -1,0 +1,346 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Combee Cloud - Overview</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary-fixed-variant": "#3d4756",
+                      "surface-container-highest": "#333535",
+                      "on-surface": "#e2e2e2",
+                      "inverse-on-surface": "#2f3130",
+                      "primary-container": "#0a0a0a",
+                      "on-primary": "#313030",
+                      "primary-fixed-dim": "#c9c6c5",
+                      "tertiary-fixed": "#ffddb8",
+                      "surface-container-low": "#1a1c1c",
+                      "surface-bright": "#383939",
+                      "on-tertiary-fixed-variant": "#653e00",
+                      "tertiary": "#ffb95f",
+                      "background": "#121414",
+                      "surface-dim": "#121414",
+                      "inverse-primary": "#5f5e5e",
+                      "on-primary-fixed-variant": "#474646",
+                      "error": "#ffb4ab",
+                      "primary": "#c9c6c5",
+                      "on-background": "#e2e2e2",
+                      "on-tertiary-container": "#aa6c00",
+                      "on-error": "#690005",
+                      "on-primary-fixed": "#1c1b1b",
+                      "on-surface-variant": "#c4c7c7",
+                      "error-container": "#93000a",
+                      "surface-container-lowest": "#0c0f0e",
+                      "outline-variant": "#444748",
+                      "secondary-container": "#404a59",
+                      "surface-variant": "#333535",
+                      "surface": "#121414",
+                      "surface-tint": "#c9c6c5",
+                      "tertiary-container": "#130800",
+                      "on-error-container": "#ffdad6",
+                      "surface-container": "#1e2020",
+                      "inverse-surface": "#e2e2e2",
+                      "on-secondary-fixed": "#121c2a",
+                      "secondary-fixed": "#d9e3f6",
+                      "on-tertiary": "#472a00",
+                      "secondary": "#bdc7d9",
+                      "on-primary-container": "#7b7979",
+                      "outline": "#8e9192",
+                      "primary-fixed": "#e5e2e1",
+                      "tertiary-fixed-dim": "#ffb95f",
+                      "secondary-fixed-dim": "#bdc7d9",
+                      "on-tertiary-fixed": "#2a1700",
+                      "surface-container-high": "#282a2a",
+                      "on-secondary-container": "#afb9cb",
+                      "on-secondary": "#27313f"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "margin-desktop": "32px",
+                      "container-max": "1280px",
+                      "unit": "4px",
+                      "gutter": "16px",
+                      "margin-mobile": "16px"
+              },
+              "fontFamily": {
+                      "body-lg": ["Geist"],
+                      "display-lg": ["Geist"],
+                      "body-sm": ["Geist"],
+                      "headline-md": ["Geist"],
+                      "headline-lg": ["Geist"],
+                      "mono-code": ["JetBrains Mono"],
+                      "headline-lg-mobile": ["Geist"],
+                      "mono-label": ["JetBrains Mono"]
+              },
+              "fontSize": {
+                      "body-lg": ["16px", {"lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "400"}],
+                      "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.04em", "fontWeight": "700"}],
+                      "body-sm": ["14px", {"lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400"}],
+                      "headline-md": ["20px", {"lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "500"}],
+                      "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                      "mono-code": ["14px", {"lineHeight": "22px", "letterSpacing": "0em", "fontWeight": "400"}],
+                      "headline-lg-mobile": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                      "mono-label": ["13px", {"lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500"}]
+              }
+            }
+          }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface font-body-sm min-h-screen flex selection:bg-tertiary selection:text-tertiary-container">
+<!-- SideNavBar (Desktop Only) -->
+<nav class="hidden md:flex flex-col h-screen w-64 bg-surface-container-low dark:bg-surface-container-low border-r border-outline-variant py-6 px-4 gap-2 sticky left-0 top-0">
+<div class="mb-8 px-2 flex items-center gap-3">
+<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuD6BoNMpGWCoJ7TUmyjmBUPyMyjq7jMxIqTUFLd2VpCyNeJ7YtBbTAXmKo9NhCR6icFFPa-OQ_4PPqAtyqpmNqfuh0lIbK6AZ4T3CTR3F_OryKfhrL14wOJQWXH8OJezxXm5uIflo3G8ztSg7hTlz0cgIglRVIxIkIX9ZlVgzQpgl-yu2SaqebMH5Hsg27WziwiEpkQHxYjIcizIEzGpN04TSxu04e9tTbKJs68LrnCMqDEc7TRcMF7yZmO46SddWSt2y8" alt="Combee Cloud Logo" class="h-8 w-8 object-contain">
+<div>
+<h1 class="text-headline-md font-headline-md font-bold text-on-surface dark:text-on-surface leading-tight">Combee Cloud</h1>
+<span class="font-mono-label text-mono-label text-on-surface-variant">v2.4.0-stable</span>
+</div>
+</div>
+<div class="flex flex-col gap-1 flex-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded bg-tertiary-container text-tertiary font-bold border-r-2 border-tertiary scale-[0.99] transition-transform font-mono-label text-mono-label" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+                Overview
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 font-mono-label text-mono-label" href="#">
+<span class="material-symbols-outlined">hive</span>
+                Cells
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 font-mono-label text-mono-label" href="#">
+<span class="material-symbols-outlined">key</span>
+                API Keys
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 font-mono-label text-mono-label" href="#">
+<span class="material-symbols-outlined">bar_chart</span>
+                Usage
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 font-mono-label text-mono-label" href="#">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+                Credits
+            </a>
+</div>
+<button class="mt-4 bg-tertiary text-primary-container px-4 py-2 font-mono-label text-mono-label font-bold rounded flex items-center justify-center gap-2 hover:bg-tertiary-fixed transition-colors">
+<span class="material-symbols-outlined text-sm">add</span> Create Cell
+        </button>
+<div class="mt-8 pt-4 border-t border-outline-variant flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 font-mono-label text-mono-label" href="#">
+<span class="material-symbols-outlined">menu_book</span>
+                Docs
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 font-mono-label text-mono-label" href="#">
+<span class="material-symbols-outlined">contact_support</span>
+                Support
+            </a>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 flex flex-col min-w-0">
+<!-- TopNavBar (Mobile/Desktop Hybrid for Header Area) -->
+<header class="flex justify-between items-center h-16 px-gutter w-full ml-auto bg-surface-dim/80 dark:bg-surface-dim/80 backdrop-blur-md border-b border-outline-variant sticky top-0 z-10 md:px-margin-desktop">
+<div class="md:hidden flex items-center gap-2">
+<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuA1mrRRBGOVc3bZDMtuztYV0g7EAh4YDx-fUpWvAavMpFAYyb2oaGjZYidYhxNIBy6q29qKnF_d-4L_fh4TRjO0FWayV_xkLTaPyvfFkCG3Vm8DmQ4nwrfI3aDXtTfquWtmVG4dv6_whg70tiPCboMKoZy4QW95_u7A5sbVpeRj8soIsdPjEpReTKrhhix1gjuLOqbYBTVhNE25FKk4NwzYWMjVYjkeMcqTCwrOs7Mocan4rHCCoepIZDH7x8ICiYxSQZs" alt="Combee Cloud Logo" class="h-8 w-8 object-contain">
+<span class="font-mono-code text-mono-code uppercase tracking-widest text-on-surface font-bold">Combee Cloud</span>
+</div>
+<div class="hidden md:flex gap-6 items-center">
+<a class="text-tertiary border-b-2 border-tertiary pb-2 font-mono-label text-mono-label pt-2" href="#">Projects</a>
+<a class="text-on-surface-variant hover:text-on-surface pb-2 font-mono-label text-mono-label pt-2 hover:text-tertiary transition-all duration-200" href="#">Regions</a>
+<a class="text-on-surface-variant hover:text-on-surface pb-2 font-mono-label text-mono-label pt-2 hover:text-tertiary transition-all duration-200" href="#">Network</a>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:text-tertiary transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-tertiary transition-colors">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-container-high border border-outline-variant overflow-hidden">
+<img alt="User profile avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuApZqqPc6qJK-nIxnbln9My-eRniJtOhBZV_HZN63v83XVRs3Gf-sfeGSbxra6YZhPukA3tSET3iQxBdya3gd_G-TRFGkMA0SHssLMCLi32UUqVV7dwQfzGvgpm7df8zRAXGHjHN6DCD7z-9KXlHvNALCSB6cdXu5rmWgrVtYwNJjTJ_duqRZJKrPVWyRnsUYM9gN4njT1IAEYGn-Ze8OT8uX8tGPSODG6lrNmBWYVZLxDt5OI2lFdJOQ">
+</div>
+</div>
+</header>
+<!-- Dashboard Content -->
+<div class="p-gutter md:p-margin-desktop flex-1 max-w-container-max mx-auto w-full flex flex-col gap-8">
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+<div>
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">Overview</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant mt-1">Your Combee usage and active data Cells.</p>
+</div>
+<button class="bg-tertiary text-primary-container px-6 py-2.5 font-mono-label text-mono-label font-bold rounded-DEFAULT flex items-center justify-center gap-2 hover:bg-tertiary-fixed transition-colors shadow-[0_0_15px_rgba(255,185,95,0.1)] focus:ring-1 focus:ring-tertiary/30 focus:outline-none">
+<span class="material-symbols-outlined text-sm">add</span> Create Cell
+                </button>
+</div>
+<!-- Summary Cards Bento Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+<!-- Cells Card -->
+<div class="bg-surface p-5 rounded-DEFAULT border border-secondary-container hover:border-tertiary/50 transition-colors flex flex-col gap-4 group">
+<div class="flex justify-between items-center">
+<span class="font-mono-label text-mono-label text-on-surface-variant uppercase tracking-wider">Cells</span>
+<span class="material-symbols-outlined text-tertiary/70 group-hover:text-tertiary">hive</span>
+</div>
+<div class="flex items-end gap-2">
+<span class="font-display-lg text-display-lg text-on-surface">12</span>
+<span class="font-mono-label text-mono-label text-on-surface-variant mb-2">Total</span>
+</div>
+<div class="flex gap-4 mt-auto">
+<div class="flex items-center gap-1.5">
+<div class="w-2 h-2 bg-tertiary rounded-sm clip-path-hexagon"></div>
+<span class="font-mono-code text-mono-code text-on-surface">9 Active</span>
+</div>
+<div class="flex items-center gap-1.5">
+<div class="w-2 h-2 bg-outline rounded-sm clip-path-hexagon"></div>
+<span class="font-mono-code text-mono-code text-on-surface-variant">3 Idle</span>
+</div>
+</div>
+</div>
+<!-- Requests Card -->
+<div class="bg-surface p-5 rounded-DEFAULT border border-secondary-container hover:border-tertiary/50 transition-colors flex flex-col gap-4 group">
+<div class="flex justify-between items-center">
+<span class="font-mono-label text-mono-label text-on-surface-variant uppercase tracking-wider">Requests (24h)</span>
+<span class="material-symbols-outlined text-tertiary/70 group-hover:text-tertiary">swap_horiz</span>
+</div>
+<div class="flex items-end gap-2">
+<span class="font-display-lg text-display-lg text-on-surface">2.4<span class="text-headline-lg">M</span></span>
+</div>
+<div class="flex items-center gap-1.5 mt-auto text-tertiary">
+<span class="material-symbols-outlined text-sm">trending_up</span>
+<span class="font-mono-code text-mono-code">+14% vs yesterday</span>
+</div>
+</div>
+<!-- Storage Card -->
+<div class="bg-surface p-5 rounded-DEFAULT border border-secondary-container hover:border-tertiary/50 transition-colors flex flex-col gap-4 group">
+<div class="flex justify-between items-center">
+<span class="font-mono-label text-mono-label text-on-surface-variant uppercase tracking-wider">Storage</span>
+<span class="material-symbols-outlined text-tertiary/70 group-hover:text-tertiary">database</span>
+</div>
+<div class="flex items-end gap-2">
+<span class="font-display-lg text-display-lg text-on-surface">845<span class="text-headline-lg">GB</span></span>
+</div>
+<div class="w-full bg-surface-container-highest h-1.5 rounded-full mt-auto overflow-hidden">
+<div class="bg-tertiary h-full w-[65%]"></div>
+</div>
+<span class="font-mono-code text-mono-code text-on-surface-variant mt-1">65% of allocated capacity</span>
+</div>
+<!-- Credits Card -->
+<div class="bg-surface p-5 rounded-DEFAULT border border-secondary-container hover:border-tertiary/50 transition-colors flex flex-col gap-4 group">
+<div class="flex justify-between items-center">
+<span class="font-mono-label text-mono-label text-on-surface-variant uppercase tracking-wider">Credits</span>
+<span class="material-symbols-outlined text-tertiary/70 group-hover:text-tertiary">account_balance_wallet</span>
+</div>
+<div class="flex items-end gap-2">
+<span class="font-display-lg text-display-lg text-on-surface">450</span>
+<span class="font-mono-label text-mono-label text-on-surface-variant mb-2">Available</span>
+</div>
+<div class="flex items-center gap-1.5 mt-auto">
+<span class="font-mono-code text-mono-code text-on-surface-variant">-120 consumed this month</span>
+</div>
+</div>
+</div>
+<!-- Recent Cells Table -->
+<div class="bg-surface rounded-DEFAULT border border-secondary-container overflow-hidden mt-4">
+<div class="p-4 border-b border-secondary-container flex justify-between items-center bg-surface-container-low">
+<h3 class="font-headline-md text-headline-md text-on-surface">Recent Cells</h3>
+<button class="text-tertiary font-mono-label text-mono-label hover:underline">View All</button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-secondary-container bg-surface-container-lowest font-mono-label text-mono-label text-on-surface-variant">
+<th class="p-4 font-medium">Cell</th>
+<th class="p-4 font-medium">Status</th>
+<th class="p-4 font-medium">Region</th>
+<th class="p-4 font-medium text-right">Storage</th>
+<th class="p-4 font-medium text-right">Requests</th>
+<th class="p-4 font-medium text-right">Last Active</th>
+</tr>
+</thead>
+<tbody class="font-mono-code text-mono-code text-on-surface divide-y divide-secondary-container">
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="p-4 font-medium text-tertiary flex items-center gap-2">
+<span class="material-symbols-outlined text-sm opacity-50 group-hover:opacity-100 transition-opacity">hive</span>
+                                    prod-auth-db-01
+                                </td>
+<td class="p-4">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-tertiary/10 text-tertiary border border-tertiary/20 text-xs">
+<div class="w-1.5 h-1.5 bg-tertiary rounded-full animate-pulse"></div>
+                                        Active
+                                    </span>
+</td>
+<td class="p-4 text-on-surface-variant">us-east-1</td>
+<td class="p-4 text-right">120 GB</td>
+<td class="p-4 text-right">1.2M</td>
+<td class="p-4 text-right text-on-surface-variant">Just now</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="p-4 font-medium text-tertiary flex items-center gap-2">
+<span class="material-symbols-outlined text-sm opacity-50 group-hover:opacity-100 transition-opacity">hive</span>
+                                    analytics-stream-eu
+                                </td>
+<td class="p-4">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-surface-bright text-on-surface-variant border border-outline-variant text-xs">
+<div class="w-1.5 h-1.5 bg-outline rounded-full"></div>
+                                        Idle
+                                    </span>
+</td>
+<td class="p-4 text-on-surface-variant">eu-west-1</td>
+<td class="p-4 text-right">45 GB</td>
+<td class="p-4 text-right">0</td>
+<td class="p-4 text-right text-on-surface-variant">2 hrs ago</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="p-4 font-medium text-tertiary flex items-center gap-2">
+<span class="material-symbols-outlined text-sm opacity-50 group-hover:opacity-100 transition-opacity">hive</span>
+                                    staging-cache-02
+                                </td>
+<td class="p-4">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-secondary-container/30 text-secondary border border-secondary/30 text-xs">
+<span class="material-symbols-outlined text-[10px] animate-spin">sync</span>
+                                        Replicating
+                                    </span>
+</td>
+<td class="p-4 text-on-surface-variant">us-west-2</td>
+<td class="p-4 text-right">8 GB</td>
+<td class="p-4 text-right">45K</td>
+<td class="p-4 text-right text-on-surface-variant">5 mins ago</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="p-4 font-medium text-tertiary flex items-center gap-2">
+<span class="material-symbols-outlined text-sm opacity-50 group-hover:opacity-100 transition-opacity">hive</span>
+                                    legacy-logs-archive
+                                </td>
+<td class="p-4">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-error-container/20 text-error border border-error/30 text-xs">
+<span class="material-symbols-outlined text-[10px]">warning</span>
+                                        Degraded
+                                    </span>
+</td>
+<td class="p-4 text-on-surface-variant">ap-south-1</td>
+<td class="p-4 text-right">560 GB</td>
+<td class="p-4 text-right">12K</td>
+<td class="p-4 text-right text-on-surface-variant">10 mins ago</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</main>
+<style>
+        .clip-path-hexagon {
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+        }
+    </style>
+
+
+</body></html>

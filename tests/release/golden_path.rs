@@ -190,6 +190,7 @@ async fn restart_preserves_web_app_state() {
             kv_cache_capacity: 10_000,
             kv_durability: KvDurability::Normal,
             sql_timeout: Some(std::time::Duration::from_secs(30)),
+            quota: Default::default(),
         });
         n.execute_sql(
             db,
@@ -234,6 +235,7 @@ async fn restart_preserves_web_app_state() {
         kv_cache_capacity: 10_000,
         kv_durability: KvDurability::Normal,
         sql_timeout: Some(std::time::Duration::from_secs(30)),
+        quota: Default::default(),
     });
     let r = n
         .execute_sql(

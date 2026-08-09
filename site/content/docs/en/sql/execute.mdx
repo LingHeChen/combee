@@ -1,0 +1,41 @@
+---
+title: Execute
+description: Run write statements and DDL, and get the changed row count.
+since: 0.1.0-beta
+status: stable
+---
+
+Use `execute` for statements that change data (`INSERT`, `UPDATE`, `DELETE`, `CREATE TABLE`, ...).
+It returns the number of affected rows.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/sql \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"sql": "CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT)"}'
+
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/sql \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"sql": "INSERT INTO posts (title) VALUES (?)", "params": ["Hello"]}'
+    # → {"columns": [], "rows": [], "rows_affected": 1, "truncated": false}
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.sql.execute(`CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT)`);
+    const result = await cell.sql.execute(`INSERT INTO posts (title) VALUES (?)`, ['Hello']);
+    // result.rows_affected === 1
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.sql.execute("CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT)")
+    result = cell.sql.execute("INSERT INTO posts (title) VALUES (?)", ["Hello"])
+    ```
+  </Tab>
+</Tabs>
+
+For multiple statements that must be atomic, use [Transactions](./transactions).

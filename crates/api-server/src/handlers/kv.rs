@@ -1,7 +1,7 @@
 //! KV / Redis-style API:GET / SET / DEL / EXISTS / MGET / MSET / TTL / EXPIRE / PERSIST / INCR。
 
 use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use combee_common::DatabaseId;
 use combee_common::protocol::{
@@ -237,4 +237,37 @@ pub async fn kv_incr(
     let client = state.data_node.client_for(id).await?;
     let value = client.kv_incr(id, req, record.generation).await?;
     Ok(Json(KvIncrResponse { value }))
+}
+
+/// GET /v1/databases/{id}/kv?prefix=&limit=&cursor= —— KV 前缀浏览。
+#[derive(serde::Deserialize, utoipa::IntoParams)]
+pub struct KvListQuery {
+    /// key 前缀过滤,缺省列出全部。
+    pub prefix: Option<String>,
+    /// 每页条数(默认 50,上限 1000)。
+    pub limit: Option<u32>,
+    /// 分页游标(上一页最后一个 key)。
+    pub cursor: Option<String>,
+}
+
+pub async fn kv_list(
+    State(state): State<AppState>,
+    auth: combee_common::AuthContext,
+    Path(id): Path<DatabaseId>,
+    Query(q): Query<KvListQuery>,
+) -> Result<Json<combee_common::rpc::RpcKvScanResult>, ApiError> {
+    require_db(&state, auth.tenant_id, id).await?;
+    state
+        .usage
+        .record(auth.tenant_id, Some(id), UsageMetric::KvRead, 1);
+    let client = state.data_node.client_for(id).await?;
+    let result = client
+        .kv_scan(
+            id,
+            q.prefix.unwrap_or_default(),
+            q.limit.unwrap_or(50),
+            q.cursor.unwrap_or_default(),
+        )
+        .await?;
+    Ok(Json(result))
 }

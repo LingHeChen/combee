@@ -1,0 +1,22 @@
+---
+title: 简介
+description: Combee 是什么,以及你能用它构建什么。
+since: 0.1.0-beta
+status: stable
+---
+
+Combee 是面向 **AI 生成应用与轻量级 Web 应用**的 **Serverless 数据运行时**。
+
+每个应用获得一个 **Cell** —— 一个逻辑数据空间,提供两种能力:
+
+- **SQL** —— SQLite 兼容的关系型数据库,无需连接串、无需管连接池。
+- **KV** —— Redis-style 键值存储,支持 TTL、原子计数器与 `NX` / `XX` 条件。
+
+Cell 创建成本几乎为零、无需独立容器,只在活跃时占用资源。
+你永远不需要管理主机、端口、用户名、密码或连接池。
+
+## 接下来
+
+- [快速上手](./quickstart)—— 几分钟内创建 Cell 并跑通第一个查询。
+- [认证](./authentication)—— API key 如何工作。
+- [核心概念](../core-concepts/cells)—— Cell 到底是什么。

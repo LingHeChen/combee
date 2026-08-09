@@ -1,0 +1,37 @@
+---
+title: 查询
+description: 执行只读 SQL SELECT 并读取结果。
+since: 0.1.0-beta
+status: stable
+---
+
+`query` 用于读操作(`SELECT`、`WITH`、`PRAGMA`、`EXPLAIN`)。返回 `{ columns, rows }`,SDK 会把每一行
+映射为对象。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/sql \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"sql": "SELECT id, title FROM posts WHERE id = ?", "params": [1]}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const { columns, rows } = await cell.sql.query<{ id: number; title: string }>(
+      `SELECT id, title FROM posts WHERE id = ?`,
+      [1],
+    );
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    result = cell.sql.query("SELECT id, title FROM posts WHERE id = ?", [1])
+    # result = {"columns": [...], "rows": [...]}
+    ```
+  </Tab>
+</Tabs>
+
+- **参数**:位置 `?` 占位符——永远用它,不要字符串拼接。
+- **只读**:写语句(`INSERT`/`UPDATE`/`DELETE`/DDL)会被该端点拒绝;请用[执行](./execute)。

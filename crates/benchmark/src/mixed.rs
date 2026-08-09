@@ -37,6 +37,7 @@ fn node(dir: &std::path::Path) -> DataNode {
         kv_cache_capacity: 500_000,
         kv_durability: KvDurability::Fast,
         sql_timeout: Some(std::time::Duration::from_secs(30)),
+        quota: Default::default(),
     })
 }
 

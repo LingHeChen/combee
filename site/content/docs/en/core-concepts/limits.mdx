@@ -1,0 +1,22 @@
+---
+title: Limits
+description: Current limits and quotas in v0.1.0-beta.
+since: 0.1.0-beta
+status: stable
+---
+
+The following limits apply to the current release. Resource quotas (max KV value size, max SQL
+result size, request concurrency caps) are **not yet enforced** — they rely on request body limits
+and SQL timeouts as a safety net.
+
+| Limit | Value |
+|---|---|
+| KV value size | bounded by request body limit (quota enforcement pending) |
+| SQL result size | bounded by response limits (quota enforcement pending) |
+| Active connections per Cell | capped by the active-database pool |
+| Replicas per Cell | 1 |
+| Region | single region for now |
+
+What is **not available** in this release: Redis RESP, PostgreSQL wire protocol, Blob / Vector /
+Queue storage, sharding, and multi-region. They are planned but not implemented — see
+[FACTS.md](https://github.com/LingHeChen/combee/blob/main/artifacts/FACTS.md) for the source of truth.

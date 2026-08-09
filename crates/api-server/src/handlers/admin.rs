@@ -12,6 +12,7 @@
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
+use combee_common::api_key;
 use combee_common::credit::{CreditTransaction, CreditTransactionType};
 use combee_common::usage::UsageMetric;
 use combee_common::{PricingRule, TenantId};
@@ -192,4 +193,32 @@ pub async fn admin_list_pricing_versions(
 ) -> Result<Json<Vec<combee_common::PricingVersion>>, ApiError> {
     let versions = state.metadata.list_pricing_versions().await?;
     Ok(Json(versions))
+}
+
+
+/// POST /admin/tenants —— 为独立新租户创建一个专属 API key(注册/开通用)。
+/// 响应中的 key 明文仅返回一次。
+#[derive(Serialize)]
+pub struct CreateTenantKeyResponse {
+    pub tenant_id: TenantId,
+    pub key: String,
+    pub key_id: Uuid,
+}
+
+pub async fn admin_create_tenant(
+    State(state): State<crate::AppState>,
+) -> Result<Json<CreateTenantKeyResponse>, crate::ApiError> {
+    let tenant = TenantId::new();
+    state.metadata.create_tenant(tenant).await?;
+    let key = api_key::generate();
+    let hash = api_key::hash(&key);
+    let record = state
+        .metadata
+        .create_api_key(tenant, hash, "console-user")
+        .await?;
+    Ok(Json(CreateTenantKeyResponse {
+        tenant_id: tenant,
+        key,
+        key_id: record.id,
+    }))
 }

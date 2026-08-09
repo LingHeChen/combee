@@ -30,6 +30,7 @@ fn node(data_dir: &std::path::Path, os_dir: &std::path::Path) -> DataNode {
         kv_cache_capacity: 10_000,
         kv_durability: KvDurability::Normal,
         sql_timeout: Some(std::time::Duration::from_secs(30)),
+        quota: Default::default(),
     })
     .with_object_store(store)
 }
@@ -113,7 +114,7 @@ async fn failover_promotes_replica_and_fences_old_primary() {
 
     let db = DatabaseId::new();
     metadata
-        .create_database(DEFAULT_TENANT, db, Some(primary))
+        .create_database(DEFAULT_TENANT, db, Some(primary), None)
         .await
         .unwrap();
     metadata
@@ -142,6 +143,8 @@ async fn failover_promotes_replica_and_fences_old_primary() {
             std::time::Duration::from_secs(3600),
         ),
         admin_token: None,
+        quota: Default::default(),
+        concurrency: Default::default(),
     };
     let promoted = combee_api_server::failover::failover_cell(&state, DEFAULT_TENANT, db)
         .await
@@ -176,7 +179,7 @@ async fn metadata_promote_replica_semantics() {
     let replica = NodeId::new();
     let db = DatabaseId::new();
     metadata
-        .create_database(DEFAULT_TENANT, db, Some(primary))
+        .create_database(DEFAULT_TENANT, db, Some(primary), None)
         .await
         .unwrap();
     metadata

@@ -20,7 +20,7 @@ use combee_common::config::{Config as CommonConfig, KvDurability};
 use combee_common::{CombeeError, DatabaseId, Result};
 use rusqlite::Connection;
 use tokio::task::JoinHandle;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 use crate::{storage, ttl};
 
@@ -34,6 +34,8 @@ pub struct DataNodeConfig {
     pub kv_cache_capacity: usize,
     /// KV 写入持久化强度。
     pub kv_durability: KvDurability,
+    /// 资源配额(安全护栏;0 = 不限)。
+    pub quota: combee_common::config::QuotaConfig,
     /// 单条 SQL 执行超时;超时中断执行并返回错误。None = 不限。
     pub sql_timeout: Option<Duration>,
 }
@@ -49,6 +51,7 @@ impl DataNodeConfig {
             kv_durability: cfg.kv_durability,
             sql_timeout: (cfg.sql_timeout_secs > 0)
                 .then(|| Duration::from_secs(cfg.sql_timeout_secs)),
+            quota: cfg.quota.clone(),
         }
     }
 }
@@ -177,7 +180,10 @@ impl ActiveDbManager {
         let max_active = self.max_active;
         let durability = self.kv_durability;
         let inner = self.inner.clone();
+        // 继承调用者 span(request_id 等)到阻塞线程:blocking 内日志可关联
+        let span = tracing::Span::current();
         let result = tokio::task::spawn_blocking(move || {
+            let _span_guard = span.enter();
             let now = Instant::now();
             let mut conns = inner.conns.lock().unwrap();
             let entry = match conns.get_mut(&db) {
@@ -190,7 +196,7 @@ impl ActiveDbManager {
                     let conn = storage::open(&path, durability)?;
                     let interrupt = conn.get_interrupt_handle();
                     inner.interrupts.lock().unwrap().insert(db, interrupt);
-                    debug!(%db, "opened sqlite connection (active={})", conns.len() + 1);
+                    debug!(service = "combee-data-node", event = "cell.open", cell_id = %db, active = conns.len() + 1);
                     conns.insert(
                         db,
                         Entry {
@@ -280,7 +286,7 @@ impl ActiveDbManager {
         let mut conns = self.inner.conns.lock().unwrap();
         for (id, entry) in conns.drain() {
             let _ = storage::checkpoint(&entry.conn);
-            debug!(%id, "closed sqlite connection on shutdown");
+            info!(service = "combee-data-node", event = "cell.close", cell_id = %id);
         }
     }
 
@@ -311,7 +317,7 @@ impl ActiveDbManager {
                     for id in idle {
                         if let Some(entry) = conns.remove(&id) {
                             let _ = storage::checkpoint(&entry.conn);
-                            debug!(%id, "connection slept (idle timeout)");
+                            debug!(service = "combee-data-node", event = "cell.sleep", cell_id = %id);
                         }
                     }
                     // 2) TTL GC(仅针对仍活跃的连接)
@@ -332,7 +338,7 @@ fn evict_lru(conns: &mut HashMap<DatabaseId, Entry>) {
     if let Some((&id, _)) = conns.iter().min_by_key(|(_, e)| e.last_used) {
         let entry = conns.remove(&id).expect("entry still present");
         let _ = storage::checkpoint(&entry.conn);
-        debug!(%id, "evicted sqlite connection (lru)");
+        debug!(service = "combee-data-node", event = "cell.evict", cell_id = %id);
     }
 }
 
@@ -353,6 +359,7 @@ mod tests {
             kv_cache_capacity: 100_000,
             kv_durability: KvDurability::Normal,
             sql_timeout: Some(std::time::Duration::from_secs(30)),
+            quota: Default::default(),
         }
     }
 
@@ -455,6 +462,7 @@ mod tests {
             kv_cache_capacity: 100_000,
             kv_durability: KvDurability::Normal,
             sql_timeout: Some(std::time::Duration::from_secs(30)),
+            quota: Default::default(),
         }));
         let _maintenance = mgr.spawn_maintenance();
 

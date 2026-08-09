@@ -1,0 +1,22 @@
+---
+title: Introduction
+description: What Combee is and what you can build with it.
+since: 0.1.0-beta
+status: stable
+---
+
+Combee is a **serverless data runtime** for AI-generated apps and lightweight web apps.
+
+Each application gets a **Cell** — a logical data space that provides two things:
+
+- **SQL** — a SQLite-compatible relational database, ready without connection strings or pools.
+- **KV** — a Redis-style key-value store with TTL, atomic counters, and `NX` / `XX` conditions.
+
+Cells are cheap to create, have no dedicated container, and only consume resources while active.
+You never manage hosts, ports, users, passwords, or connection pools.
+
+## Where to go next
+
+- [Quickstart](./quickstart) — create a Cell and run your first query in minutes.
+- [Authentication](./authentication) — how API keys work.
+- [Core Concepts](../core-concepts/cells) — what a Cell actually is.

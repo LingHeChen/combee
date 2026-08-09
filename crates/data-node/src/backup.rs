@@ -32,6 +32,7 @@ pub fn build_s3_store(
     secret_key: &str,
     bucket: &str,
     region: &str,
+    virtual_hosted: bool,
 ) -> Result<Arc<dyn ObjectStore>> {
     if endpoint.is_empty() {
         return Err(CombeeError::Internal(
@@ -45,7 +46,7 @@ pub fn build_s3_store(
         .with_bucket_name(bucket)
         .with_region(region)
         .with_allow_http(true)
-        .with_virtual_hosted_style_request(false) // MinIO 使用 path-style
+        .with_virtual_hosted_style_request(virtual_hosted) // true=虚拟主机(COS),false=path-style(MinIO)
         .build()
         .map_err(|e| CombeeError::Internal(format!("s3 build: {e}")))?;
     Ok(Arc::new(store))
@@ -160,6 +161,7 @@ mod tests {
             kv_cache_capacity: 10_000,
             kv_durability: KvDurability::Normal,
             sql_timeout: Some(std::time::Duration::from_secs(30)),
+            quota: Default::default(),
         })
         .with_object_store(store)
     }
@@ -417,6 +419,7 @@ mod incremental_tests {
             kv_cache_capacity: 10_000,
             kv_durability: KvDurability::Normal,
             sql_timeout: Some(std::time::Duration::from_secs(30)),
+            quota: Default::default(),
         })
         .with_object_store(store)
     }

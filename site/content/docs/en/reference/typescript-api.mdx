@@ -1,0 +1,474 @@
+---
+title: TypeScript API
+description: Full API reference for @combee/sdk — every method with signatures and examples.
+since: 0.1.0-beta
+status: stable
+---
+
+The official TypeScript SDK is `@combee/sdk`. Every method below maps to a REST endpoint documented in
+[REST API](./rest-api) (with curl examples).
+
+## Install
+
+```bash
+npm install @combee/sdk
+```
+
+## Client
+
+```ts
+import { Combee } from '@combee/sdk';
+
+const combee = new Combee({
+  baseUrl: 'https://api.combee.cloud',
+  apiKey: process.env.COMBEE_API_KEY!,
+  timeoutMs: 30_000, // optional, default 30s
+});
+```
+
+| Option | Type | Description |
+|---|---|---|
+| `baseUrl` | `string` | API base URL |
+| `apiKey` | `string` | Key created in [API Keys](../platform/api-keys) |
+| `timeoutMs` | `number` | Request timeout in milliseconds (default `30000`) |
+
+### `combee.cell(id): Cell`
+
+Binds a Cell by id locally — no request is sent until the first method call.
+
+```ts
+const cell = combee.cell('2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b');
+await cell.sql.query(`SELECT 1`);
+```
+
+## Cells — `combee.cells`
+
+### `create(input?): Promise<Cell>`
+
+Creates a new Cell. **Strict**: if `name` is already used in the account, it throws
+`CellAlreadyExistsError` (409). Use [`ensure`](#ensurename-promisecell) for an idempotent get-or-create.
+REST: [`POST /v1/databases`](./rest-api#create-a-cell).
+
+```ts
+const cell = await combee.cells.create({ name: 'my-app' });
+console.log(cell.id, cell.name);
+```
+
+| Input | Type | Description |
+|---|---|---|
+| `name` | `string` | Optional; tenant-unique name (must match `^[a-z0-9][a-z0-9-_]{0,62}$`); omitted generates `cell-<short-id>` |
+| `region` | `string` | Reserved for future use |
+
+Errors: `CellAlreadyExistsError` (409), `InvalidCellNameError` (400).
+
+### `ensure(name): Promise<Cell>`
+
+Idempotent get-or-create by name: creates the Cell if it does not exist, otherwise reuses it.
+Recommended at application startup. REST: [`PUT /v1/databases/by-name/{name}`](./rest-api#ensure-a-cell).
+
+```ts
+const cell = await combee.cells.ensure('my-app');
+```
+
+### `getByName(name): Promise<Cell>`
+
+Looks up a Cell by name; throws `CellNotFoundError` (404) when it does not exist.
+REST: [`GET /v1/databases/by-name/{name}`](./rest-api#get-a-cell-by-name).
+
+```ts
+const cell = await combee.cells.getByName('my-app');
+```
+
+### `get(id): Promise<Cell>`
+
+Returns a Cell handle and verifies it exists (via the list endpoint).
+
+```ts
+const cell = await combee.cells.get('2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b');
+```
+
+### `list(limit?, cursor?): Promise<Page<CellInfo>>`
+
+Lists the account's Cells. REST: [`GET /v1/databases`](./rest-api#list-cells).
+
+```ts
+const { items } = await combee.cells.list();
+for (const cell of items) {
+  console.log(cell.id, cell.state);
+}
+```
+
+### `delete(id): Promise<void>`
+
+Deletes a Cell permanently. REST: [`DELETE /v1/databases/{id}`](./rest-api#delete-a-cell).
+
+```ts
+await combee.cells.delete(cell.id);
+```
+
+## Cell — `cell`
+
+### `info(): Promise<CellInfo>`
+
+Fetches the Cell's metadata (`id`, `tenant_id`, `state`, `created_at`, `storage_node_id`).
+
+```ts
+const info = await cell.info();
+```
+
+### `delete(): Promise<void>`
+
+Deletes this Cell.
+
+```ts
+await cell.delete();
+```
+
+### `rename(name): Promise<CellInfo>`
+
+Renames the Cell; the `id` is preserved. Throws `CellNameConflictError` (409) when the name is taken,
+`InvalidCellNameError` (400) for invalid names. REST: [`PATCH /v1/databases/{id}`](./rest-api#rename-a-cell).
+
+```ts
+const updated = await cell.rename('blog-prod-v2');
+console.log(updated.name);
+```
+
+### `reset(): Promise<CellInfo>`
+
+Wipes all SQL and KV data; the `id` and `name` are preserved. Destructive — no undo.
+REST: [`POST /v1/databases/{id}/reset`](./rest-api#reset-a-cell).
+
+```ts
+await cell.reset();
+```
+
+## SQL — `cell.sql`
+
+### `query<T>(sql, params?): Promise<SqlQueryResult<T>>`
+
+Runs a read-only statement (`SELECT`, `WITH`, `PRAGMA`, `EXPLAIN`) and maps each row to an object.
+REST: [`POST /v1/databases/{id}/sql`](./rest-api#execute-a-statement).
+
+```ts
+const { columns, rows } = await cell.sql.query<{ id: number; title: string }>(
+  `SELECT id, title FROM posts WHERE id = ?`,
+  [1],
+);
+```
+
+### `execute(sql, params?): Promise<SqlExecuteResult>`
+
+Runs a write statement or DDL. Returns `{ rows_affected, last_insert_rowid }`.
+REST: [`POST /v1/databases/{id}/sql`](./rest-api#execute-a-statement).
+
+```ts
+await cell.sql.execute(`CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT)`);
+const result = await cell.sql.execute(`INSERT INTO posts (title) VALUES (?)`, ['Hello']);
+console.log(result.rows_affected); // 1
+```
+
+### `transaction(statements): Promise<SqlExecuteResult[]>`
+
+Runs a list of statements atomically. REST: [`POST /v1/databases/{id}/transaction`](./rest-api#run-a-transaction).
+
+```ts
+const results = await cell.sql.transaction([
+  { sql: `UPDATE accounts SET balance = balance - 100 WHERE id = ?`, params: [1] },
+  { sql: `UPDATE accounts SET balance = balance + 100 WHERE id = ?`, params: [2] },
+]);
+```
+
+## KV — `cell.kv`
+
+All keys are URL-encoded automatically by the SDK.
+
+### `get(key): Promise<string | null>`
+
+REST: [`GET /v1/databases/{id}/kv/{key}`](./rest-api#get-a-value).
+
+```ts
+const value = await cell.kv.get('greeting'); // 'hello', or null when missing
+```
+
+### `getJson<T>(key): Promise<T | null>`
+
+`get` + `JSON.parse`.
+
+```ts
+const config = await cell.kv.getJson<{ theme: string }>('config');
+```
+
+### `set(key, value, opts?): Promise<boolean>`
+
+REST: [`PUT /v1/databases/{id}/kv/{key}`](./rest-api#set-a-value). Returns whether the write happened
+(`false` when an `nx` / `xx` condition is not met).
+
+| Option | Type | Description |
+|---|---|---|
+| `ttl` | `number` | TTL in seconds; omitted = persistent |
+| `condition` | `'nx' \| 'xx'` | Conditional write (see [NX / XX](../kv/nx-xx)) |
+
+```ts
+const written = await cell.kv.set('greeting', 'hello', { ttl: 60 });
+const acquired = await cell.kv.set('lock:deploy', 'running', { condition: 'nx', ttl: 30 });
+```
+
+### `setJson(key, value, opts?): Promise<boolean>`
+
+`JSON.stringify` + `set`.
+
+```ts
+await cell.kv.setJson('config', { theme: 'dark' });
+```
+
+### `delete(key): Promise<boolean>`
+
+REST: [`DELETE /v1/databases/{id}/kv/{key}`](./rest-api#delete-a-value). Returns whether the key existed.
+
+```ts
+const deleted = await cell.kv.delete('greeting');
+```
+
+### `exists(key): Promise<boolean>`
+
+REST: [`POST /v1/databases/{id}/kv/ops/exists`](./rest-api#check-existence).
+
+```ts
+const exists = await cell.kv.exists('greeting');
+```
+
+### `mget(keys): Promise<Array<string | null>>`
+
+REST: [`POST /v1/databases/{id}/kv/ops/mget`](./rest-api#get-many-values).
+
+```ts
+const values = await cell.kv.mget(['a', 'b', 'missing']); // ['1', '2', null]
+```
+
+### `mset(entries): Promise<void>`
+
+Atomic multi-write. REST: [`POST /v1/databases/{id}/kv/ops/mset`](./rest-api#set-many-values).
+
+```ts
+await cell.kv.mset({ a: '1', b: '2' });
+```
+
+### `ttl(key): Promise<KvTtl>`
+
+REST: [`POST /v1/databases/{id}/kv/ops/ttl`](./rest-api#time-to-live).
+
+```ts
+const ttl = await cell.kv.ttl('greeting');
+// { state: 'expires', seconds: 299 } | { state: 'persistent' } | { state: 'missing' }
+```
+
+### `expire(key, seconds): Promise<boolean>`
+
+REST: [`POST /v1/databases/{id}/kv/ops/expire`](./rest-api#set-or-remove-expiry).
+
+```ts
+await cell.kv.expire('greeting', 60); // reset to 60s
+```
+
+### `persist(key): Promise<boolean>`
+
+Removes the TTL (keeps the key forever).
+
+```ts
+await cell.kv.persist('greeting');
+```
+
+### `incr(key, delta?): Promise<number>`
+
+REST: [`POST /v1/databases/{id}/kv/ops/incr`](./rest-api#increment--decrement). `delta` defaults to `1`.
+
+```ts
+const value = await cell.kv.incr('pageviews', 5); // 6
+```
+
+### `decr(key, delta?): Promise<number>`
+
+`incr(key, -delta)`. `delta` defaults to `1`.
+
+```ts
+const value = await cell.kv.decr('pageviews', 2); // 4
+```
+
+## Backups — `cell.backups`
+
+### `create(): Promise<BackupInfo>`
+
+Full snapshot backup. REST: [`POST /v1/databases/{id}/backup`](./rest-api#create-a-snapshot-backup).
+
+```ts
+const backup = await cell.backups.create();
+```
+
+### `createIncremental(): Promise<BackupInfo>`
+
+WAL incremental backup. REST: [`POST /v1/databases/{id}/backup/incr`](./rest-api#create-an-incremental-backup).
+
+```ts
+const incr = await cell.backups.createIncremental();
+```
+
+### `restore(version?): Promise<void>`
+
+Restores from a specific backup object key. REST: [`POST /v1/databases/{id}/restore`](./rest-api#restore-a-cell).
+
+```ts
+await cell.backups.restore('snapshots/2f1c4a0e-.../backup-20260801T000000Z');
+```
+
+### `restoreLatest(): Promise<void>`
+
+Restores the latest backup.
+
+```ts
+await cell.backups.restoreLatest();
+```
+
+## Replication — `cell.replication`
+
+### `get(): Promise<ReplicationStatus>`
+
+REST: [`GET /v1/databases/{id}/replication`](./rest-api#get-replication-status).
+
+```ts
+const status = await cell.replication.get();
+// { enabled: true, replica_node: 'node-b', ... }
+```
+
+### `enable(replicaNode): Promise<void>`
+
+REST: [`POST /v1/databases/{id}/replication`](./rest-api#enable-replication).
+
+```ts
+await cell.replication.enable('node-b');
+```
+
+### `disable(): Promise<void>`
+
+REST: [`DELETE /v1/databases/{id}/replication`](./rest-api#disable-replication).
+
+```ts
+await cell.replication.disable();
+```
+
+## API Keys — `combee.apiKeys`
+
+### `create(name?): Promise<CreatedApiKey>`
+
+REST: [`POST /v1/api-keys`](./rest-api#create-an-api-key). The plaintext `key` is returned once.
+
+```ts
+const key = await combee.apiKeys.create({ name: 'ci' });
+console.log(key.key); // save it now — it is shown once
+```
+
+### `list(): Promise<ApiKeyInfo[]>`
+
+REST: [`GET /v1/api-keys`](./rest-api#list-api-keys).
+
+```ts
+const keys = await combee.apiKeys.list();
+```
+
+### `revoke(id): Promise<void>`
+
+REST: [`DELETE /v1/api-keys/{id}`](./rest-api#revoke-an-api-key).
+
+```ts
+await combee.apiKeys.revoke(key.id);
+```
+
+## Usage — `combee.usage`
+
+### `summary(opts?): Promise<UsageSummary>`
+
+REST: [`GET /v1/usage/summary`](./rest-api#usage-summary).
+
+```ts
+const summary = await combee.usage.summary({ from: '2026-08-01T00:00:00Z' });
+```
+
+### `cell(cellId, opts?): Promise<UsageSummary>`
+
+REST: [`GET /v1/cells/{id}/usage`](./rest-api#cell-usage).
+
+```ts
+const cellUsage = await combee.usage.cell(cell.id);
+```
+
+### `timeseries(opts): Promise<Array<{ bucket_start: string; value: number }>>`
+
+REST: [`GET /v1/usage/timeseries`](./rest-api#usage-timeseries).
+
+| Option | Type | Description |
+|---|---|---|
+| `metric` | `string` | `kv_read` \| `kv_write` \| `sql_read` \| `sql_write` \| `requests` \| `bytes_in` \| `bytes_out` \| `storage_bytes` |
+| `interval` | `'minute' \| 'hour' \| 'day'` | Default `minute` |
+| `from` / `to` | `string` | RFC3339; default last 24h |
+
+```ts
+const series = await combee.usage.timeseries({ metric: 'kv_read', interval: 'hour' });
+```
+
+## Credits — `combee.credits`
+
+### `balance(): Promise<CreditBalance>`
+
+REST: [`GET /v1/credits/balance`](./rest-api#balance).
+
+```ts
+const balance = await combee.credits.balance();
+// { available: '50000000', reserved: '0', currency: 'CREDIT', updated_at: 1755000000 }
+```
+
+### `transactions(limit?, cursor?): Promise<Page<CreditTransaction>>`
+
+REST: [`GET /v1/credits/transactions`](./rest-api#transactions).
+
+```ts
+const { items, nextCursor } = await combee.credits.transactions(100);
+```
+
+### `redeem(code): Promise<RedeemResult>`
+
+REST: [`POST /v1/credits/redeem`](./rest-api#redeem-a-voucher).
+
+```ts
+const result = await combee.credits.redeem('CMB-84PA-X2KD-7MQR');
+// { credits_added: '50000000', balance: '100000000', already_redeemed: false }
+```
+
+## Pricing — `combee.pricing`
+
+### `get(): Promise<Pricing>`
+
+REST: [`GET /v1/pricing`](./rest-api#pricing).
+
+```ts
+const pricing = await combee.pricing.get();
+// { version: 1, effective_at: 1755000000, units: { ... } }
+```
+
+## Key types
+
+| Type | Shape |
+|---|---|
+| `Page<T>` | `{ items: T[]; nextCursor: string \| null }` |
+| `SqlQueryResult<T>` | `{ columns: string[]; rows: T[] }` |
+| `SqlExecuteResult` | `{ rows_affected: number; last_insert_rowid?: number \| string \| null }` |
+| `KvTtl` | `{ state: 'expires'; seconds: number } \| { state: 'persistent' } \| { state: 'missing' }` |
+| `CellInfo` | `{ id; name; tenant_id; state; created_at; storage_node_id? }` |
+| `BackupInfo` | `{ id; type: 'snapshot' \| 'incremental'; created_at; size_bytes? }` |
+| `ReplicationStatus` | `{ enabled: boolean; primary_node?; replica_node?; generation? }` |
+
+## Errors
+
+All errors extend `CombeeError` and carry a `requestId`. See [Error Codes](./error-codes) for the full
+mapping (`SqlError`, `CellNotFoundError`, `CellAlreadyExistsError`, `CellNameConflictError`, ...). The
+SDK retries conservatively and never blindly retries write requests; the default timeout is 30 seconds
+(`timeoutMs`).

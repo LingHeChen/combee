@@ -72,6 +72,7 @@ pub async fn run_contention() {
         kv_cache_capacity: 100_000,
         kv_durability: KvDurability::Fast,
         sql_timeout: Some(std::time::Duration::from_secs(30)),
+        quota: Default::default(),
     }));
     let db = DatabaseId::new();
 

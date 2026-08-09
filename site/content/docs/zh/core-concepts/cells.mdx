@@ -1,0 +1,33 @@
+---
+title: Cell
+description: Cell 是同时提供 SQL 与 KV 的逻辑数据空间。
+since: 0.1.0-beta
+status: stable
+---
+
+**Cell** 是 Combee 中数据的基本单位——一个应用对应一个逻辑数据空间,提供:
+
+- **SQL** —— 关系型数据库,支持标准表、索引与事务。
+- **KV** —— Redis-style 键值存储,与 SQL 共享同一个生命周期。
+
+## Cell 不是什么
+
+- **不是**数据库服务器。你不会看到主机名、端口或连接池。
+- **不是**容器。创建 Cell 成本几乎为零;只在活跃时占用资源。
+
+## 生命周期一览
+
+| 步骤 | 结果 |
+|---|---|
+| `create` | 创建带租户内唯一 `name` 的新 Cell(严格——名称已占用会失败) |
+| `ensure` | 按名称“存在即创建”——幂等,启动时推荐 |
+| 使用 | 按应用执行 SQL / KV |
+| rename / reset | 改名称 / 清数据,保留 id |
+| delete | 数据被清除 |
+
+细节见[生命周期](./lifecycle)与[限制](./limits)。
+
+## 在 REST API 中
+
+出于兼容性,Cell 的 REST 路径前缀是 `/v1/databases/...`,但公共概念始终是 **Cell**——SDK 不会向你暴露
+"database" 术语。

@@ -1,4 +1,4 @@
-//! Public API 契约测试(设计文档 P2 §9 / docs/API.md)。
+//! Public API 契约测试(设计文档 P2 §9 / artifacts/engineering/API.md)。
 //!
 //! 覆盖:request-id 透传与生成、稳定错误 code、Idempotency-Key 幂等创建、
 //! /openapi.json 可访问且无内部端点泄漏。

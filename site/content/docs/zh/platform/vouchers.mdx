@@ -1,0 +1,36 @@
+---
+title: 兑换券
+description: 用兑换码充值 Credits。
+since: 0.1.0-beta
+status: stable
+---
+
+兑换码(如 `CMB-XXXX-XXXX-XXXX`)可以为你的账号增加 Credits。兑换是单次使用、幂等且并发安全的。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/credits/redeem \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"code": "CMB-84PA-X2KD-7MQR"}'
+    # → {"credits_added": "50000000", "balance": "50000000", "already_redeemed": false}
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const result = await combee.credits.redeem('CMB-84PA-X2KD-7MQR');
+    // { balance: 50000000, already_redeemed: false }
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    result = combee.credits.redeem("CMB-84PA-X2KD-7MQR")
+    # {"balance": 50000000, "already_redeemed": False}
+    ```
+  </Tab>
+</Tabs>
+
+- 重复兑换同一兑换码**不会**重复加钱(返回 `already_redeemed`)。
+- 过期或无效的兑换码会被拒绝。
+- v0.1.0-beta 只能通过兑换券充值(在线支付不可用)。

@@ -1,4 +1,4 @@
-//! Release Gate 集成测试入口(对应 docs/COMBEE_RELEASE_READINESS_TEST_PLAN.md)。
+//! Release Gate 集成测试入口(对应 artifacts/engineering/COMBEE_RELEASE_READINESS_TEST_PLAN.md)。
 //! 子模块位于 tests/release/*.rs。
 #![allow(clippy::duplicate_mod)]
 

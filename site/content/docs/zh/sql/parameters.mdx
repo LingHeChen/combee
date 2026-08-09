@@ -1,0 +1,38 @@
+---
+title: 参数
+description: 用位置占位符安全绑定参数。
+since: 0.1.0-beta
+status: stable
+---
+
+永远用参数而不是把值拼进 SQL 字符串——避免 SQL 注入,自动处理引号。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/sql \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"sql": "INSERT INTO posts (title) VALUES (?)", "params": ["Hello \"quoted\""]}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.sql.execute(`INSERT INTO posts (title) VALUES (?)`, ['Hello "quoted"']);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.sql.execute("INSERT INTO posts (title) VALUES (?)", ['Hello "quoted"'])
+    ```
+  </Tab>
+</Tabs>
+
+支持的参数类型:`null`、`boolean`、`number`、`string`。
+
+| 占位符 | 含义 |
+|---|---|
+| `?` | 位置参数——第 N 个 `?` 绑定第 N 个值 |
+
+- 一次调用一条语句;多条语句需要多次调用或[事务](./transactions)。
+- 服务端会拒绝试图逃出 Cell 的语句(如 `ATTACH`、写任意文件系统路径)。

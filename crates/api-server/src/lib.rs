@@ -11,8 +11,10 @@ pub mod auth;
 pub mod client;
 pub mod failover;
 pub mod handlers;
+pub mod logging;
 pub mod nodes;
 pub mod pricing;
+pub mod quota;
 pub mod settlement;
 pub mod usage;
 
@@ -46,6 +48,12 @@ pub struct AppState {
     pub pricing: Arc<crate::pricing::PricingManager>,
     /// Operator/Admin 令牌(`COMBEE_ADMIN_TOKEN`);未配置时 admin 接口 401。
     pub admin_token: Option<String>,
+    /// 预配置的 admin API key(可调用 /admin/* 的租户 key)。
+    pub admin_api_key: Option<String>,
+    /// 资源配额(安全护栏)。
+    pub quota: combee_common::config::QuotaConfig,
+    /// 并发计数(per-tenant / per-Cell)。
+    pub concurrency: std::sync::Arc<crate::quota::ConcurrencyCounters>,
 }
 
 /// 统一的 JSON 错误响应体。
@@ -53,7 +61,7 @@ pub struct AppState {
 /// - `code`:稳定错误码(跨版本不变,SDK 据此映射异常类型);
 /// - `error`:人类可读描述。
 ///
-/// 与 [`CombeeError::kind`] 一一对应(见 docs/API.md 错误模型)。
+/// 与 [`CombeeError::kind`] 一一对应(见 artifacts/engineering/API.md 错误模型)。
 #[derive(Serialize)]
 pub struct ErrorBody {
     pub code: String,
@@ -63,6 +71,10 @@ pub struct ErrorBody {
 /// 请求扩展中携带的 request id(由 `auth::request_id` 注入)。
 #[derive(Clone, Debug)]
 pub struct RequestId(pub String);
+
+tokio::task_local! {
+    pub static REQUEST_ID: String;
+}
 
 /// 把 [`CombeeError`] 映射为 HTTP 响应。
 pub struct ApiError(pub CombeeError);
@@ -84,6 +96,11 @@ impl IntoResponse for ApiError {
         let status = match &self.0 {
             CombeeError::DatabaseNotFound(_) => StatusCode::NOT_FOUND,
             CombeeError::DatabaseAlreadyExists(_) => StatusCode::CONFLICT,
+            CombeeError::CellAlreadyExists(_) | CombeeError::CellNameConflict(_) => {
+                StatusCode::CONFLICT
+            }
+            CombeeError::InvalidCellName(_) => StatusCode::BAD_REQUEST,
+            CombeeError::CellResetFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
             CombeeError::ApiKeyNotFound => StatusCode::NOT_FOUND,
             CombeeError::Unauthorized => StatusCode::UNAUTHORIZED,
             CombeeError::InvalidRequest(_) => StatusCode::BAD_REQUEST,

@@ -1,0 +1,51 @@
+---
+title: Errors / Timeouts
+description: How SQL errors surface, and what happens on timeout.
+since: 0.1.0-beta
+status: stable
+---
+
+SQL failures map to the unified error model:
+
+- Syntax / constraint errors → HTTP `400` with `error.code: "sql"` → `SqlError` in the SDKs.
+- A statement that runs too long → `SqlTimeoutError` (client-side timeout).
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/sql \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"sql": "SELECT * FROM missing_table"}' -i
+    # HTTP/1.1 400 Bad Request
+    # x-request-id: 3f1c4a0e-...
+    # {"code": "sql", "error": "no such table: missing_table"}
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    import { SqlError } from '@combee/sdk';
+
+    try {
+      await cell.sql.query(`SELECT * FROM missing_table`);
+    } catch (err) {
+      if (err instanceof SqlError) {
+        console.error(err.message, err.requestId);
+      }
+    }
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    from combee import SqlError
+
+    try:
+        cell.sql.query("SELECT * FROM missing_table")
+    except SqlError as err:
+        print(err)
+    ```
+  </Tab>
+</Tabs>
+
+Every error response echoes the `x-request-id` header; SDK errors expose it as `requestId` so you can
+report issues precisely. See [Error Codes](../reference/error-codes) for the full table.

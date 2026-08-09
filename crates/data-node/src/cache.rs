@@ -205,6 +205,7 @@ mod tests {
             kv_cache_capacity: cache_capacity as usize,
             kv_durability: KvDurability::Normal,
             sql_timeout: Some(std::time::Duration::from_secs(30)),
+            quota: Default::default(),
         })
     }
 

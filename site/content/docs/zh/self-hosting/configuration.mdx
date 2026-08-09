@@ -1,0 +1,27 @@
+---
+title: 配置
+description: API Server 与 Data Node 的环境变量。
+since: 0.1.0-beta
+status: stable
+---
+
+两个二进制都用环境变量配置。常用项:
+
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `COMBEE_BIND_ADDR` | `127.0.0.1:8080` | API Server 监听地址 |
+| `COMBEE_DATA_DIR` | `./data` | 本地数据目录 |
+| `COMBEE_METADATA` | `in-memory` | `in-memory` 或 `postgres` |
+| `COMBEE_DATABASE_URL` | — | PostgreSQL 连接串(`COMBEE_METADATA=postgres` 时使用) |
+| `COMBEE_DATA_NODE_URL` | — | API Server 使用的 Data Node 地址 |
+| `COMBEE_CONTROL_PLANE_TOKEN` | — | 内部控制面认证 |
+| `COMBEE_ADMIN_TOKEN` | — | 运营/管理员认证(未配置时 admin 接口 401) |
+| `COMBEE_MAX_ACTIVE_DBS` | `100` | 活跃数据库池上限 |
+| `COMBEE_SQL_TIMEOUT_SECS` | `30` | SQL 语句超时 |
+| `COMBEE_KV_DURABILITY` | `normal` | `fast` / `normal` / `strict` |
+| `COMBEE_S3_*` | — | 对象存储(见[对象存储](./object-storage)) |
+| `COMBEE_USAGE_FLUSH_INTERVAL_SECS` | `5` | 用量批量刷盘间隔 |
+
+<Callout type="warn" title="生产环境">
+  生产环境请用 `COMBEE_METADATA=postgres`——in-memory 存储在重启后会丢失 Cell 目录。
+</Callout>

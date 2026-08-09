@@ -1,0 +1,50 @@
+---
+title: Usage
+description: How much you are using — requests, operations, and storage.
+since: 0.1.0-beta
+status: stable
+---
+
+Usage is metered per account and per Cell:
+
+- KV read / write operations
+- SQL read / write operations
+- requests, bytes in / out
+- current storage bytes
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # 账号汇总
+    curl "https://api.combee.cloud/v1/usage/summary" \
+      -H "x-api-key: $COMBEE_API_KEY"
+
+    # 单 Cell 用量
+    curl "https://api.combee.cloud/v1/cells/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/usage" \
+      -H "x-api-key: $COMBEE_API_KEY"
+
+    # 时序(按小时聚合 kv_read)
+    curl "https://api.combee.cloud/v1/usage/timeseries?metric=kv_read&interval=hour" \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const summary = await combee.usage.summary();
+    const cellUsage = await combee.usage.cell(cell.id);
+    const series = await combee.usage.timeseries({
+      metric: 'kv_read',
+      interval: 'hour',
+    });
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    summary = combee.usage.summary()
+    cell_usage = combee.usage.cell(cell_id)
+    series = combee.usage.timeseries("kv_read", interval="hour")
+    ```
+  </Tab>
+</Tabs>
+
+Time filters accept RFC3339 `from` / `to` (default: last 24h); `interval` is `minute` | `hour` | `day`.

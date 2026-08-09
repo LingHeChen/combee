@@ -1,0 +1,469 @@
+---
+title: Python API
+description: combee 包完整 API 参考——每个方法都带签名与示例。
+since: 0.1.0-beta
+status: stable
+---
+
+官方 Python SDK 发布在 PyPI,包名 **`combee`**。同时提供同步与异步(`a` 前缀)API。
+下面每个方法都对应 [REST API](./rest-api) 中记录的端点(那里有 curl 示例)。
+
+## 安装
+
+```bash
+pip install combee
+```
+
+## 客户端
+
+```python
+import os
+from combee import Combee, AsyncCombee
+
+combee = Combee(
+    base_url="https://api.combee.cloud",
+    api_key=os.environ["COMBEE_API_KEY"],
+    timeout_ms=30_000,  # 可选,默认 30000
+)
+
+# 异步版本:
+# async_combee = AsyncCombee(base_url=..., api_key=...)
+```
+
+`Combee` 可作为上下文管理器使用(自动关闭 HTTP 客户端);`AsyncCombee` 支持 `async with`。
+金额与余额都是 decimal string——禁止浮点。
+
+### `combee.cell(cell_id) -> Cell`
+
+按 id 本地绑定一个 Cell——首次调用方法前不发请求。
+
+```python
+cell = combee.cell("2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b")
+cell.sql.query("SELECT 1")
+```
+
+## Cells — `combee.cells`
+
+### `create(name=None, region=None) -> Cell`
+
+创建新的 Cell。**严格**:`name` 在账号内已被占用时抛出 `CellAlreadyExistsError`(409)。
+需要幂等的“存在即复用”,用 [`ensure`](#ensurename---cell)。
+REST:[`POST /v1/databases`](./rest-api#创建-cell)。异步:`acreate`。
+
+```python
+cell = combee.cells.create(name="my-app")
+print(cell.id, cell.name)
+```
+
+错误:`CellAlreadyExistsError`(409)、`InvalidCellNameError`(400)。
+
+### `ensure(name) -> Cell`
+
+按名称幂等“存在即创建,否则复用”。应用启动推荐用它。
+REST:[`PUT /v1/databases/by-name/{name}`](./rest-api#确保-cell-存在)。异步:`aensure`。
+
+```python
+cell = combee.cells.ensure("my-app")
+```
+
+### `get_by_name(name) -> Cell`
+
+按名称查找 Cell;不存在时抛出 `CellNotFoundError`(404)。
+REST:[`GET /v1/databases/by-name/{name}`](./rest-api#按名称查询-cell)。异步:`aget_by_name`。
+
+```python
+cell = combee.cells.get_by_name("my-app")
+```
+
+### `get(cell_id) -> Cell`
+
+返回 Cell 句柄并验证其存在(通过 list 端点)。异步:`aget`。
+
+```python
+cell = combee.cells.get("2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b")
+```
+
+### `list(limit=100, cursor=None) -> dict`
+
+列出账号的 Cells。返回 `{"items": [...], "next_cursor": None}`。
+REST:[`GET /v1/databases`](./rest-api#列出-cells)。异步:`alist`。
+
+```python
+for c in combee.cells.list()["items"]:
+    print(c["id"], c["state"])
+```
+
+### `delete(cell_id) -> None`
+
+永久删除 Cell。REST:[`DELETE /v1/databases/{id}`](./rest-api#删除-cell)。异步:`adelete`。
+
+```python
+combee.cells.delete(cell.id)
+```
+
+## Cell — `cell`
+
+### `info() -> dict`
+
+获取 Cell 元数据(`id`、`tenant_id`、`state`、`created_at`、`storage_node_id`)。异步:`ainfo`。
+
+```python
+info = cell.info()
+```
+
+### `delete() -> None`
+
+删除当前 Cell。异步:`adelete`。
+
+```python
+cell.delete()
+```
+
+### `rename(name) -> dict`
+
+重命名 Cell;`id` 保持不变。名称被占用时抛出 `CellNameConflictError`(409),
+名称非法时抛出 `InvalidCellNameError`(400)。REST:[`PATCH /v1/databases/{id}`](./rest-api#重命名-cell)。
+异步:`arename`。
+
+```python
+updated = cell.rename("blog-prod-v2")
+print(updated["name"])
+```
+
+### `reset() -> dict`
+
+清空全部 SQL 与 KV 数据;`id` 和 `name` 保持不变。破坏性操作——无法撤销。
+REST:[`POST /v1/databases/{id}/reset`](./rest-api#重置-cell)。异步:`areset`。
+
+```python
+cell.reset()
+```
+
+## SQL — `cell.sql`
+
+### `query(sql, params=None) -> dict`
+
+执行只读语句(`SELECT`、`WITH`、`PRAGMA`、`EXPLAIN`),把每行映射为 dict。
+REST:[`POST /v1/databases/{id}/sql`](./rest-api#执行单条语句)。异步:`aquery`。
+
+```python
+result = cell.sql.query("SELECT id, title FROM posts WHERE id = ?", [1])
+# {"columns": ["id", "title"], "rows": [{"id": 1, "title": "Hello"}]}
+```
+
+### `execute(sql, params=None) -> dict`
+
+执行写语句或 DDL。返回 `{"rows_affected": ..., "last_insert_rowid": ...}`。
+REST:[`POST /v1/databases/{id}/sql`](./rest-api#执行单条语句)。异步:`aexecute`。
+
+```python
+cell.sql.execute("CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT)")
+result = cell.sql.execute("INSERT INTO posts (title) VALUES (?)", ["Hello"])
+print(result["rows_affected"])  # 1
+```
+
+### `transaction(statements) -> list`
+
+原子执行一组语句。REST:[`POST /v1/databases/{id}/transaction`](./rest-api#执行事务)。
+异步:`atransaction`。
+
+```python
+results = cell.sql.transaction([
+    {"sql": "UPDATE accounts SET balance = balance - 100 WHERE id = ?", "params": [1]},
+    {"sql": "UPDATE accounts SET balance = balance + 100 WHERE id = ?", "params": [2]},
+])
+```
+
+## KV — `cell.kv`
+
+所有 key 由 SDK 自动做 URL 编码。v0.1.0-beta 中异步方法只有 `aget` / `aset` / `adelete` / `aincr`。
+
+### `get(key) -> Optional[str]`
+
+REST:[`GET /v1/databases/{id}/kv/{key}`](./rest-api#读取值)。异步:`aget`。
+
+```python
+value = cell.kv.get("greeting")  # "hello",缺失时为 None
+```
+
+### `get_json(key) -> Any`
+
+`get` + `json.loads`。
+
+```python
+config = cell.kv.get_json("config")
+```
+
+### `set(key, value, ttl=None, condition=None) -> bool`
+
+REST:[`PUT /v1/databases/{id}/kv/{key}`](./rest-api#写入值)。返回是否真正写入
+(`nx` / `xx` 条件不满足时为 `False`)。异步:`aset`。
+
+| 参数 | 说明 |
+|---|---|
+| `ttl` | TTL(秒);省略 = 持久 key |
+| `condition` | `"nx"` 或 `"xx"`——条件写入(见 [NX / XX](../kv/nx-xx)) |
+
+```python
+written = cell.kv.set("greeting", "hello", ttl=60)
+acquired = cell.kv.set("lock:deploy", "running", ttl=30, condition="nx")
+```
+
+### `set_json(key, value, ttl=None, condition=None) -> bool`
+
+`json.dumps` + `set`。
+
+```python
+cell.kv.set_json("config", {"theme": "dark"})
+```
+
+### `delete(key) -> bool`
+
+REST:[`DELETE /v1/databases/{id}/kv/{key}`](./rest-api#删除值)。返回 key 是否存在过。
+异步:`adelete`。
+
+```python
+deleted = cell.kv.delete("greeting")
+```
+
+### `exists(key) -> bool`
+
+REST:[`POST /v1/databases/{id}/kv/ops/exists`](./rest-api#检查存在性)。
+
+```python
+exists = cell.kv.exists("greeting")
+```
+
+### `mget(keys) -> list`
+
+REST:[`POST /v1/databases/{id}/kv/ops/mget`](./rest-api#批量读取)。
+
+```python
+values = cell.kv.mget(["a", "b", "missing"])  # ['1', '2', None]
+```
+
+### `mset(entries) -> None`
+
+原子批量写入。REST:[`POST /v1/databases/{id}/kv/ops/mset`](./rest-api#批量写入)。
+
+```python
+cell.kv.mset({"a": "1", "b": "2"})
+```
+
+### `ttl(key) -> dict`
+
+REST:[`POST /v1/databases/{id}/kv/ops/ttl`](./rest-api#剩余存活时间)。
+
+```python
+ttl = cell.kv.ttl("greeting")
+# {"state": "expires", "seconds": 299} | {"state": "persistent"} | {"state": "missing"}
+```
+
+### `expire(key, seconds) -> bool`
+
+REST:[`POST /v1/databases/{id}/kv/ops/expire`](./rest-api#设置或移除过期时间)。
+
+```python
+cell.kv.expire("greeting", 60)  # 重置为 60 秒
+```
+
+### `persist(key) -> bool`
+
+移除 TTL(永久保留)。
+
+```python
+cell.kv.persist("greeting")
+```
+
+### `incr(key, delta=1) -> int`
+
+REST:[`POST /v1/databases/{id}/kv/ops/incr`](./rest-api#自增--自减)。异步:`aincr`。
+
+```python
+value = cell.kv.incr("pageviews", 5)  # 6
+```
+
+### `decr(key, delta=1) -> int`
+
+`incr(key, -delta)`。
+
+```python
+value = cell.kv.decr("pageviews", 2)  # 4
+```
+
+## Backups — `cell.backups`
+
+v0.1.0-beta 仅同步。
+
+### `create() -> dict`
+
+全量快照备份。REST:[`POST /v1/databases/{id}/backup`](./rest-api#创建快照备份)。
+
+```python
+backup = cell.backups.create()
+```
+
+### `create_incremental() -> dict`
+
+WAL 增量备份。REST:[`POST /v1/databases/{id}/backup/incr`](./rest-api#创建增量备份)。
+
+```python
+incr = cell.backups.create_incremental()
+```
+
+### `restore(version=None) -> None`
+
+从指定备份对象 key 恢复;省略则恢复最新备份。
+REST:[`POST /v1/databases/{id}/restore`](./rest-api#恢复-cell)。
+
+```python
+cell.backups.restore("snapshots/2f1c4a0e-.../backup-20260801T000000Z")
+```
+
+### `restore_latest() -> None`
+
+恢复最新备份。
+
+```python
+cell.backups.restore_latest()
+```
+
+## Replication — `cell.replication`
+
+v0.1.0-beta 仅同步。
+
+### `get() -> dict`
+
+REST:[`GET /v1/databases/{id}/replication`](./rest-api#查询复制状态)。
+
+```python
+status = cell.replication.get()
+# {"enabled": True, "replica_node": "node-b"}
+```
+
+### `enable(replica_node) -> None`
+
+REST:[`POST /v1/databases/{id}/replication`](./rest-api#启用复制)。
+
+```python
+cell.replication.enable("node-b")
+```
+
+### `disable() -> None`
+
+REST:[`DELETE /v1/databases/{id}/replication`](./rest-api#禁用复制)。
+
+```python
+cell.replication.disable()
+```
+
+## API Keys — `combee.api_keys`
+
+### `create(name=None) -> dict`
+
+REST:[`POST /v1/api-keys`](./rest-api#创建-api-key)。明文 `key` 只返回一次。异步:`acreate`。
+
+```python
+key = combee.api_keys.create(name="ci")
+print(key["key"])  # 只显示一次——请立即保存
+```
+
+### `list() -> list`
+
+REST:[`GET /v1/api-keys`](./rest-api#列出-api-keys)。异步:`alist`。
+
+```python
+keys = combee.api_keys.list()
+```
+
+### `revoke(key_id) -> None`
+
+REST:[`DELETE /v1/api-keys/{id}`](./rest-api#撤销-api-key)。异步:`arevoke`。
+
+```python
+combee.api_keys.revoke(key["id"])
+```
+
+## Usage — `combee.usage`
+
+### `summary(opts=None) -> dict`
+
+REST:[`GET /v1/usage/summary`](./rest-api#用量汇总)。异步:`asummary`。
+
+```python
+summary = combee.usage.summary({"from": "2026-08-01T00:00:00Z"})
+```
+
+### `cell(cell_id, opts=None) -> dict`
+
+REST:[`GET /v1/cells/{id}/usage`](./rest-api#单-cell-用量)。异步:`acell`。
+
+```python
+cell_usage = combee.usage.cell(cell.id)
+```
+
+### `timeseries(metric, interval="minute", opts=None) -> list`
+
+REST:[`GET /v1/usage/timeseries`](./rest-api#用量时序)。异步:`atimeseries`。
+
+| 参数 | 说明 |
+|---|---|
+| `metric` | `kv_read` \| `kv_write` \| `sql_read` \| `sql_write` \| `requests` \| `bytes_in` \| `bytes_out` \| `storage_bytes` |
+| `interval` | `"minute"`(默认)\| `"hour"` \| `"day"` |
+| `opts` | 可选 `{"from": ..., "to": ...}` RFC3339;默认最近 24h |
+
+```python
+series = combee.usage.timeseries("kv_read", interval="hour")
+```
+
+## Credits — `combee.credits`
+
+### `balance() -> dict`
+
+REST:[`GET /v1/credits/balance`](./rest-api#余额)。异步:`abalance`。
+
+```python
+balance = combee.credits.balance()
+# {"available": "50000000", "reserved": "0", "currency": "CREDIT", "updated_at": 1755000000}
+```
+
+### `transactions(limit=100, cursor=None) -> dict`
+
+REST:[`GET /v1/credits/transactions`](./rest-api#交易记录)。异步:`atransactions`。
+
+```python
+page = combee.credits.transactions()
+# {"items": [...], "next_cursor": ...}
+```
+
+### `redeem(code) -> dict`
+
+REST:[`POST /v1/credits/redeem`](./rest-api#兑换兑换券)。异步:`aredeem`。
+
+```python
+result = combee.credits.redeem("CMB-84PA-X2KD-7MQR")
+# {"credits_added": "50000000", "balance": "100000000", "already_redeemed": False}
+```
+
+## Pricing — `combee.pricing`
+
+### `get() -> dict`
+
+REST:[`GET /v1/pricing`](./rest-api#定价)。异步:`aget`。
+
+```python
+pricing = combee.pricing.get()
+# {"version": 1, "effective_at": 1755000000, "units": {...}}
+```
+
+## 错误
+
+所有错误继承 `CombeeError` 并携带 `requestId`。完整映射见 [Error Codes](./error-codes)
+(`SqlError`、`CellNotFoundError`、`CellAlreadyExistsError`、`CellNameConflictError`、
+`RateLimitError`、`InsufficientCreditsError`、...)。v0.1.0-beta 中 Cell 相关错误
+(`CellAlreadyExistsError`、`InvalidCellNameError`、`CellNameConflictError`、`CellResetFailedError`)
+从 `combee.errors` 模块导出:
+
+```python
+from combee.errors import CellAlreadyExistsError
+```

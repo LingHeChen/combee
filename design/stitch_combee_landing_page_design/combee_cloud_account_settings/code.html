@@ -1,0 +1,364 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Combee Cloud - Account Settings</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-secondary-fixed-variant": "#3d4756",
+                    "surface-container-highest": "#333535",
+                    "on-surface": "#e2e2e2",
+                    "inverse-on-surface": "#2f3130",
+                    "primary-container": "#0a0a0a",
+                    "on-primary": "#313030",
+                    "primary-fixed-dim": "#c9c6c5",
+                    "tertiary-fixed": "#ffddb8",
+                    "surface-container-low": "#1a1c1c",
+                    "surface-bright": "#383939",
+                    "on-tertiary-fixed-variant": "#653e00",
+                    "tertiary": "#ffb95f",
+                    "background": "#121414",
+                    "surface-dim": "#121414",
+                    "inverse-primary": "#5f5e5e",
+                    "on-primary-fixed-variant": "#474646",
+                    "error": "#ffb4ab",
+                    "primary": "#c9c6c5",
+                    "on-background": "#e2e2e2",
+                    "on-tertiary-container": "#aa6c00",
+                    "on-error": "#690005",
+                    "on-primary-fixed": "#1c1b1b",
+                    "on-surface-variant": "#c4c7c7",
+                    "error-container": "#93000a",
+                    "surface-container-lowest": "#0c0f0e",
+                    "outline-variant": "#444748",
+                    "secondary-container": "#404a59",
+                    "surface-variant": "#333535",
+                    "surface": "#121414",
+                    "surface-tint": "#c9c6c5",
+                    "tertiary-container": "#130800",
+                    "on-error-container": "#ffdad6",
+                    "surface-container": "#1e2020",
+                    "inverse-surface": "#e2e2e2",
+                    "on-secondary-fixed": "#121c2a",
+                    "secondary-fixed": "#d9e3f6",
+                    "on-tertiary": "#472a00",
+                    "secondary": "#bdc7d9",
+                    "on-primary-container": "#7b7979",
+                    "outline": "#8e9192",
+                    "primary-fixed": "#e5e2e1",
+                    "tertiary-fixed-dim": "#ffb95f",
+                    "secondary-fixed-dim": "#bdc7d9",
+                    "on-tertiary-fixed": "#2a1700",
+                    "surface-container-high": "#282a2a",
+                    "on-secondary-container": "#afb9cb",
+                    "on-secondary": "#27313f"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "margin-desktop": "32px",
+                    "container-max": "1280px",
+                    "unit": "4px",
+                    "gutter": "16px",
+                    "margin-mobile": "16px"
+            },
+            "fontFamily": {
+                    "body-lg": [
+                            "Geist"
+                    ],
+                    "display-lg": [
+                            "Geist"
+                    ],
+                    "body-sm": [
+                            "Geist"
+                    ],
+                    "headline-md": [
+                            "Geist"
+                    ],
+                    "headline-lg": [
+                            "Geist"
+                    ],
+                    "mono-code": [
+                            "JetBrains Mono"
+                    ],
+                    "headline-lg-mobile": [
+                            "Geist"
+                    ],
+                    "mono-label": [
+                            "JetBrains Mono"
+                    ]
+            },
+            "fontSize": {
+                    "body-lg": [
+                            "16px",
+                            {
+                                    "lineHeight": "24px",
+                                    "letterSpacing": "0em",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "display-lg": [
+                            "48px",
+                            {
+                                    "lineHeight": "56px",
+                                    "letterSpacing": "-0.04em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "body-sm": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "letterSpacing": "0em",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-md": [
+                            "20px",
+                            {
+                                    "lineHeight": "28px",
+                                    "letterSpacing": "-0.01em",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "headline-lg": [
+                            "32px",
+                            {
+                                    "lineHeight": "40px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "mono-code": [
+                            "14px",
+                            {
+                                    "lineHeight": "22px",
+                                    "letterSpacing": "0em",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-lg-mobile": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "mono-label": [
+                            "13px",
+                            {
+                                    "lineHeight": "16px",
+                                    "letterSpacing": "0.02em",
+                                    "fontWeight": "500"
+                            }
+                    ]
+            }
+    },
+        },
+      }
+    </script>
+<style>
+        body { background-color: #0A0A0A; }
+    </style>
+</head>
+<body class="text-on-background font-body-sm bg-[#0A0A0A] min-h-screen flex selection:bg-tertiary/30 selection:text-tertiary">
+<!-- TopNavBar (Mobile) -->
+<nav class="md:hidden flex justify-between items-center h-16 px-gutter w-full fixed top-0 z-50 bg-surface-dim/80 dark:bg-surface-dim/80 backdrop-blur-md border-b border-outline-variant">
+<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCOUBr-yGpvhLg3bXQssjGsh2vjpIQncz3S4ScQV3Sh99HRy1fpW8J_mnISiaNAWLxRZOU2uGiAK-46pULnSUawrX67uuzfeqvlgWGDsF5jIKgiZFo2nda2c5TGFLJ2UMk0-ouRTxuNQVtuHZAX5g86P5d10MZ6G5VxasylmQ3I8wrIF-LYqQ3V-5UMpoju70a11SLzbJCR8VdkrM1kJqbHWma2LVlup7Sn-MmfqyemTet187uzDwJcLB00Z6uy7y3c2nI" alt="Combee Cloud Logo" class="h-8 w-8 object-cover mr-2"><div class="flex items-center"><img src="https://lh3.googleusercontent.com/aida-public/AB6AXuAK0-07Y-U-ImN_lF6avsF6GKTu8910R9n3HO8N7vllvdJ6FHs3yuIXzL_jrxpuanlPbp4qppttU-rjIQBQ2DBYcMERdqonwgHJukM3ilXXQVbxp2PdyHJqBXnViyaSasM46CwTzpX_FCZGM6-j7Ze8U5SbLHHc0i8AsphJYgTapi138WLhp2iRPXzqam5Hvfvkf0LqJTj3rc-DUMM9BO4Su76y60BhMX9N8rFNGYTH0XNh2xtNA4iqdJW29xOyRsE-fV8" alt="Combee Cloud Logo" class="h-8 w-8 object-cover mr-2"><div class="font-mono-code text-mono-code uppercase tracking-widest text-on-surface">Combee Cloud</div></div>
+<div class="flex gap-4 items-center">
+<button class="text-on-surface-variant hover:text-tertiary transition-all duration-200 focus:ring-1 focus:ring-tertiary/30 focus:outline-none rounded">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-tertiary border-b-2 border-tertiary pb-2 transition-all duration-200 focus:ring-1 focus:ring-tertiary/30 focus:outline-none rounded">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<img alt="User profile avatar" class="w-8 h-8 rounded-full border border-outline-variant object-cover" data-alt="A small, circular abstract geometric profile avatar for a user in a modern corporate dashboard. The image features sharp angles and a muted color palette of slate grey and pale amber on a dark charcoal background. It embodies a clean, technical, and developer-first aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAg2NILvv7Qss_NP8cL9rW9QCe5o6-b3Bts_Or2IeeIuMPg6wAKizBGvOjFqspq7mUFdv0b_ilnVb6jC9ENd4PvCfnP1Ft4NxkiZi_C4A3b3MEHqVMxw84fr2dIw-od9epMbugwK4pNDbpQletBZ2Zy7rDb6FF0YZed_DhGRXbQN9IFIpBGS7Etf1hco1mI1xgwZs7mNQWflx8F6xV55rEQs7WB5Mgt_qjjsQeRGPrZK9oEQtAfBaDUUA">
+</div>
+</nav>
+<!-- SideNavBar (Desktop) -->
+<aside class="hidden md:flex flex-col h-full py-6 px-4 gap-2 bg-surface-container-low dark:bg-surface-container-low docked left-0 h-screen w-64 border-r border-outline-variant shrink-0 sticky top-0 z-40">
+<div class="flex items-center gap-3 mb-8 px-2">
+<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuB1z5sFHn1Ed-_xB7RGZ6CbAUgF9geq5f-bP9iG8uIoJpQOijhn9px1F2G9TR_p6mMJbj8KDgMQHBrLxPyH88RIeU_fhYIPYfLEbcMWaEtIT8pYEUFgARTOzECX37OSz3Y9B3aWjqj9dbOHcbgl5CtjiQMSlLGZ7d6xhd-B4xQ05tcqB_Vr1k8Xugwv8PfgLBcI5_2EfQeg09F2HaMB-K7d0ao3aHP12nmmzVmKynFwDIXKH5grIxmOlAMDUHtrFq_xMgg" alt="Combee Cloud Logo" class="w-8 h-8 object-cover rounded">
+<div>
+<h1 class="text-headline-md font-headline-md font-bold text-on-surface dark:text-on-surface">Combee Cloud</h1>
+<p class="font-mono-label text-mono-label text-on-surface-variant">v2.4.0-stable</p>
+</div>
+</div>
+<nav class="flex-1 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-mono-label text-mono-label">Overview</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="hive">hive</span>
+<span class="font-mono-label text-mono-label">Cells</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="key">key</span>
+<span class="font-mono-label text-mono-label">API Keys</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="bar_chart">bar_chart</span>
+<span class="font-mono-label text-mono-label">Usage</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="account_balance_wallet">account_balance_wallet</span>
+<span class="font-mono-label text-mono-label">Credits</span>
+</a>
+</nav>
+<button class="mt-4 mb-8 w-full bg-tertiary text-primary-container font-mono-label text-mono-label font-bold py-2 px-4 rounded hover:bg-tertiary-fixed transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]" data-icon="add">add</span>
+            Create Cell
+        </button>
+<div class="flex flex-col gap-1 border-t border-outline-variant pt-4">
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span>
+<span class="font-mono-label text-mono-label">Docs</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="contact_support">contact_support</span>
+<span class="font-mono-label text-mono-label">Support</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 flex flex-col pt-16 md:pt-0 max-w-container-max mx-auto w-full">
+<!-- TopNavBar (Desktop) -->
+<header class="hidden md:flex justify-between items-center h-16 px-margin-desktop w-full ml-auto bg-surface-dim/80 dark:bg-surface-dim/80 backdrop-blur-md sticky top-0 z-30">
+<div class="flex gap-8 items-center h-full">
+<a class="text-on-surface-variant hover:text-on-surface pb-2 h-full flex items-center mt-2 font-mono-label text-mono-label transition-all duration-200" href="#">Projects</a>
+<a class="text-on-surface-variant hover:text-on-surface pb-2 h-full flex items-center mt-2 font-mono-label text-mono-label transition-all duration-200" href="#">Regions</a>
+<a class="text-on-surface-variant hover:text-on-surface pb-2 h-full flex items-center mt-2 font-mono-label text-mono-label transition-all duration-200" href="#">Network</a>
+</div>
+<div class="flex gap-4 items-center h-full">
+<button class="text-on-surface-variant hover:text-tertiary transition-all duration-200 focus:ring-1 focus:ring-tertiary/30 focus:outline-none rounded p-1">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-tertiary border-b-2 border-tertiary h-full flex items-center transition-all duration-200 focus:ring-1 focus:ring-tertiary/30 focus:outline-none">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<img alt="User profile avatar" class="w-8 h-8 rounded-full border border-outline-variant object-cover ml-2" data-alt="A small, circular abstract geometric profile avatar for a user in a modern corporate dashboard. The image features sharp angles and a muted color palette of slate grey and pale amber on a dark charcoal background. It embodies a clean, technical, and developer-first aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCWeiI13d6CFbYDWtE7k-8ti0MZTbP6li59zOb8h4KK6oLDmCA8jgNqztjUdy7YeB3J0aPGvfA843b7auqt3xL-iYKV9iDaS3d_DPq3RwOo-TL5oK6AxMxOlEJXPwAP4jQt4JUw1JHN--LOYhS3Qrp8bdO4z26h5h7nDW4VKkFpv63VtdgTMjCY6Y6wzQVC46Q-bYwlVRx-_aKr4T7khbwdpxyGRXDRwDLUPCGrXkHvtbU8upkojQVvAQ">
+</div>
+</header>
+<div class="p-margin-mobile md:p-margin-desktop space-y-12">
+<div>
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-2">Account Settings</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant max-w-2xl">Manage your personal account details, security preferences, and active sessions.</p>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Account Details Card -->
+<section class="lg:col-span-7 bg-[#111111] border border-[#1F2937] rounded-xl p-6 relative overflow-hidden group hover:border-outline transition-colors">
+<div class="absolute top-4 right-4 font-mono-code text-[10px] text-on-surface-variant/50">SEC-01</div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary text-[20px]" data-icon="person">person</span>
+                        Identity
+                    </h3>
+<div class="space-y-6">
+<div class="flex flex-col gap-1">
+<label class="font-mono-label text-mono-label text-on-surface-variant">Primary Email</label>
+<div class="flex items-center justify-between py-2 border-b border-[#1F2937]">
+<span class="font-body-lg text-body-lg text-on-surface">engineer@combee.cloud</span>
+<span class="bg-[#1F2937]/50 text-on-surface-variant font-mono-code text-[12px] px-2 py-1 rounded">Verified</span>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-mono-label text-mono-label text-on-surface-variant">Tenant ID</label>
+<div class="flex items-center justify-between py-2 border-b border-[#1F2937] group-hover:border-[#374151] transition-colors">
+<span class="font-mono-code text-mono-code text-primary-fixed-dim">tnt_98af7c2b4e109d</span>
+<button class="text-on-surface-variant hover:text-tertiary transition-colors" title="Copy ID">
+<span class="material-symbols-outlined text-[18px]" data-icon="content_copy">content_copy</span>
+</button>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-mono-label text-mono-label text-on-surface-variant">Created At</label>
+<div class="py-2">
+<span class="font-body-sm text-body-sm text-on-surface-variant">October 12, 2023 · 14:32 UTC</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Security & Sessions Card -->
+<section class="lg:col-span-5 bg-[#111111] border border-[#1F2937] rounded-xl p-6 relative overflow-hidden flex flex-col">
+<div class="absolute top-4 right-4 font-mono-code text-[10px] text-on-surface-variant/50">SEC-02</div>
+<div class="flex justify-between items-start mb-6">
+<h3 class="font-headline-md text-headline-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary text-[20px]" data-icon="shield_lock">shield_lock</span>
+                            Security
+                        </h3>
+</div>
+<div class="flex-1 space-y-4">
+<h4 class="font-mono-label text-mono-label text-on-surface-variant uppercase tracking-wider text-[11px]">Active Sessions</h4>
+<div class="space-y-3">
+<!-- Current Session -->
+<div class="flex items-start gap-3 p-3 rounded bg-[#1F2937]/30 border border-[#1F2937]">
+<div class="mt-1">
+<div class="w-2 h-2 rounded-sm bg-tertiary transform rotate-45 relative">
+<div class="absolute inset-0 bg-tertiary blur-[2px] opacity-50"></div>
+</div>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-baseline">
+<span class="font-body-sm text-body-sm text-on-surface font-medium">Mac OS · Chrome</span>
+<span class="font-mono-code text-[10px] text-tertiary">Current</span>
+</div>
+<div class="font-mono-code text-[11px] text-on-surface-variant mt-1">192.168.1.42 · Seattle, WA</div>
+</div>
+</div>
+<!-- Other Session -->
+<div class="flex items-start gap-3 p-3 rounded border border-transparent hover:border-[#1F2937] hover:bg-[#1F2937]/10 transition-colors">
+<div class="mt-1">
+<div class="w-2 h-2 rounded-sm bg-outline transform rotate-45"></div>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-baseline">
+<span class="font-body-sm text-body-sm text-on-surface">iOS · Safari</span>
+<span class="font-mono-code text-[10px] text-on-surface-variant">2h ago</span>
+</div>
+<div class="font-mono-code text-[11px] text-on-surface-variant mt-1">172.56.21.9 · Portland, OR</div>
+</div>
+</div>
+</div>
+</div>
+<div class="mt-8 pt-4 border-t border-[#1F2937]">
+<button class="w-full py-2 px-4 rounded border border-[#1F2937] bg-transparent text-on-surface font-mono-label text-mono-label hover:bg-[#1F2937] hover:text-error transition-colors flex items-center justify-center gap-2 group">
+<span class="material-symbols-outlined text-[18px] group-hover:text-error transition-colors" data-icon="logout">logout</span>
+                            Sign out all other sessions
+                        </button>
+</div>
+</section>
+</div>
+</div>
+</main>
+<script>
+        // Simple subtle interaction for tech feel
+        document.querySelectorAll('button, a').forEach(el => {
+            el.addEventListener('mousedown', () => {
+                el.style.transform = 'scale(0.98)';
+            });
+            el.addEventListener('mouseup', () => {
+                el.style.transform = 'scale(1)';
+            });
+            el.addEventListener('mouseleave', () => {
+                el.style.transform = 'scale(1)';
+            });
+        });
+    </script>
+
+
+</body></html>

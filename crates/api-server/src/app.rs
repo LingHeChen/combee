@@ -1,14 +1,16 @@
 //! HTTP 路由。
 
 use axum::Router;
+use axum::extract::DefaultBodyLimit;
 use axum::middleware;
-use axum::routing::{delete, get, post};
+use axum::routing::{delete, get, post, put};
 use tower_http::trace::TraceLayer;
 
 use crate::AppState;
 use crate::auth;
 use crate::handlers::{
     admin, backup, credits, database, failover, internal, keys, kv, replication, sql, usage,
+    waitlist,
 };
 
 pub fn build_app(state: AppState) -> Router {
@@ -18,7 +20,17 @@ pub fn build_app(state: AppState) -> Router {
             "/v1/databases",
             get(database::list_databases).post(database::create_database),
         )
-        .route("/v1/databases/{id}", delete(database::delete_database))
+        .route(
+            "/v1/databases/by-name/{name}",
+            put(database::ensure_database)
+                .get(database::get_database_by_name)
+                .delete(database::delete_database_by_name),
+        )
+        .route(
+            "/v1/databases/{id}",
+            delete(database::delete_database).patch(database::rename_database),
+        )
+        .route("/v1/databases/{id}/reset", post(database::reset_database))
         .route("/v1/databases/{id}/sql", post(sql::execute_sql))
         .route("/v1/databases/{id}/backup", post(backup::backup))
         .route(
@@ -36,6 +48,7 @@ pub fn build_app(state: AppState) -> Router {
         )
         // 操作端点统一放在 /kv/ops/* 下,避免与任意 key 名冲突
         // (若直接放在 /kv/exists 等,同名 key 的 GET/PUT 会因静态路由优先返回 405)。
+        .route("/v1/databases/{id}/kv", get(kv::kv_list))
         .route("/v1/databases/{id}/kv/ops/exists", post(kv::kv_exists))
         .route("/v1/databases/{id}/kv/ops/mget", post(kv::kv_mget))
         .route("/v1/databases/{id}/kv/ops/mset", post(kv::kv_mset))
@@ -53,6 +66,10 @@ pub fn build_app(state: AppState) -> Router {
         .route("/v1/api-keys/{id}", delete(keys::revoke_api_key))
         .route("/v1/usage/summary", get(usage::usage_summary))
         .route("/v1/usage/timeseries", get(usage::usage_timeseries))
+        .route(
+            "/v1/waitlist",
+            post(waitlist::join).layer(waitlist::waitlist_cors()),
+        )
         .route("/v1/cells/{id}/usage", get(usage::cell_usage))
         .route("/v1/credits/balance", get(credits::credits_balance))
         .route(
@@ -80,7 +97,9 @@ pub fn build_app(state: AppState) -> Router {
             "/admin/vouchers/generate",
             post(admin::admin_generate_vouchers),
         )
+        .route("/admin/tenants", post(admin::admin_create_tenant))
         .route("/admin/vouchers", get(admin::admin_list_vouchers))
+        .route("/admin/waitlist", get(waitlist::admin_list))
         .route(
             "/admin/pricing/versions",
             post(admin::admin_create_pricing_version),
@@ -107,6 +126,15 @@ pub fn build_app(state: AppState) -> Router {
         ));
 
     public
+        .layer(DefaultBodyLimit::max(state.quota.max_request_body_bytes))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::quota::concurrency_quota,
+        ))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::logging::request_logging,
+        ))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             crate::usage::usage_tracking,

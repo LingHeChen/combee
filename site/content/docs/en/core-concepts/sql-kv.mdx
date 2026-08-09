@@ -1,0 +1,31 @@
+---
+title: SQL + KV
+description: The two data models available in every Cell.
+since: 0.1.0-beta
+status: stable
+---
+
+Every Cell gives you two data models with the same lifecycle and isolation boundary:
+
+## SQL
+
+A SQLite-compatible relational database. Use it for structured data:
+
+- Tables, indexes, constraints, and transactions.
+- Parameterized queries with positional `?` placeholders.
+- Read queries return `{ columns, rows }`; writes return the changed row count.
+
+See the [SQL](../sql/query) section for the full API.
+
+## KV
+
+A Redis-style key-value store, useful for cache, sessions, counters, and feature flags:
+
+- `GET` / `SET`, `MGET` / `MSET`, `DEL`, `EXISTS`.
+- `TTL` / `EXPIRE` / `PERSIST` for time-based expiry.
+- `INCR` / `DECR` atomic counters.
+- `NX` / `XX` conditions for set-if-absent / set-if-present.
+
+See the [KV](../kv/get-set) section for the full API.
+
+Both share one namespace per Cell — SQL tables and KV keys live side by side without extra provisioning.

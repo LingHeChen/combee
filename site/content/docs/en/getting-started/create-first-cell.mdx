@@ -1,0 +1,106 @@
+---
+title: Create your first Cell
+description: Create, list, and delete Cells with the SDK.
+since: 0.1.0-beta
+status: stable
+---
+
+A Cell is your app's data space. Creating one is nearly free — no container, no connection string.
+
+## Create
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -H "Idempotency-Key: cell:blog-prod" \
+      -d '{}'
+    # → {"id": "2f1c4a0e-..."}
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const cell = await combee.cells.create({ name: 'blog-prod' });
+    console.log(cell.id); // uuid
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell = combee.cells.create(name="blog-prod")
+    ```
+  </Tab>
+</Tabs>
+
+Creating a Cell with the same `name` is **strict**: a second `create` with a used name fails with
+`CellAlreadyExistsError` (409). For an idempotent get-or-create, use `combee.cells.ensure(name)` — it
+creates the Cell if needed and reuses it otherwise.
+
+## List
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl https://api.combee.cloud/v1/databases \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const { items } = await combee.cells.list();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    items = combee.cells.list()
+    ```
+  </Tab>
+</Tabs>
+
+## Reopen a Cell
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # SDK 的 get 通过 list 端点实现;REST 等价:
+    curl "https://api.combee.cloud/v1/databases?limit=1000" \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const cell = combee.cells.get('2f1c4a0e-...'); // lazily bound; first request validates it
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell = combee.cell('2f1c4a0e-...')
+    ```
+  </Tab>
+</Tabs>
+
+## Delete
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X DELETE https://api.combee.cloud/v1/databases/2f1c4a0e-... \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.delete();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.delete()
+    ```
+  </Tab>
+</Tabs>
+
+<Callout type="warn" title="Destructive">
+  Deleting a Cell removes its data. Create a [backup](../reliability/backups) first if you might need it later.
+</Callout>

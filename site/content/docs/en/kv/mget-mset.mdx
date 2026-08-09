@@ -1,0 +1,44 @@
+---
+title: MGET / MSET
+description: Read and write many keys in one round trip.
+since: 0.1.0-beta
+status: stable
+---
+
+`MGET` fetches several keys in one request; `MSET` writes several key/value pairs atomically.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # MGET
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/mget \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"keys": ["a", "b", "missing"]}'
+    # → {"values": ["1", "2", null]}
+
+    # MSET(原子)
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/mset \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"items": [{"key": "a", "value": "1"}, {"key": "b", "value": "2"}]}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const values = await cell.kv.mget(['a', 'b', 'missing']); // ['1', '2', null]
+
+    await cell.kv.mset({ a: '1', b: '2' });
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    values = cell.kv.mget(["a", "b", "missing"])  # ['1', '2', None]
+
+    cell.kv.mset({"a": "1", "b": "2"})
+    ```
+  </Tab>
+</Tabs>
+
+- `MGET` returns values in key order; missing keys are `null`.
+- `MSET` is a single atomic write — either all keys are written, or none.

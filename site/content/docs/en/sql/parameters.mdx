@@ -1,0 +1,40 @@
+---
+title: Parameters
+description: Bind parameters safely with positional placeholders.
+since: 0.1.0-beta
+status: stable
+---
+
+Always use parameters instead of interpolating values into SQL strings — it prevents SQL injection
+and handles quoting automatically.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/sql \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"sql": "INSERT INTO posts (title) VALUES (?)", "params": ["Hello \"quoted\""]}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.sql.execute(`INSERT INTO posts (title) VALUES (?)`, ['Hello "quoted"']);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.sql.execute("INSERT INTO posts (title) VALUES (?)", ['Hello "quoted"'])
+    ```
+  </Tab>
+</Tabs>
+
+Supported parameter types: `null`, `boolean`, `number`, `string`.
+
+| Placeholder | Meaning |
+|---|---|
+| `?` | positional — the Nth `?` binds the Nth value |
+
+- One statement, one call: multiple statements need separate calls or a [transaction](./transactions).
+- The server rejects statements that attempt to escape the Cell (e.g. `ATTACH`, writing to arbitrary
+  filesystem paths).

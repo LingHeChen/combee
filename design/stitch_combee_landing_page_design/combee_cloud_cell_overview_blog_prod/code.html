@@ -1,0 +1,331 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Combee Cloud - blog-prod Overview</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed-variant": "#3d4756",
+                        "surface-container-highest": "#333535",
+                        "on-surface": "#e2e2e2",
+                        "inverse-on-surface": "#2f3130",
+                        "primary-container": "#0a0a0a",
+                        "on-primary": "#313030",
+                        "primary-fixed-dim": "#c9c6c5",
+                        "tertiary-fixed": "#ffddb8",
+                        "surface-container-low": "#1a1c1c",
+                        "surface-bright": "#383939",
+                        "on-tertiary-fixed-variant": "#653e00",
+                        "tertiary": "#ffb95f",
+                        "background": "#121414",
+                        "surface-dim": "#121414",
+                        "inverse-primary": "#5f5e5e",
+                        "on-primary-fixed-variant": "#474646",
+                        "error": "#ffb4ab",
+                        "primary": "#c9c6c5",
+                        "on-background": "#e2e2e2",
+                        "on-tertiary-container": "#aa6c00",
+                        "on-error": "#690005",
+                        "on-primary-fixed": "#1c1b1b",
+                        "on-surface-variant": "#c4c7c7",
+                        "error-container": "#93000a",
+                        "surface-container-lowest": "#0c0f0e",
+                        "outline-variant": "#444748",
+                        "secondary-container": "#404a59",
+                        "surface-variant": "#333535",
+                        "surface": "#121414",
+                        "surface-tint": "#c9c6c5",
+                        "tertiary-container": "#130800",
+                        "on-error-container": "#ffdad6",
+                        "surface-container": "#1e2020",
+                        "inverse-surface": "#e2e2e2",
+                        "on-secondary-fixed": "#121c2a",
+                        "secondary-fixed": "#d9e3f6",
+                        "on-tertiary": "#472a00",
+                        "secondary": "#bdc7d9",
+                        "on-primary-container": "#7b7979",
+                        "outline": "#8e9192",
+                        "primary-fixed": "#e5e2e1",
+                        "tertiary-fixed-dim": "#ffb95f",
+                        "secondary-fixed-dim": "#bdc7d9",
+                        "on-tertiary-fixed": "#2a1700",
+                        "surface-container-high": "#282a2a",
+                        "on-secondary-container": "#afb9cb",
+                        "on-secondary": "#27313f"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "margin-desktop": "32px",
+                        "container-max": "1280px",
+                        "unit": "4px",
+                        "gutter": "16px",
+                        "margin-mobile": "16px"
+                    },
+                    "fontFamily": {
+                        "body-lg": ["Geist"],
+                        "display-lg": ["Geist"],
+                        "body-sm": ["Geist"],
+                        "headline-md": ["Geist"],
+                        "headline-lg": ["Geist"],
+                        "mono-code": ["JetBrains Mono"],
+                        "headline-lg-mobile": ["Geist"],
+                        "mono-label": ["JetBrains Mono"]
+                    },
+                    "fontSize": {
+                        "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "400" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.04em", "fontWeight": "700" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "500" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "mono-code": ["14px", { "lineHeight": "22px", "letterSpacing": "0em", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "mono-label": ["13px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { background-color: #0A0A0A; }
+        .glass-panel { background: rgba(17, 17, 17, 0.8); backdrop-filter: blur(12px); border: 1px solid #1F2937; }
+        .hex-pulse { width: 8px; height: 8px; background-color: #F59E0B; clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); } 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); } }
+        .card-glow:hover { box-shadow: 0 0 20px 0 rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.3); transition: all 0.3s ease; }
+        .data-label { color: #8e9192; }
+        .data-value { color: #e2e2e2; }
+    </style>
+</head>
+<body class="text-on-surface font-body-sm bg-primary-container h-screen flex overflow-hidden">
+<!-- SideNavBar -->
+<nav class="bg-surface-container-low border-r border-outline-variant flex flex-col h-full py-6 px-4 gap-2 docked left-0 h-screen w-64 hidden md:flex shrink-0">
+<div class="mb-8 px-2 flex items-center gap-3">
+<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCdDu-DG3V3Ub5RwXlMlkE7LFI_u8k3IyVtL2bjCFHzL-LOk_XzMNV_krCgAqt5geGlt5MIog_bJYyPL5JmERi9g3KsaymzfPOcIv1FWnPRuer47KbPFUcuxloZFqMFkiZKQv7vv1bJbsUulMTOXLZ0iy4vsR5vBtdwVV1YZaS3RR4u3GY2SwUhYFadIt_DUrswA-fpw-bnlbmj43GpwOzXJcKB7s9RjR9nKCsvt0M_nlu2-y1CSLPN7E9OiQoBA7cDuJA" alt="Combee Cloud Logo" class="h-8 w-8 shrink-0">
+<div>
+<h1 class="text-headline-md font-headline-md font-bold text-on-surface">Combee Cloud</h1>
+<p class="font-mono-label text-mono-label text-on-surface-variant">v2.4.0-stable</p>
+</div>
+</div>
+<div class="flex-1 flex flex-col gap-1">
+<a class="text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 flex items-center gap-3 px-3 py-2 rounded" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-mono-label text-mono-label">Overview</span>
+</a>
+<a class="bg-tertiary-container text-tertiary font-bold border-r-2 border-tertiary hover:bg-surface-container-highest transition-colors duration-150 flex items-center gap-3 px-3 py-2 rounded" href="#">
+<span class="material-symbols-outlined">hive</span>
+<span class="font-mono-label text-mono-label">Cells</span>
+</a>
+<a class="text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 flex items-center gap-3 px-3 py-2 rounded" href="#">
+<span class="material-symbols-outlined">key</span>
+<span class="font-mono-label text-mono-label">API Keys</span>
+</a>
+<a class="text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 flex items-center gap-3 px-3 py-2 rounded" href="#">
+<span class="material-symbols-outlined">bar_chart</span>
+<span class="font-mono-label text-mono-label">Usage</span>
+</a>
+<a class="text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 flex items-center gap-3 px-3 py-2 rounded" href="#">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+<span class="font-mono-label text-mono-label">Credits</span>
+</a>
+</div>
+<button class="bg-[#F59E0B] text-[#0A0A0A] font-medium py-2 px-4 rounded w-full mb-4 flex justify-center items-center gap-2 hover:bg-tertiary transition-colors">
+<span class="material-symbols-outlined text-sm">add</span>
+            Create Cell
+        </button>
+<div class="border-t border-outline-variant pt-4 flex flex-col gap-1 mt-auto">
+<a class="text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 flex items-center gap-3 px-3 py-2 rounded" href="#">
+<span class="material-symbols-outlined">menu_book</span>
+<span class="font-mono-label text-mono-label">Docs</span>
+</a>
+<a class="text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 flex items-center gap-3 px-3 py-2 rounded" href="#">
+<span class="material-symbols-outlined">contact_support</span>
+<span class="font-mono-label text-mono-label">Support</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 flex flex-col h-full overflow-hidden">
+<!-- TopNavBar -->
+<header class="bg-surface-dim/80 backdrop-blur-md border-b border-outline-variant flex justify-between items-center h-16 px-gutter w-full ml-auto shrink-0 z-10 sticky top-0">
+<div class="flex items-center gap-6">
+<!-- Breadcrumb or context -->
+<div class="text-on-surface-variant font-mono-code text-mono-code flex items-center gap-2">
+<a class="hover:text-tertiary transition-colors" href="#">Cells</a>
+<span class="material-symbols-outlined text-sm">chevron_right</span>
+<span class="text-on-surface font-medium">blog-prod</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="hidden md:flex gap-4">
+<a class="text-on-surface-variant hover:text-tertiary transition-all duration-200 pb-2 border-b-2 border-transparent hover:border-tertiary/50" href="#">Projects</a>
+<a class="text-on-surface-variant hover:text-tertiary transition-all duration-200 pb-2 border-b-2 border-transparent hover:border-tertiary/50" href="#">Regions</a>
+<a class="text-on-surface-variant hover:text-tertiary transition-all duration-200 pb-2 border-b-2 border-transparent hover:border-tertiary/50" href="#">Network</a>
+</div>
+<div class="h-6 w-px bg-outline-variant mx-2"></div>
+<button class="text-on-surface-variant hover:text-tertiary transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-tertiary transition-colors">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-container-highest border border-outline-variant overflow-hidden ml-2">
+<img alt="User profile avatar" class="w-full h-full object-cover" data-alt="A stylized, minimalist avatar placeholder for a developer profile. It uses high contrast, sharp geometric shapes in shades of deep charcoal, crisp white, and a single accent of electric amber. The overall mood is modern, technical, and precise, aligning with a dark-mode, high-density infrastructure UI theme." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCbeFCgts_EguA2Q5iiW_PRRS05R-K_SaHvD2H3fuhxhZ2XCkY5KV1289TwPV8pblcZ1p99rdHeM5hmsjbX9gPbVWu0LmVCk6n82mUg8HNojw9kIx8mzSzKksjzzyxoyPnVCX2FJDzpDNGnZs3j6cYxoua-Dov0w2dxtRF4mGWOWvDHZKmVgpAL7d4OrdjUjH91HmsUH-cEdQOQwwFG8WYoISHgA12oCAFxE2QpYmSdvW1eqoJh7wl9vw">
+</div>
+</div>
+</header>
+<!-- Page Content -->
+<main class="flex-1 overflow-y-auto p-4 md:p-margin-desktop">
+<div class="max-w-container-max mx-auto space-y-8">
+<!-- Cell Header -->
+<div class="flex flex-col md:flex-row md:items-start justify-between gap-4">
+<div>
+<div class="flex items-center gap-3 mb-2">
+<h2 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface m-0">blog-prod</h2>
+<div class="flex items-center gap-2 bg-[#1F2937]/50 border border-[#1F2937] px-2 py-1 rounded">
+<div class="hex-pulse"></div>
+<span class="font-mono-code text-[12px] text-tertiary uppercase tracking-wider">Healthy</span>
+</div>
+</div>
+<div class="flex flex-wrap gap-4 text-on-surface-variant font-mono-code text-mono-code">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">location_on</span> Region: Tokyo</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">tag</span> Cell ID: cell_xxxxx</span>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<button class="bg-[#F59E0B] text-[#0A0A0A] font-medium py-2 px-6 rounded flex justify-center items-center gap-2 hover:bg-tertiary transition-colors">
+<span class="material-symbols-outlined text-sm">cable</span> Connect
+                        </button>
+<button class="bg-transparent border border-[#1F2937] text-[#FAFAF9] font-medium p-2 rounded flex justify-center items-center hover:bg-surface-container-highest transition-colors relative group">
+<span class="material-symbols-outlined">more_vert</span>
+<!-- Dropdown mock -->
+<div class="absolute right-0 top-full mt-1 w-48 bg-surface-container-high border border-outline-variant rounded shadow-lg hidden group-hover:block z-20">
+<ul class="py-1 font-body-sm">
+<li class=""><a class="block px-4 py-2 hover:bg-surface-container-highest text-on-surface" href="#">Rename</a></li>
+<li class=""><a class="block px-4 py-2 hover:bg-surface-container-highest text-on-surface" href="#">Create Backup</a></li>
+<li><hr class="border-outline-variant my-1"></li>
+<li class=""><a class="block px-4 py-2 hover:bg-error-container text-error" href="#">Delete Cell</a></li>
+</ul>
+</div>
+</button>
+</div>
+</div>
+<!-- Tabs -->
+<div class="border-b border-outline-variant flex overflow-x-auto hide-scrollbar">
+<a class="px-4 py-2 text-tertiary border-b-2 border-tertiary font-medium whitespace-nowrap" href="#">Overview</a>
+<a class="px-4 py-2 text-on-surface-variant hover:text-on-surface transition-colors whitespace-nowrap" href="#">SQL</a>
+<a class="px-4 py-2 text-on-surface-variant hover:text-on-surface transition-colors whitespace-nowrap" href="#">KV</a>
+<a class="px-4 py-2 text-on-surface-variant hover:text-on-surface transition-colors whitespace-nowrap" href="#">Usage</a>
+<a class="px-4 py-2 text-on-surface-variant hover:text-on-surface transition-colors whitespace-nowrap" href="#">Backups</a>
+<a class="px-4 py-2 text-on-surface-variant hover:text-on-surface transition-colors whitespace-nowrap" href="#">Replication</a>
+<a class="px-4 py-2 text-on-surface-variant hover:text-on-surface transition-colors whitespace-nowrap" href="#">Settings</a>
+</div>
+<!-- Bento Grid Content -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+<!-- Summary Block 1 -->
+<div class="glass-panel p-4 rounded card-glow relative overflow-hidden group">
+<div class="absolute top-2 right-2 font-mono-code text-[10px] text-outline-variant opacity-50">01_STAT</div>
+<h3 class="font-mono-label text-mono-label data-label mb-2 uppercase tracking-widest">Status</h3>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary">check_circle</span>
+<span class="font-headline-md text-headline-md data-value">Operational</span>
+</div>
+</div>
+<!-- Summary Block 2 -->
+<div class="glass-panel p-4 rounded card-glow relative overflow-hidden">
+<div class="absolute top-2 right-2 font-mono-code text-[10px] text-outline-variant opacity-50">02_RGN</div>
+<h3 class="font-mono-label text-mono-label data-label mb-2 uppercase tracking-widest">Region</h3>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-on-surface-variant">public</span>
+<span class="font-headline-md text-headline-md data-value">Tokyo (ap-northeast-1)</span>
+</div>
+</div>
+<!-- Summary Block 3 -->
+<div class="glass-panel p-4 rounded card-glow relative overflow-hidden">
+<div class="absolute top-2 right-2 font-mono-code text-[10px] text-outline-variant opacity-50">03_STRG</div>
+<h3 class="font-mono-label text-mono-label data-label mb-2 uppercase tracking-widest">Storage</h3>
+<div class="flex items-end gap-2">
+<span class="font-headline-md text-headline-md data-value">1.2</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant mb-1">GB</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1 mt-2 rounded overflow-hidden">
+<div class="bg-tertiary h-full w-[15%]"></div>
+</div>
+</div>
+<!-- Summary Block 4 -->
+<div class="glass-panel p-4 rounded card-glow relative overflow-hidden">
+<div class="absolute top-2 right-2 font-mono-code text-[10px] text-outline-variant opacity-50">04_REQ</div>
+<h3 class="font-mono-label text-mono-label data-label mb-2 uppercase tracking-widest">Requests (30d)</h3>
+<div class="flex items-end gap-2">
+<span class="font-headline-md text-headline-md data-value">4.5M</span>
+<span class="material-symbols-outlined text-tertiary text-sm mb-1">trending_up</span>
+</div>
+</div>
+<!-- Summary Block 5 (Spans 2 cols on lg) -->
+<div class="glass-panel p-4 rounded card-glow relative overflow-hidden lg:col-span-2 flex flex-col justify-between">
+<div class="absolute top-2 right-2 font-mono-code text-[10px] text-outline-variant opacity-50">05_TIME</div>
+<div class="grid grid-cols-2 gap-4">
+<div>
+<h3 class="font-mono-label text-mono-label data-label mb-1 uppercase tracking-widest">Created</h3>
+<p class="font-mono-code text-mono-code data-value">2023-10-24 14:32 UTC</p>
+</div>
+<div>
+<h3 class="font-mono-label text-mono-label data-label mb-1 uppercase tracking-widest">Last Active</h3>
+<p class="font-mono-code text-mono-code data-value">2 mins ago</p>
+</div>
+</div>
+</div>
+<!-- Summary Block 6 -->
+<div class="glass-panel p-4 rounded card-glow relative overflow-hidden">
+<div class="absolute top-2 right-2 font-mono-code text-[10px] text-outline-variant opacity-50">06_BKP</div>
+<h3 class="font-mono-label text-mono-label data-label mb-2 uppercase tracking-widest">Backup Health</h3>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary">cloud_done</span>
+<span class="font-body-sm text-body-sm data-value">Last run: 4h ago</span>
+</div>
+</div>
+<!-- Summary Block 7 -->
+<div class="glass-panel p-4 rounded card-glow relative overflow-hidden">
+<div class="absolute top-2 right-2 font-mono-code text-[10px] text-outline-variant opacity-50">07_REPL</div>
+<h3 class="font-mono-label text-mono-label data-label mb-2 uppercase tracking-widest">Replication Health</h3>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary">sync_alt</span>
+<span class="font-body-sm text-body-sm data-value">In Sync (2 read replicas)</span>
+</div>
+</div>
+</div>
+<!-- Advanced Diagnostics (Collapsed) -->
+<div class="border border-[#1F2937] rounded overflow-hidden mt-8">
+<button class="w-full bg-[#111111] hover:bg-surface-container-highest transition-colors p-4 flex justify-between items-center text-left" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.icon').textContent = this.querySelector('.icon').textContent === 'expand_more' ? 'expand_less' : 'expand_more';">
+<span class="font-mono-label text-mono-label uppercase tracking-widest text-on-surface-variant">Advanced Diagnostics (Internal)</span>
+<span class="material-symbols-outlined text-on-surface-variant icon">expand_more</span>
+</button>
+<div class="hidden bg-[#0A0A0A] p-4 border-t border-[#1F2937]">
+<pre class="font-mono-code text-mono-code text-on-surface-variant overflow-x-auto text-xs">{
+  "node_id": "n_tk_883a",
+  "alloc_id": "a_992f",
+  "engine_version": "v1.14.2",
+  "shard_count": 4,
+  "raft_status": "leader",
+  "memory_pressure": "0.14",
+  "last_compaction": "2023-11-01T04:00:00Z"
+}
+                        </pre>
+</div>
+</div>
+</div>
+</main>
+</div>
+
+
+</body></html>

@@ -1,0 +1,1469 @@
+---
+title: REST API
+description: 完整的 HTTP API 参考——每个端点都带 curl、TypeScript、Python 三种示例。
+since: 0.1.0-beta
+status: stable
+---
+
+REST API 是接口的事实来源。下面每个端点都由机器可读的 OpenAPI 文档描述——服务端从 handler 注解生成,
+地址为 `/openapi.json`。
+
+## 通用约定
+
+- **Base URL**:`https://api.combee.cloud`
+- **认证**:除 `/v1/waitlist` 外,每个请求都带 `x-api-key: <key>`;key 以 `cmb_sk_...` 开头。
+- **请求 ID**:可选 `x-request-id` 请求头;服务端在每个响应(含错误)中回显。
+- **错误**:所有错误使用统一的 `{ "code", "error" }` 结构——见 [Error Codes](./error-codes)。
+- **分页**:只有明确说明的端点才返回 `{ items, next_cursor }`(或 `{ keys, next_cursor }`);
+  直接返回数组的列表端点不分页。
+
+## Cells
+
+**Cell** 是包含 SQL 和 KV 的逻辑数据空间。REST 路径前缀为 `/v1/databases/...`(历史命名),
+但公共概念始终是 Cell。
+
+### 创建 Cell
+
+`POST /v1/databases`
+
+创建一个新的 Cell(懒创建——首次使用前不做磁盘操作)。传 `name` 可以带上人类可读、租户内唯一的名称;
+省略时自动生成 `cell-<short-id>`。
+
+**严格创建**:`name` 在账号内已存在时返回 `409 cell_already_exists`。需要幂等的
+“存在即复用”,请用[确保 Cell 存在](#确保-cell-存在)。名称必须匹配 `^[a-z0-9][a-z0-9-_]{0,62}$`
+(小写字母、数字、`-`、`_`;以字母或数字开头;≤ 63 字符)——否则返回 `400 invalid_cell_name`。
+
+| 参数 | 位置 | 说明 |
+|---|---|---|
+| `name` | body | 可选;租户内唯一名称(规则见上) |
+| `Idempotency-Key` | header | 可选;相同 key 重复调用返回首次创建的 Cell |
+
+响应 `201 Created`:
+
+```json
+{ "id": "2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b", "name": "my-app" }
+```
+
+错误:`409 cell_already_exists`(名称已被占用)、`400 invalid_cell_name`。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -H "Idempotency-Key: cell:my-app" \
+      -d '{"name": "my-app"}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    import { Combee } from '@combee/sdk';
+
+    const combee = new Combee({
+      baseUrl: 'https://api.combee.cloud',
+      apiKey: process.env.COMBEE_API_KEY!,
+    });
+
+    const cell = await combee.cells.create({ name: 'my-app' });
+    console.log(cell.id);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    import os
+    from combee import Combee
+
+    combee = Combee(
+        base_url="https://api.combee.cloud",
+        api_key=os.environ["COMBEE_API_KEY"],
+    )
+
+    cell = combee.cells.create(name="my-app")
+    print(cell.id)
+    ```
+  </Tab>
+</Tabs>
+
+### 列出 Cells
+
+`GET /v1/databases`
+
+返回当前账号拥有的全部 Cell。响应是纯数组(不分页)。
+
+响应 `200 OK`:
+
+```json
+[
+  {
+    "id": "2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b",
+    "name": "my-app",
+    "tenant_id": "9c8b7a6f-...",
+    "state": "idle",
+    "created_at": 1755000000,
+    "storage_node_id": null
+  }
+]
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl https://api.combee.cloud/v1/databases \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const { items } = await combee.cells.list();
+    for (const cell of items) {
+      console.log(cell.id, cell.state);
+    }
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cells = combee.cells.list()
+    for c in cells["items"]:
+        print(c["id"], c["state"])
+    ```
+  </Tab>
+</Tabs>
+
+### 删除 Cell
+
+`DELETE /v1/databases/{id}`
+
+永久删除 Cell 及其数据。无响应体。
+
+| 参数 | 位置 | 说明 |
+|---|---|---|
+| `id` | path | Cell id(UUID) |
+
+响应 `204 No Content`。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X DELETE https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.delete();
+    // 或:await combee.cells.delete(cell.id);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.delete()
+    # 或:combee.cells.delete(cell.id)
+    ```
+  </Tab>
+</Tabs>
+
+### 确保 Cell 存在
+
+`PUT /v1/databases/by-name/{name}`
+
+按名称幂等“存在即创建,否则复用”。应用启动推荐用它,而不是严格的[创建 Cell](#创建-cell)。
+
+| 参数 | 位置 | 说明 |
+|---|---|---|
+| `name` | path | Cell 名称(URL 编码,须匹配 `^[a-z0-9][a-z0-9-_]{0,62}$`) |
+
+响应 `201 Created`(新建)或 `200 OK`(已存在):
+
+```json
+{
+  "cell": { "id": "2f1c4a0e-...", "name": "my-app", "tenant_id": "9c8b7a6f-...", "state": "idle", "created_at": 1755000000 },
+  "created": true
+}
+```
+
+错误:`400 invalid_cell_name`、`429 quota_exceeded`。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X PUT https://api.combee.cloud/v1/databases/by-name/my-app \
+      -H "x-api-key: $COMBEE_API_KEY"
+    # → {"cell": {...}, "created": true} 首次创建
+    # → {"cell": {...}, "created": false} 已存在,复用
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const cell = await combee.cells.ensure('my-app');
+    console.log(cell.id, cell.name);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell = combee.cells.ensure("my-app")
+    print(cell.id, cell.name)
+    ```
+  </Tab>
+</Tabs>
+
+### 按名称查询 Cell
+
+`GET /v1/databases/by-name/{name}`
+
+返回指定名称的 Cell。不存在时返回 `404 database_not_found`(不泄露名称是否存在)。
+
+响应 `200 OK`:
+
+```json
+{ "id": "2f1c4a0e-...", "name": "my-app", "tenant_id": "9c8b7a6f-...", "state": "idle", "created_at": 1755000000 }
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl https://api.combee.cloud/v1/databases/by-name/my-app \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const cell = await combee.cells.getByName('my-app');
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell = combee.cells.get_by_name("my-app")
+    ```
+  </Tab>
+</Tabs>
+
+### 重命名 Cell
+
+`PATCH /v1/databases/{id}`
+
+重命名 Cell。`id` 保持不变;新名称必须在账号内唯一。
+
+| 参数 | 位置 | 说明 |
+|---|---|---|
+| `id` | path | Cell id(UUID) |
+| `name` | body | 新名称(须匹配 `^[a-z0-9][a-z0-9-_]{0,62}$`) |
+
+响应 `200 OK`——更新后的 Cell 记录。
+
+错误:`409 cell_name_conflict`(名称已被占用)、`400 invalid_cell_name`。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X PATCH https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"name": "blog-prod-v2"}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const updated = await cell.rename('blog-prod-v2');
+    console.log(updated.name);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    updated = cell.rename("blog-prod-v2")
+    print(updated["name"])
+    ```
+  </Tab>
+</Tabs>
+
+### 重置 Cell
+
+`POST /v1/databases/{id}/reset`
+
+清空全部 SQL 与 KV 数据。`id` 和 `name` 保持不变,generation 计数 +1,使过期写入者被拒绝。
+破坏性操作——无法撤销。
+
+| 参数 | 位置 | 说明 |
+|---|---|---|
+| `id` | path | Cell id(UUID) |
+
+响应 `200 OK`——更新后的 Cell 记录。
+
+错误:`500 cell_reset_failed`。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/reset \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.reset();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.reset()
+    ```
+  </Tab>
+</Tabs>
+
+## SQL
+
+### 执行单条语句
+
+`POST /v1/databases/{id}/sql`
+
+对 Cell 执行单条 SQL 语句。读和写语句都接受。
+
+| 参数 | 位置 | 说明 |
+|---|---|---|
+| `id` | path | Cell id(UUID) |
+| `sql` | body | SQL 文本,使用 `?` 位置占位符 |
+| `params` | body | 可选;`null` / boolean / number / string 数组,按占位符顺序 |
+
+响应 `200 OK`:
+
+```json
+{
+  "columns": ["id", "title"],
+  "rows": [[1, "Hello"]],
+  "rows_affected": 1,
+  "truncated": false
+}
+```
+
+读语句的 `rows_affected` 为 `0`;写语句的 `columns` 和 `rows` 为空数组。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/sql \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"sql": "SELECT id, title FROM posts WHERE id = ?", "params": [1]}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const { columns, rows } = await cell.sql.query<{ id: number; title: string }>(
+      `SELECT id, title FROM posts WHERE id = ?`,
+      [1],
+    );
+
+    const result = await cell.sql.execute(`INSERT INTO posts (title) VALUES (?)`, ['Hello']);
+    console.log(result.rows_affected);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    result = cell.sql.query("SELECT id, title FROM posts WHERE id = ?", [1])
+    # {"columns": [...], "rows": [...]}
+
+    result = cell.sql.execute("INSERT INTO posts (title) VALUES (?)", ["Hello"])
+    print(result["rows_affected"])
+    ```
+  </Tab>
+</Tabs>
+
+### 执行事务
+
+`POST /v1/databases/{id}/transaction`
+
+在单个原子单元中执行一组语句——要么全部提交,要么全部回滚。
+
+| 参数 | 位置 | 说明 |
+|---|---|---|
+| `id` | path | Cell id(UUID) |
+| `statements` | body | `{ sql, params }` 对象数组,按顺序执行 |
+
+响应 `200 OK`——每个语句一个结果:
+
+```json
+[
+  { "columns": [], "rows": [], "rows_affected": 1, "truncated": false },
+  { "columns": [], "rows": [], "rows_affected": 1, "truncated": false }
+]
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/transaction \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "statements": [
+          {"sql": "UPDATE accounts SET balance = balance - 100 WHERE id = ?", "params": [1]},
+          {"sql": "UPDATE accounts SET balance = balance + 100 WHERE id = ?", "params": [2]}
+        ]
+      }'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const results = await cell.sql.transaction([
+      { sql: `UPDATE accounts SET balance = balance - 100 WHERE id = ?`, params: [1] },
+      { sql: `UPDATE accounts SET balance = balance + 100 WHERE id = ?`, params: [2] },
+    ]);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    results = cell.sql.transaction([
+        {"sql": "UPDATE accounts SET balance = balance - 100 WHERE id = ?", "params": [1]},
+        {"sql": "UPDATE accounts SET balance = balance + 100 WHERE id = ?", "params": [2]},
+    ])
+    ```
+  </Tab>
+</Tabs>
+
+## KV
+
+KV 的值是字符串。key 位于 URL 路径中,必须做百分号编码(SDK 会自动处理)。
+操作端点统一放在 `/kv/ops/...` 下,这样任意 key 名也能直接读写。
+
+### 读取值
+
+`GET /v1/databases/{id}/kv/{key}`
+
+| 参数 | 位置 | 说明 |
+|---|---|---|
+| `id` | path | Cell id(UUID) |
+| `key` | path | KV key(URL 编码) |
+
+响应 `200 OK`:
+
+```json
+{ "exists": true, "value": "hello", "ttl_seconds": 60 }
+```
+
+key 不存在时返回 `{ "exists": false, "value": null }`——**不是**错误。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/greeting \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const value = await cell.kv.get('greeting'); // 'hello',缺失时为 null
+    const config = await cell.kv.getJson<{ theme: string }>('config');
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    value = cell.kv.get("greeting")   # "hello",缺失时为 None
+    config = cell.kv.get_json("config")
+    ```
+  </Tab>
+</Tabs>
+
+### 写入值
+
+`PUT /v1/databases/{id}/kv/{key}`
+
+| 参数 | 位置 | 说明 |
+|---|---|---|
+| `id` | path | Cell id(UUID) |
+| `key` | path | KV key(URL 编码) |
+| `value` | body | 要存储的字符串值 |
+| `ttl_seconds` | body | 可选 TTL(秒);省略 = 持久 key |
+| `nx` | body | 可选;仅当 key 不存在时写入 |
+| `xx` | body | 可选;仅当 key 已存在时写入 |
+
+响应 `200 OK`:
+
+```json
+{ "written": true }
+```
+
+`nx` / `xx` 条件不满足时 `written` 为 `false`(空操作,不写入)。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X PUT https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/greeting \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"value": "hello", "ttl_seconds": 60, "nx": false, "xx": false}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const written = await cell.kv.set('greeting', 'hello', { ttl: 60 });
+    await cell.kv.setJson('config', { theme: 'dark' });
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    written = cell.kv.set("greeting", "hello", ttl=60)
+    cell.kv.set_json("config", {"theme": "dark"})
+    ```
+  </Tab>
+</Tabs>
+
+### 删除值
+
+`DELETE /v1/databases/{id}/kv/{key}`
+
+响应 `200 OK`:
+
+```json
+{ "deleted": true }
+```
+
+key 不存在时 `deleted` 为 `false`。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X DELETE https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/greeting \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const deleted = await cell.kv.delete('greeting');
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    deleted = cell.kv.delete("greeting")
+    ```
+  </Tab>
+</Tabs>
+
+### 扫描 keys
+
+`GET /v1/databases/{id}/kv?prefix=&limit=&cursor=`
+
+按字典序列出 keys,可选前缀过滤。
+
+| 参数 | 位置 | 说明 |
+|---|---|---|
+| `prefix` | query | 可选;只返回以该字符串开头的 key |
+| `limit` | query | 可选;每页条数,默认 50,上限 1000 |
+| `cursor` | query | 可选;传入上一页的 `next_cursor` |
+
+响应 `200 OK`:
+
+```json
+{ "keys": ["greeting", "greeting:2"], "next_cursor": "" }
+```
+
+`next_cursor` 为空表示扫描结束。SDK 尚未暴露此端点——请直接调用。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl "https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv?prefix=greet&limit=100" \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    // @combee/sdk 尚未暴露,直接调用端点:
+    const res = await fetch(
+      `https://api.combee.cloud/v1/databases/${cell.id}/kv?prefix=greet&limit=100`,
+      { headers: { 'x-api-key': process.env.COMBEE_API_KEY! } },
+    );
+    const { keys, next_cursor } = await res.json();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    # 尚未在 SDK 中封装,直接用 httpx 调用:
+    import os, httpx
+
+    resp = httpx.get(
+        f"https://api.combee.cloud/v1/databases/{cell.id}/kv",
+        params={"prefix": "greet", "limit": 100},
+        headers={"x-api-key": os.environ["COMBEE_API_KEY"]},
+    )
+    print(resp.json())  # {"keys": [...], "next_cursor": "..."}
+    ```
+  </Tab>
+</Tabs>
+
+### 检查存在性
+
+`POST /v1/databases/{id}/kv/ops/exists`
+
+请求体:`{ "keys": ["a", "b"] }` → 响应 `200 OK`:`[true, false]`(每个 key 一个布尔,按顺序)。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/exists \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"keys": ["a", "b"]}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const exists = await cell.kv.exists('a'); // boolean
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    exists = cell.kv.exists("a")  # bool
+    ```
+  </Tab>
+</Tabs>
+
+### 批量读取
+
+`POST /v1/databases/{id}/kv/ops/mget`
+
+请求体:`{ "keys": ["a", "b"] }` → 响应 `200 OK`:
+
+```json
+{ "values": ["1", null] }
+```
+
+值与请求的 keys 一一对应;缺失的 key 为 `null`。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/mget \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"keys": ["a", "b", "missing"]}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const values = await cell.kv.mget(['a', 'b', 'missing']); // ['1', '2', null]
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    values = cell.kv.mget(["a", "b", "missing"])  # ['1', '2', None]
+    ```
+  </Tab>
+</Tabs>
+
+### 批量写入
+
+`POST /v1/databases/{id}/kv/ops/mset`
+
+请求体:
+
+```json
+{
+  "items": [
+    { "key": "a", "value": "1", "ttl_seconds": 60 },
+    { "key": "b", "value": "2" }
+  ]
+}
+```
+
+原子写入——要么全部写入,要么全部不写。响应 `204 No Content`。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/mset \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"items": [{"key": "a", "value": "1", "ttl_seconds": 60}, {"key": "b", "value": "2"}]}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.kv.mset({ a: '1', b: '2' });
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.kv.mset({"a": "1", "b": "2"})
+    ```
+  </Tab>
+</Tabs>
+
+### 剩余存活时间
+
+`POST /v1/databases/{id}/kv/ops/ttl`
+
+请求体:`{ "keys": ["a", "b"] }` → 响应 `200 OK`:
+
+```json
+[60, -1]
+```
+
+每个 key:剩余秒数(`>= 0`)、`-1` = 持久、`null` = key 不存在。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/ttl \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"keys": ["a", "b"]}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const ttl = await cell.kv.ttl('a');
+    // { state: 'expires', seconds: 60 } | { state: 'persistent' } | { state: 'missing' }
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    ttl = cell.kv.ttl("a")
+    # {"state": "expires", "seconds": 60} | {"state": "persistent"} | {"state": "missing"}
+    ```
+  </Tab>
+</Tabs>
+
+### 设置或移除过期时间
+
+`POST /v1/databases/{id}/kv/ops/expire`
+
+请求体:`{ "key": "a", "ttl_seconds": 60 }`。省略 `ttl_seconds`(或传 `null`)即 PERSIST(移除 TTL)。
+响应 `200 OK`:
+
+```json
+{ "updated": true }
+```
+
+key 不存在时 `updated` 为 `false`。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # 设置 60 秒 TTL
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/expire \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"key": "a", "ttl_seconds": 60}'
+
+    # 移除 TTL(持久化)
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/expire \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"key": "a"}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.kv.expire('a', 60); // 重置为 60 秒
+    await cell.kv.persist('a');    // 移除 TTL
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.kv.expire("a", 60)   # 重置为 60 秒
+    cell.kv.persist("a")      # 移除 TTL
+    ```
+  </Tab>
+</Tabs>
+
+### 自增 / 自减
+
+`POST /v1/databases/{id}/kv/ops/incr`
+
+请求体:`{ "key": "c", "delta": 1, "ttl_seconds": 60 }` → 响应 `200 OK`:
+
+```json
+{ "value": 6 }
+```
+
+`delta` 缺省为 `1`(负数即自减)。缺失的 key 从 `0` 开始。可选的 `ttl_seconds` 只在首次创建时生效,
+否则保持原有 TTL。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/incr \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"key": "pageviews", "delta": 5}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const v1 = await cell.kv.incr('pageviews');      // 1
+    const v2 = await cell.kv.incr('pageviews', 5);   // 6
+    const v3 = await cell.kv.decr('pageviews', 2);   // 4
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    v1 = cell.kv.incr("pageviews")       # 1
+    v2 = cell.kv.incr("pageviews", 5)    # 6
+    v3 = cell.kv.decr("pageviews", 2)    # 4
+    ```
+  </Tab>
+</Tabs>
+
+## API Keys
+
+### 创建 API key
+
+`POST /v1/api-keys`
+
+创建一个 key。明文**只返回一次**;Combee 只存储其 SHA-256 哈希。
+
+响应 `201 Created`:
+
+```json
+{
+  "key": "cmb_sk_8f3a...",
+  "record": {
+    "id": "1a2b3c4d-...",
+    "tenant_id": "9c8b7a6f-...",
+    "key_hash": "e3b0c442...",
+    "created_at": 1755000000,
+    "revoked_at": null
+  }
+}
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/api-keys \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const key = await combee.apiKeys.create({ name: 'ci' });
+    // key.key 只显示一次——请立即保存。
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    key = combee.api_keys.create(name="ci")
+    # key["key"] 只显示一次,请立即保存
+    ```
+  </Tab>
+</Tabs>
+
+### 列出 API keys
+
+`GET /v1/api-keys`
+
+列出账号的 key。明文不会再返回——只有元数据。
+
+响应 `200 OK`:
+
+```json
+[
+  {
+    "id": "1a2b3c4d-...",
+    "tenant_id": "9c8b7a6f-...",
+    "key_hash": "e3b0c442...",
+    "created_at": 1755000000,
+    "revoked_at": null
+  }
+]
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl https://api.combee.cloud/v1/api-keys \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const keys = await combee.apiKeys.list();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    keys = combee.api_keys.list()
+    ```
+  </Tab>
+</Tabs>
+
+### 撤销 API key
+
+`DELETE /v1/api-keys/{id}`
+
+撤销立即生效——该 key 在下一个请求就被拒绝。响应 `204 No Content`。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X DELETE https://api.combee.cloud/v1/api-keys/1a2b3c4d-... \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await combee.apiKeys.revoke(key.id);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    combee.api_keys.revoke(key["id"])
+    ```
+  </Tab>
+</Tabs>
+
+## Usage(用量)
+
+用量按账号和 Cell 计量。时间过滤接受 RFC3339 的 `from` / `to`;两者都缺省为最近 24 小时。
+
+### 用量汇总
+
+`GET /v1/usage/summary?from=&to=`
+
+跨全部 Cell 的账号级汇总。
+
+响应 `200 OK`:
+
+```json
+{
+  "period": { "from": "2026-08-01T00:00:00+00:00", "to": "2026-08-02T00:00:00+00:00" },
+  "operations": { "kv_reads": 1200, "kv_writes": 340, "sql_reads": 80, "sql_writes": 25 },
+  "request_count": 1650,
+  "bytes_in": 20480,
+  "bytes_out": 81920,
+  "current_storage_bytes": 1048576
+}
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl "https://api.combee.cloud/v1/usage/summary?from=2026-08-01T00:00:00Z&to=2026-08-02T00:00:00Z" \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const summary = await combee.usage.summary({
+      from: '2026-08-01T00:00:00Z',
+      to: '2026-08-02T00:00:00Z',
+    });
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    summary = combee.usage.summary({"from": "2026-08-01T00:00:00Z", "to": "2026-08-02T00:00:00Z"})
+    ```
+  </Tab>
+</Tabs>
+
+### 用量时序
+
+`GET /v1/usage/timeseries?metric=&interval=&from=&to=`
+
+单个 metric 的分桶时序。
+
+| 参数 | 说明 |
+|---|---|
+| `metric` | 必填。`kv_read`、`kv_write`、`sql_read`、`sql_write`、`requests`、`bytes_in`、`bytes_out`、`storage_bytes` 之一 |
+| `interval` | `minute`(默认)\| `hour` \| `day` |
+
+响应 `200 OK`:
+
+```json
+[
+  { "bucket_start": "2026-08-01T00:00:00+00:00", "value": 340 },
+  { "bucket_start": "2026-08-01T01:00:00+00:00", "value": 512 }
+]
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl "https://api.combee.cloud/v1/usage/timeseries?metric=kv_read&interval=hour" \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const series = await combee.usage.timeseries({
+      metric: 'kv_read',
+      interval: 'hour',
+    });
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    series = combee.usage.timeseries("kv_read", interval="hour")
+    ```
+  </Tab>
+</Tabs>
+
+### 单 Cell 用量
+
+`GET /v1/cells/{id}/usage?from=&to=`
+
+单个 Cell 的用量,带精确的 `current_storage_bytes`。
+
+响应 `200 OK`——结构同[用量汇总](#用量汇总),但只针对一个 Cell。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl "https://api.combee.cloud/v1/cells/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/usage" \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const cellUsage = await combee.usage.cell(cell.id);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell_usage = combee.usage.cell(cell.id)
+    ```
+  </Tab>
+</Tabs>
+
+## Credits & Pricing(额度与定价)
+
+金额是整数基本单位(microcredits),以 decimal string 返回——禁止浮点。
+
+### 余额
+
+`GET /v1/credits/balance`
+
+响应 `200 OK`:
+
+```json
+{ "available": "50000000", "reserved": "0", "currency": "CREDIT", "updated_at": 1755000000 }
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl https://api.combee.cloud/v1/credits/balance \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const balance = await combee.credits.balance();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    balance = combee.credits.balance()
+    ```
+  </Tab>
+</Tabs>
+
+### 交易记录
+
+`GET /v1/credits/transactions?limit=&cursor=`
+
+append-only 账本,最新的在前。用 `{ items, next_cursor }` 分页。
+
+响应 `200 OK`:
+
+```json
+{
+  "items": [
+    {
+      "id": "7f8e9d0c-...",
+      "tenant_id": "9c8b7a6f-...",
+      "txn_type": "voucher",
+      "amount_units": "50000000",
+      "pricing_version": null,
+      "reference_id": "voucher:ab12...",
+      "description": null,
+      "created_at": 1755000000,
+      "balance_after": "50000000"
+    }
+  ],
+  "next_cursor": null
+}
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl "https://api.combee.cloud/v1/credits/transactions?limit=100" \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const { items, nextCursor } = await combee.credits.transactions();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    page = combee.credits.transactions()
+    # {"items": [...], "next_cursor": ...}
+    ```
+  </Tab>
+</Tabs>
+
+### 兑换兑换券
+
+`POST /v1/credits/redeem`
+
+单次使用、幂等、并发安全:重复兑换同一个 code 不会重复加钱。
+
+请求体:`{ "code": "CMB-84PA-X2KD-7MQR" }` → 响应 `200 OK`:
+
+```json
+{ "credits_added": "50000000", "balance": "100000000", "already_redeemed": false }
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/credits/redeem \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"code": "CMB-84PA-X2KD-7MQR"}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const result = await combee.credits.redeem('CMB-84PA-X2KD-7MQR');
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    result = combee.credits.redeem("CMB-84PA-X2KD-7MQR")
+    ```
+  </Tab>
+</Tabs>
+
+### 定价
+
+`GET /v1/pricing`
+
+当前生效的定价表(只读;权威计价在服务端)。
+
+响应 `200 OK`:
+
+```json
+{
+  "version": 1,
+  "effective_at": 1755000000,
+  "units": {
+    "kv_read": {
+      "unit_size": 1000,
+      "price_units": 10,
+      "price_per_unit": "10 microcredits / 1000 kv_read"
+    }
+  }
+}
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl https://api.combee.cloud/v1/pricing \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const pricing = await combee.pricing.get();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    pricing = combee.pricing.get()
+    ```
+  </Tab>
+</Tabs>
+
+## Backups & Restore(备份与恢复)
+
+备份存放在 Cell 之外的对象存储中——删除 Cell 不影响已有备份。
+
+### 创建快照备份
+
+`POST /v1/databases/{id}/backup`
+
+Cell 的一致性时间点快照。
+
+响应 `200 OK`:
+
+```json
+{ "key": "snapshots/2f1c4a0e-.../backup-20260801T000000Z", "size_bytes": 40960, "created_at": 1755000000 }
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/backup \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const backup = await cell.backups.create();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    backup = cell.backups.create()
+    ```
+  </Tab>
+</Tabs>
+
+### 创建增量备份
+
+`POST /v1/databases/{id}/backup/incr`
+
+归档数据库加上当前 WAL,缩短恢复时间。
+
+响应 `200 OK`——结构与快照备份相同。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/backup/incr \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const incr = await cell.backups.createIncremental();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    incr = cell.backups.create_incremental()
+    ```
+  </Tab>
+</Tabs>
+
+### 恢复 Cell
+
+`POST /v1/databases/{id}/restore`
+
+从备份恢复 Cell。请求体 `{ "version": "snapshots/..." }` 可选——省略时恢复最新备份。
+原子操作:Cell 作为一个整体切换到恢复后的数据。
+
+响应 `204 No Content`。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # 最新备份
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/restore \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{}'
+
+    # 指定版本
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/restore \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"version": "snapshots/2f1c4a0e-.../backup-20260801T000000Z"}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.backups.restoreLatest();
+    await cell.backups.restore('snapshots/2f1c4a0e-.../backup-20260801T000000Z');
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.backups.restore_latest()
+    cell.backups.restore("snapshots/2f1c4a0e-.../backup-20260801T000000Z")
+    ```
+  </Tab>
+</Tabs>
+
+## Replication & Failover(复制与故障转移)
+
+每个 Cell 最多**一个副本**。
+
+### 查询复制状态
+
+`GET /v1/databases/{id}/replication`
+
+响应 `200 OK`:
+
+```json
+{ "db": "2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b", "replica_node": "node-b" }
+```
+
+未启用复制时 `replica_node` 为 `null`。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/replication \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const status = await cell.replication.get();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    status = cell.replication.get()
+    ```
+  </Tab>
+</Tabs>
+
+### 启用复制
+
+`POST /v1/databases/{id}/replication`
+
+请求体:`{ "replica_node": "node-b" }` → 响应 `200 OK`:
+
+```json
+{ "db": "2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b", "replica_node": "node-b" }
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/replication \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"replica_node": "node-b"}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.replication.enable('node-b');
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.replication.enable("node-b")
+    ```
+  </Tab>
+</Tabs>
+
+### 禁用复制
+
+`DELETE /v1/databases/{id}/replication`
+
+响应 `204 No Content`。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X DELETE https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/replication \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.replication.disable();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.replication.disable()
+    ```
+  </Tab>
+</Tabs>
+
+### 手动触发故障转移
+
+`POST /v1/databases/{id}/failover`
+
+手动把副本提升为主库。正常情况下主库心跳丢失后会自动故障转移;需要强制执行时用本端点。
+SDK 尚未封装——请直接调用。
+
+响应 `200 OK`——更新后的 Cell 记录。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/failover \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    // @combee/sdk 尚未暴露,直接调用端点:
+    const res = await fetch(
+      `https://api.combee.cloud/v1/databases/${cell.id}/failover`,
+      { method: 'POST', headers: { 'x-api-key': process.env.COMBEE_API_KEY! } },
+    );
+    const record = await res.json();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    # 尚未在 SDK 中封装,直接用 httpx 调用:
+    import os, httpx
+
+    resp = httpx.post(
+        f"https://api.combee.cloud/v1/databases/{cell.id}/failover",
+        headers={"x-api-key": os.environ["COMBEE_API_KEY"]},
+    )
+    print(resp.json())
+    ```
+  </Tab>
+</Tabs>
+
+## Waitlist(候补名单)
+
+### 加入候补名单
+
+`POST /v1/waitlist`
+
+Public Beta 登记。这是唯一**不需要** `x-api-key` 的端点(CORS 全放开,允许任何网站调用)。
+
+请求体:`{ "email": "ada@example.com" }` → 响应 `200 OK`:
+
+```json
+{ "ok": true, "created_at": 1755000000 }
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/waitlist \
+      -H "Content-Type: application/json" \
+      -d '{"email": "ada@example.com"}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    // @combee/sdk 尚未暴露,直接调用端点:
+    const res = await fetch('https://api.combee.cloud/v1/waitlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'ada@example.com' }),
+    });
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    # 尚未在 SDK 中封装,直接用 httpx 调用:
+    import httpx
+
+    resp = httpx.post(
+        "https://api.combee.cloud/v1/waitlist",
+        json={"email": "ada@example.com"},
+    )
+    print(resp.json())
+    ```
+  </Tab>
+</Tabs>
+
+## OpenAPI 文档
+
+机器可读的规范在 `GET /openapi.json`(无需认证):
+
+```bash
+curl https://api.combee.cloud/openapi.json
+```

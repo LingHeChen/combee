@@ -100,6 +100,7 @@ async fn run_phase(dir: &Path, cells: &[DatabaseId], active: usize, samples: usi
         kv_cache_capacity: CACHE_CAPACITY,
         kv_durability: KvDurability::Fast,
         sql_timeout: Some(std::time::Duration::from_secs(30)),
+        quota: Default::default(),
     });
 
     let active_cells = &cells[..active];

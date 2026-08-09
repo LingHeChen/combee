@@ -1,0 +1,36 @@
+---
+title: Docker Compose
+description: 一条命令跑起完整的 Combee 服务栈。
+since: 0.1.0-beta
+status: stable
+---
+
+仓库自带 `docker-compose.yml`,包含四个服务:
+
+| 服务 | 角色 |
+|---|---|
+| `postgres` | 元数据存储(Cell、API key、用量、额度) |
+| `minio`(+ `minio-init`) | S3 兼容对象存储,用于备份 |
+| `data-node` | SQLite / KV 运行时(RPC 端口 `:9000`) |
+| `api-server` | 公共 HTTP API(端口 `:8080`) |
+
+## 启动
+
+```bash
+docker compose up -d --build
+```
+
+## 冒烟测试
+
+```bash
+curl http://127.0.0.1:8080/openapi.json   # 机器可读 API
+```
+
+然后创建 API key(`cmb_sk_...`),用 SDK 连接 `baseUrl: 'http://127.0.0.1:8080'`。
+
+## 端口与存储
+
+- PostgreSQL 只在内部网络(不发布宿主机端口)。
+- MinIO 暴露 `9000`(S3 API)与 `9001`(控制台)。
+- API Server 发布 `8080`。
+- 数据保存在 Docker 命名卷(`combee-pg-data`、`combee-minio-data`)。

@@ -1,5 +1,5 @@
 //! P1 Credits / Pricing / Voucher / Settlement 集成测试
-//! (设计文档 §5-8,验收清单见 docs/plan/COMBEE_NEXT_PHASE_V0.1.0_BETA_PLAN.md)。
+//! (设计文档 §5-8,验收清单见 artifacts/engineering/plan/COMBEE_NEXT_PHASE_V0.1.0_BETA_PLAN.md)。
 //!
 //! 覆盖:整数账本、admin grant、voucher 单次/幂等/并发/过期、pricing 版本热生效与
 //! 无效配置拒绝、settlement 幂等不重复扣款、三类 token 分离、租户隔离。
@@ -78,6 +78,7 @@ async fn make_harness() -> Harness {
         kv_cache_capacity: 100_000,
         kv_durability: KvDurability::Normal,
         sql_timeout: Some(Duration::from_secs(5)),
+        quota: Default::default(),
     }));
     let client = Arc::new(LocalDataNodeClient::new(node));
     let provider: Arc<dyn DataNodeProvider> = Arc::new(LocalProvider::new(client));
@@ -93,6 +94,8 @@ async fn make_harness() -> Harness {
         usage: usage.clone(),
         pricing: pricing.clone(),
         admin_token: Some(ADMIN.into()),
+        quota: Default::default(),
+        concurrency: Default::default(),
     };
     Harness {
         app: build_app(state),

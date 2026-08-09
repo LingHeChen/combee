@@ -1,0 +1,57 @@
+---
+title: Counters
+description: Atomic INCR / DECR counters.
+since: 0.1.0-beta
+status: stable
+---
+
+Use `INCR` / `DECR` for atomic counters — page views, rate limits, likes, stock, ...
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X PUT https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/pageviews \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"value": "0"}'
+
+    # INCR → {"value": 1}
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/incr \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"key": "pageviews"}'
+
+    # INCR by 5 → {"value": 6}
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/incr \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"key": "pageviews", "delta": 5}'
+
+    # DECR by 2(delta 为负)→ {"value": 4}
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/incr \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"key": "pageviews", "delta": -2}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.kv.set('pageviews', '0');
+    const v1 = await cell.kv.incr('pageviews'); // 1
+    const v2 = await cell.kv.incr('pageviews', 5); // 6
+    const v3 = await cell.kv.decr('pageviews', 2); // 4
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.kv.set("pageviews", "0")
+    v1 = cell.kv.incr("pageviews")        # 1
+    v2 = cell.kv.incr("pageviews", 5)     # 6
+    v3 = cell.kv.decr("pageviews", 2)     # 4
+    ```
+  </Tab>
+</Tabs>
+
+- Counters are stored as integer strings and updated atomically — concurrent increments never lose updates.
+- `INCR` on a missing key starts from `0` (the result is `1`).
+- The counter can carry a TTL (e.g. a per-minute rate limit window).

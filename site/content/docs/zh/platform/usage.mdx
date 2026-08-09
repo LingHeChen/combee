@@ -1,0 +1,50 @@
+---
+title: 用量
+description: 你使用了多少——请求、操作与存储。
+since: 0.1.0-beta
+status: stable
+---
+
+用量按账号与 Cell 计量:
+
+- KV 读 / 写操作
+- SQL 读 / 写操作
+- 请求数、字节入 / 出
+- 当前存储字节
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # 账号汇总
+    curl "https://api.combee.cloud/v1/usage/summary" \
+      -H "x-api-key: $COMBEE_API_KEY"
+
+    # 单 Cell 用量
+    curl "https://api.combee.cloud/v1/cells/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/usage" \
+      -H "x-api-key: $COMBEE_API_KEY"
+
+    # 时序(按小时聚合 kv_read)
+    curl "https://api.combee.cloud/v1/usage/timeseries?metric=kv_read&interval=hour" \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const summary = await combee.usage.summary();
+    const cellUsage = await combee.usage.cell(cell.id);
+    const series = await combee.usage.timeseries({
+      metric: 'kv_read',
+      interval: 'hour',
+    });
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    summary = combee.usage.summary()
+    cell_usage = combee.usage.cell(cell_id)
+    series = combee.usage.timeseries("kv_read", interval="hour")
+    ```
+  </Tab>
+</Tabs>
+
+时间过滤接受 RFC3339 的 `from` / `to`(默认最近 24h);`interval` 为 `minute` | `hour` | `day`。

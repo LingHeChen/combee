@@ -31,6 +31,12 @@ pub struct CreateTenantResponse {
 
 /// POST /v1/api-keys —— 创建密钥(明文仅返回一次,库中只存 sha256)。
 /// 创建 API key(明文仅返回一次)。
+/// POST body:可选 name(默认 `default`)。
+#[derive(serde::Deserialize)]
+pub struct CreateApiKeyRequest {
+    pub name: Option<String>,
+}
+
 #[utoipa::path(
     post,
     path = "/v1/api-keys",
@@ -40,12 +46,18 @@ pub struct CreateTenantResponse {
 pub async fn create_api_key(
     State(state): State<AppState>,
     auth: AuthContext,
+    body: Option<Json<CreateApiKeyRequest>>,
 ) -> Result<(StatusCode, Json<CreateApiKeyResponse>), ApiError> {
     let plain = api_key::generate();
     let key_hash = api_key::hash(&plain);
+    let name = body
+        .as_ref()
+        .and_then(|b| b.0.name.as_deref())
+        .filter(|n| !n.trim().is_empty())
+        .unwrap_or("default");
     let record = state
         .metadata
-        .create_api_key(auth.tenant_id, key_hash)
+        .create_api_key(auth.tenant_id, key_hash, name)
         .await?;
     Ok((
         StatusCode::CREATED,

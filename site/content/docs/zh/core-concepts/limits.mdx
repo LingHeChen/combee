@@ -1,0 +1,21 @@
+---
+title: 限制
+description: v0.1.0-beta 当前的限制与配额。
+since: 0.1.0-beta
+status: stable
+---
+
+以下是当前版本适用的限制。资源配额(max KV value、max SQL 结果、请求并发上限)**尚未强制**——
+目前依赖请求体大小限制与 SQL 超时兜底。
+
+| 限制 | 值 |
+|---|---|
+| KV value 大小 | 受请求体大小限制(配额未落地) |
+| SQL 结果大小 | 受响应大小限制(配额未落地) |
+| 每个 Cell 的活跃连接 | 由活跃数据库池上限控制 |
+| 每个 Cell 的副本 | 1 |
+| 区域 | 当前单区域 |
+
+本版本**不可用**:Redis RESP、PostgreSQL wire protocol、Blob / Vector / Queue 存储、sharding、multi-region。
+这些是规划中但未实现的能力——事实来源见
+[FACTS.md](https://github.com/LingHeChen/combee/blob/main/artifacts/FACTS.md)。

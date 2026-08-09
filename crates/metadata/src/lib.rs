@@ -9,6 +9,6 @@ pub mod store;
 
 pub use postgres::PostgresStore;
 pub use store::{
-    ApiKeyRecord, DEFAULT_TENANT, DatabaseRecord, DatabaseState, InMemoryStore, MetadataStore,
-    TenantRecord,
+    ApiKeyRecord, DataNodeRecord, DEFAULT_TENANT, DatabaseRecord, DatabaseState, InMemoryStore,
+    MetadataStore, TenantRecord, WaitlistEntry,
 };

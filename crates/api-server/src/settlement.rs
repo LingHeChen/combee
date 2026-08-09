@@ -128,7 +128,12 @@ impl Settlement {
         self.last_settled_bucket
             .store(current_bucket, Ordering::Relaxed);
         if written > 0 {
-            info!(written, "settlement round done");
+            info!(
+                service = "combee-api",
+                event = "credits.settlement.success",
+                job = "credit_settlement",
+                entries = written
+            );
         }
         Ok(written)
     }
@@ -142,8 +147,13 @@ impl Settlement {
             ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
             loop {
                 ticker.tick().await;
-                if let Err(e) = this.settle_once().await {
-                    warn!("settlement round failed: {e}");
+                if let Err(_e) = this.settle_once().await {
+                    warn!(
+                        service = "combee-api",
+                        event = "credits.settlement.failed",
+                        job = "credit_settlement",
+                        error_code = "SETTLEMENT_FAILED"
+                    );
                 }
             }
         })

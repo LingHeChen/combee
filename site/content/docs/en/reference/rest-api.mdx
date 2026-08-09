@@ -1,0 +1,1474 @@
+---
+title: REST API
+description: The complete HTTP API reference — every endpoint with curl, TypeScript, and Python examples.
+since: 0.1.0-beta
+status: stable
+---
+
+The REST API is the interface source of truth. Every endpoint below is described by the machine-readable
+OpenAPI document served at `/openapi.json` (generated from the server handlers).
+
+## Conventions
+
+- **Base URL**: `https://api.combee.cloud`
+- **Authentication**: every request (except `/v1/waitlist`) sends `x-api-key: <key>`; keys start with `cmb_sk_...`.
+- **Request IDs**: send an optional `x-request-id` header; the server echoes it on every response, including errors.
+- **Errors**: all errors use the unified `{ "code", "error" }` shape — see [Error Codes](./error-codes).
+- **Pagination**: only endpoints that document it return `{ items, next_cursor }` (or `{ keys, next_cursor }`);
+  list endpoints that return a plain array are not paginated.
+
+## Cells
+
+A **Cell** is a logical data space with SQL and KV. The REST path prefix is `/v1/databases/...` for
+historical reasons, but the public concept is always a Cell.
+
+### Create a Cell
+
+`POST /v1/databases`
+
+Creates a new Cell (lazy — no disk work until first use). Provide a `name` to create with a
+human-readable, tenant-unique name; if omitted, one is generated as `cell-<short-id>`.
+
+**Strict creation**: creating a Cell with a `name` that already exists in your account fails with
+`409 cell_already_exists`. For an idempotent "get-or-create", use [Ensure a Cell](#ensure-a-cell).
+Names must match `^[a-z0-9][a-z0-9-_]{0,62}$` (lowercase letters, digits, `-`, `_`; starts with a
+letter or digit; ≤ 63 chars) — anything else fails with `400 invalid_cell_name`.
+
+| Parameter | Location | Description |
+|---|---|---|
+| `name` | body | Optional; tenant-unique name (see rules above) |
+| `Idempotency-Key` | header | Optional; repeated calls with the same key return the first-created Cell |
+
+Response `201 Created`:
+
+```json
+{ "id": "2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b", "name": "my-app" }
+```
+
+Errors: `409 cell_already_exists` (name taken), `400 invalid_cell_name`.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -H "Idempotency-Key: cell:my-app" \
+      -d '{"name": "my-app"}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    import { Combee } from '@combee/sdk';
+
+    const combee = new Combee({
+      baseUrl: 'https://api.combee.cloud',
+      apiKey: process.env.COMBEE_API_KEY!,
+    });
+
+    const cell = await combee.cells.create({ name: 'my-app' });
+    console.log(cell.id);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    import os
+    from combee import Combee
+
+    combee = Combee(
+        base_url="https://api.combee.cloud",
+        api_key=os.environ["COMBEE_API_KEY"],
+    )
+
+    cell = combee.cells.create(name="my-app")
+    print(cell.id)
+    ```
+  </Tab>
+</Tabs>
+
+### List Cells
+
+`GET /v1/databases`
+
+Returns all Cells owned by the current account. The response is a plain array (not paginated).
+
+Response `200 OK`:
+
+```json
+[
+  {
+    "id": "2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b",
+    "name": "my-app",
+    "tenant_id": "9c8b7a6f-...",
+    "state": "idle",
+    "created_at": 1755000000,
+    "storage_node_id": null
+  }
+]
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl https://api.combee.cloud/v1/databases \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const { items } = await combee.cells.list();
+    for (const cell of items) {
+      console.log(cell.id, cell.state);
+    }
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cells = combee.cells.list()
+    for c in cells["items"]:
+        print(c["id"], c["state"])
+    ```
+  </Tab>
+</Tabs>
+
+### Delete a Cell
+
+`DELETE /v1/databases/{id}`
+
+Permanently deletes the Cell and its data. Returns no body.
+
+| Parameter | Location | Description |
+|---|---|---|
+| `id` | path | Cell id (UUID) |
+
+Response `204 No Content`.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X DELETE https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.delete();
+    // or: await combee.cells.delete(cell.id);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.delete()
+    # or: combee.cells.delete(cell.id)
+    ```
+  </Tab>
+</Tabs>
+
+### Ensure a Cell
+
+`PUT /v1/databases/by-name/{name}`
+
+Idempotent "get-or-create" by name: creates the Cell if it does not exist, otherwise reuses the
+existing one. Recommended at application startup instead of strict [Create a Cell](#create-a-cell).
+
+| Parameter | Location | Description |
+|---|---|---|
+| `name` | path | Cell name (URL-encoded, must match `^[a-z0-9][a-z0-9-_]{0,62}$`) |
+
+Response `201 Created` (new) or `200 OK` (already existed):
+
+```json
+{
+  "cell": { "id": "2f1c4a0e-...", "name": "my-app", "tenant_id": "9c8b7a6f-...", "state": "idle", "created_at": 1755000000 },
+  "created": true
+}
+```
+
+Errors: `400 invalid_cell_name`, `429 quota_exceeded`.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X PUT https://api.combee.cloud/v1/databases/by-name/my-app \
+      -H "x-api-key: $COMBEE_API_KEY"
+    # → {"cell": {...}, "created": true} 首次创建
+    # → {"cell": {...}, "created": false} 已存在,复用
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const cell = await combee.cells.ensure('my-app');
+    console.log(cell.id, cell.name);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell = combee.cells.ensure("my-app")
+    print(cell.id, cell.name)
+    ```
+  </Tab>
+</Tabs>
+
+### Get a Cell by name
+
+`GET /v1/databases/by-name/{name}`
+
+Returns the Cell with the given name. Fails with `404 database_not_found` when it does not exist
+(no name existence is leaked).
+
+Response `200 OK`:
+
+```json
+{ "id": "2f1c4a0e-...", "name": "my-app", "tenant_id": "9c8b7a6f-...", "state": "idle", "created_at": 1755000000 }
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl https://api.combee.cloud/v1/databases/by-name/my-app \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const cell = await combee.cells.getByName('my-app');
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell = combee.cells.get_by_name("my-app")
+    ```
+  </Tab>
+</Tabs>
+
+### Rename a Cell
+
+`PATCH /v1/databases/{id}`
+
+Renames the Cell. The `id` is preserved; the new name must be unique in the account.
+
+| Parameter | Location | Description |
+|---|---|---|
+| `id` | path | Cell id (UUID) |
+| `name` | body | New name (must match `^[a-z0-9][a-z0-9-_]{0,62}$`) |
+
+Response `200 OK` — the updated Cell record.
+
+Errors: `409 cell_name_conflict` (name already used), `400 invalid_cell_name`.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X PATCH https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"name": "blog-prod-v2"}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const updated = await cell.rename('blog-prod-v2');
+    console.log(updated.name);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    updated = cell.rename("blog-prod-v2")
+    print(updated["name"])
+    ```
+  </Tab>
+</Tabs>
+
+### Reset a Cell
+
+`POST /v1/databases/{id}/reset`
+
+Wipes all SQL and KV data. The `id` and `name` are preserved and the generation counter is bumped
+so stale writers are rejected. Destructive — there is no undo.
+
+| Parameter | Location | Description |
+|---|---|---|
+| `id` | path | Cell id (UUID) |
+
+Response `200 OK` — the updated Cell record.
+
+Errors: `500 cell_reset_failed`.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/reset \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.reset();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.reset()
+    ```
+  </Tab>
+</Tabs>
+
+## SQL
+
+### Execute a statement
+
+`POST /v1/databases/{id}/sql`
+
+Runs a single SQL statement against the Cell. Read and write statements are both accepted here.
+
+| Parameter | Location | Description |
+|---|---|---|
+| `id` | path | Cell id (UUID) |
+| `sql` | body | The SQL text, with `?` positional placeholders |
+| `params` | body | Optional; array of `null` / boolean / number / string, in placeholder order |
+
+Response `200 OK`:
+
+```json
+{
+  "columns": ["id", "title"],
+  "rows": [[1, "Hello"]],
+  "rows_affected": 1,
+  "truncated": false
+}
+```
+
+For read statements `rows_affected` is `0`; for write statements `columns` and `rows` are empty arrays.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/sql \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"sql": "SELECT id, title FROM posts WHERE id = ?", "params": [1]}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const { columns, rows } = await cell.sql.query<{ id: number; title: string }>(
+      `SELECT id, title FROM posts WHERE id = ?`,
+      [1],
+    );
+
+    const result = await cell.sql.execute(`INSERT INTO posts (title) VALUES (?)`, ['Hello']);
+    console.log(result.rows_affected);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    result = cell.sql.query("SELECT id, title FROM posts WHERE id = ?", [1])
+    # {"columns": [...], "rows": [...]}
+
+    result = cell.sql.execute("INSERT INTO posts (title) VALUES (?)", ["Hello"])
+    print(result["rows_affected"])
+    ```
+  </Tab>
+</Tabs>
+
+### Run a transaction
+
+`POST /v1/databases/{id}/transaction`
+
+Executes a list of statements in one atomic unit — either all commit, or none do.
+
+| Parameter | Location | Description |
+|---|---|---|
+| `id` | path | Cell id (UUID) |
+| `statements` | body | Array of `{ sql, params }` objects, executed in order |
+
+Response `200 OK` — array of results, one per statement:
+
+```json
+[
+  { "columns": [], "rows": [], "rows_affected": 1, "truncated": false },
+  { "columns": [], "rows": [], "rows_affected": 1, "truncated": false }
+]
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/transaction \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "statements": [
+          {"sql": "UPDATE accounts SET balance = balance - 100 WHERE id = ?", "params": [1]},
+          {"sql": "UPDATE accounts SET balance = balance + 100 WHERE id = ?", "params": [2]}
+        ]
+      }'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const results = await cell.sql.transaction([
+      { sql: `UPDATE accounts SET balance = balance - 100 WHERE id = ?`, params: [1] },
+      { sql: `UPDATE accounts SET balance = balance + 100 WHERE id = ?`, params: [2] },
+    ]);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    results = cell.sql.transaction([
+        {"sql": "UPDATE accounts SET balance = balance - 100 WHERE id = ?", "params": [1]},
+        {"sql": "UPDATE accounts SET balance = balance + 100 WHERE id = ?", "params": [2]},
+    ])
+    ```
+  </Tab>
+</Tabs>
+
+## KV
+
+KV values are strings. Keys live in the URL path and must be percent-encoded (the SDKs do this for you).
+Operational endpoints live under `/kv/ops/...` so any key name can also be read/written directly.
+
+### Get a value
+
+`GET /v1/databases/{id}/kv/{key}`
+
+| Parameter | Location | Description |
+|---|---|---|
+| `id` | path | Cell id (UUID) |
+| `key` | path | KV key (URL-encoded) |
+
+Response `200 OK`:
+
+```json
+{ "exists": true, "value": "hello", "ttl_seconds": 60 }
+```
+
+A missing key returns `{ "exists": false, "value": null }` — it is **not** an error.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/greeting \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const value = await cell.kv.get('greeting'); // 'hello', or null when missing
+    const config = await cell.kv.getJson<{ theme: string }>('config');
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    value = cell.kv.get("greeting")   # "hello", or None when missing
+    config = cell.kv.get_json("config")
+    ```
+  </Tab>
+</Tabs>
+
+### Set a value
+
+`PUT /v1/databases/{id}/kv/{key}`
+
+| Parameter | Location | Description |
+|---|---|---|
+| `id` | path | Cell id (UUID) |
+| `key` | path | KV key (URL-encoded) |
+| `value` | body | String value to store |
+| `ttl_seconds` | body | Optional TTL in seconds; omitted = persistent key |
+| `nx` | body | Optional; write only if the key does not exist |
+| `xx` | body | Optional; write only if the key already exists |
+
+Response `200 OK`:
+
+```json
+{ "written": true }
+```
+
+`written` is `false` when an `nx` / `xx` condition is not met (no-op write).
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X PUT https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/greeting \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"value": "hello", "ttl_seconds": 60, "nx": false, "xx": false}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const written = await cell.kv.set('greeting', 'hello', { ttl: 60 });
+    await cell.kv.setJson('config', { theme: 'dark' });
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    written = cell.kv.set("greeting", "hello", ttl=60)
+    cell.kv.set_json("config", {"theme": "dark"})
+    ```
+  </Tab>
+</Tabs>
+
+### Delete a value
+
+`DELETE /v1/databases/{id}/kv/{key}`
+
+Response `200 OK`:
+
+```json
+{ "deleted": true }
+```
+
+`deleted` is `false` when the key did not exist.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X DELETE https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/greeting \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const deleted = await cell.kv.delete('greeting');
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    deleted = cell.kv.delete("greeting")
+    ```
+  </Tab>
+</Tabs>
+
+### Scan keys
+
+`GET /v1/databases/{id}/kv?prefix=&limit=&cursor=`
+
+Lists keys in lexicographic order, filtered by an optional prefix.
+
+| Parameter | Location | Description |
+|---|---|---|
+| `prefix` | query | Optional; only keys starting with this string |
+| `limit` | query | Optional; page size, default 50, max 1000 |
+| `cursor` | query | Optional; pass `next_cursor` from the previous page |
+
+Response `200 OK`:
+
+```json
+{ "keys": ["greeting", "greeting:2"], "next_cursor": "" }
+```
+
+`next_cursor` empty means the end of the scan. The SDKs do not expose this endpoint yet — call it directly.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl "https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv?prefix=greet&limit=100" \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    // Not exposed in @combee/sdk yet — call the endpoint directly:
+    const res = await fetch(
+      `https://api.combee.cloud/v1/databases/${cell.id}/kv?prefix=greet&limit=100`,
+      { headers: { 'x-api-key': process.env.COMBEE_API_KEY! } },
+    );
+    const { keys, next_cursor } = await res.json();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    # 尚未在 SDK 中封装,直接用 httpx 调用:
+    import os, httpx
+
+    resp = httpx.get(
+        f"https://api.combee.cloud/v1/databases/{cell.id}/kv",
+        params={"prefix": "greet", "limit": 100},
+        headers={"x-api-key": os.environ["COMBEE_API_KEY"]},
+    )
+    print(resp.json())  # {"keys": [...], "next_cursor": "..."}
+    ```
+  </Tab>
+</Tabs>
+
+### Check existence
+
+`POST /v1/databases/{id}/kv/ops/exists`
+
+Body: `{ "keys": ["a", "b"] }` → Response `200 OK`: `[true, false]` (one boolean per key, in order).
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/exists \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"keys": ["a", "b"]}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const exists = await cell.kv.exists('a'); // boolean
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    exists = cell.kv.exists("a")  # bool
+    ```
+  </Tab>
+</Tabs>
+
+### Get many values
+
+`POST /v1/databases/{id}/kv/ops/mget`
+
+Body: `{ "keys": ["a", "b"] }` → Response `200 OK`:
+
+```json
+{ "values": ["1", null] }
+```
+
+Values align with the requested keys; missing keys are `null`.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/mget \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"keys": ["a", "b", "missing"]}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const values = await cell.kv.mget(['a', 'b', 'missing']); // ['1', '2', null]
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    values = cell.kv.mget(["a", "b", "missing"])  # ['1', '2', None]
+    ```
+  </Tab>
+</Tabs>
+
+### Set many values
+
+`POST /v1/databases/{id}/kv/ops/mset`
+
+Body:
+
+```json
+{
+  "items": [
+    { "key": "a", "value": "1", "ttl_seconds": 60 },
+    { "key": "b", "value": "2" }
+  ]
+}
+```
+
+Atomic write — either all keys are written, or none. Response `204 No Content`.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/mset \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"items": [{"key": "a", "value": "1", "ttl_seconds": 60}, {"key": "b", "value": "2"}]}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.kv.mset({ a: '1', b: '2' });
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.kv.mset({"a": "1", "b": "2"})
+    ```
+  </Tab>
+</Tabs>
+
+### Time to live
+
+`POST /v1/databases/{id}/kv/ops/ttl`
+
+Body: `{ "keys": ["a", "b"] }` → Response `200 OK`:
+
+```json
+[60, -1]
+```
+
+Per key: remaining seconds (`>= 0`), `-1` = persistent, `null` = key does not exist.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/ttl \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"keys": ["a", "b"]}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const ttl = await cell.kv.ttl('a');
+    // { state: 'expires', seconds: 60 } | { state: 'persistent' } | { state: 'missing' }
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    ttl = cell.kv.ttl("a")
+    # {"state": "expires", "seconds": 60} | {"state": "persistent"} | {"state": "missing"}
+    ```
+  </Tab>
+</Tabs>
+
+### Set or remove expiry
+
+`POST /v1/databases/{id}/kv/ops/expire`
+
+Body: `{ "key": "a", "ttl_seconds": 60 }`. Omitting `ttl_seconds` (or passing `null`) removes the TTL
+(PERSIST). Response `200 OK`:
+
+```json
+{ "updated": true }
+```
+
+`updated` is `false` when the key does not exist.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # Set TTL to 60s
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/expire \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"key": "a", "ttl_seconds": 60}'
+
+    # Remove TTL (persist)
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/expire \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"key": "a"}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.kv.expire('a', 60); // reset to 60s
+    await cell.kv.persist('a');    // remove TTL
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.kv.expire("a", 60)   # 重置为 60 秒
+    cell.kv.persist("a")      # 移除 TTL
+    ```
+  </Tab>
+</Tabs>
+
+### Increment / decrement
+
+`POST /v1/databases/{id}/kv/ops/incr`
+
+Body: `{ "key": "c", "delta": 1, "ttl_seconds": 60 }` → Response `200 OK`:
+
+```json
+{ "value": 6 }
+```
+
+`delta` defaults to `1` (negative values decrement). Missing keys start from `0`. The optional
+`ttl_seconds` is only applied on first creation; otherwise the existing TTL is kept.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/incr \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"key": "pageviews", "delta": 5}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const v1 = await cell.kv.incr('pageviews');      // 1
+    const v2 = await cell.kv.incr('pageviews', 5);   // 6
+    const v3 = await cell.kv.decr('pageviews', 2);   // 4
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    v1 = cell.kv.incr("pageviews")       # 1
+    v2 = cell.kv.incr("pageviews", 5)    # 6
+    v3 = cell.kv.decr("pageviews", 2)    # 4
+    ```
+  </Tab>
+</Tabs>
+
+## API Keys
+
+### Create an API key
+
+`POST /v1/api-keys`
+
+Creates a key. The plaintext is returned **exactly once**; Combee stores only its SHA-256 hash.
+
+Response `201 Created`:
+
+```json
+{
+  "key": "cmb_sk_8f3a...",
+  "record": {
+    "id": "1a2b3c4d-...",
+    "tenant_id": "9c8b7a6f-...",
+    "key_hash": "e3b0c442...",
+    "created_at": 1755000000,
+    "revoked_at": null
+  }
+}
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/api-keys \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const key = await combee.apiKeys.create({ name: 'ci' });
+    // key.key is shown ONCE — save it now.
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    key = combee.api_keys.create(name="ci")
+    # key["key"] 只显示一次,请立即保存
+    ```
+  </Tab>
+</Tabs>
+
+### List API keys
+
+`GET /v1/api-keys`
+
+Lists the account's keys. The plaintext is never returned again — only metadata.
+
+Response `200 OK`:
+
+```json
+[
+  {
+    "id": "1a2b3c4d-...",
+    "tenant_id": "9c8b7a6f-...",
+    "key_hash": "e3b0c442...",
+    "created_at": 1755000000,
+    "revoked_at": null
+  }
+]
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl https://api.combee.cloud/v1/api-keys \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const keys = await combee.apiKeys.list();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    keys = combee.api_keys.list()
+    ```
+  </Tab>
+</Tabs>
+
+### Revoke an API key
+
+`DELETE /v1/api-keys/{id}`
+
+Revocation is immediate — the key is rejected on the next request. Response `204 No Content`.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X DELETE https://api.combee.cloud/v1/api-keys/1a2b3c4d-... \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await combee.apiKeys.revoke(key.id);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    combee.api_keys.revoke(key["id"])
+    ```
+  </Tab>
+</Tabs>
+
+## Usage
+
+Usage is metered per account and per Cell. Time filters accept RFC3339 `from` / `to`; both default to
+the last 24 hours.
+
+### Usage summary
+
+`GET /v1/usage/summary?from=&to=`
+
+Account-wide totals across all Cells.
+
+Response `200 OK`:
+
+```json
+{
+  "period": { "from": "2026-08-01T00:00:00+00:00", "to": "2026-08-02T00:00:00+00:00" },
+  "operations": { "kv_reads": 1200, "kv_writes": 340, "sql_reads": 80, "sql_writes": 25 },
+  "request_count": 1650,
+  "bytes_in": 20480,
+  "bytes_out": 81920,
+  "current_storage_bytes": 1048576
+}
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl "https://api.combee.cloud/v1/usage/summary?from=2026-08-01T00:00:00Z&to=2026-08-02T00:00:00Z" \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const summary = await combee.usage.summary({
+      from: '2026-08-01T00:00:00Z',
+      to: '2026-08-02T00:00:00Z',
+    });
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    summary = combee.usage.summary({"from": "2026-08-01T00:00:00Z", "to": "2026-08-02T00:00:00Z"})
+    ```
+  </Tab>
+</Tabs>
+
+### Usage timeseries
+
+`GET /v1/usage/timeseries?metric=&interval=&from=&to=`
+
+Per-bucket time series for one metric.
+
+| Parameter | Description |
+|---|---|
+| `metric` | Required. One of `kv_read`, `kv_write`, `sql_read`, `sql_write`, `requests`, `bytes_in`, `bytes_out`, `storage_bytes` |
+| `interval` | `minute` (default) \| `hour` \| `day` |
+
+Response `200 OK`:
+
+```json
+[
+  { "bucket_start": "2026-08-01T00:00:00+00:00", "value": 340 },
+  { "bucket_start": "2026-08-01T01:00:00+00:00", "value": 512 }
+]
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl "https://api.combee.cloud/v1/usage/timeseries?metric=kv_read&interval=hour" \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const series = await combee.usage.timeseries({
+      metric: 'kv_read',
+      interval: 'hour',
+    });
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    series = combee.usage.timeseries("kv_read", interval="hour")
+    ```
+  </Tab>
+</Tabs>
+
+### Cell usage
+
+`GET /v1/cells/{id}/usage?from=&to=`
+
+Usage for a single Cell, with an exact `current_storage_bytes`.
+
+Response `200 OK` — same shape as [Usage summary](#usage-summary), but scoped to one Cell.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl "https://api.combee.cloud/v1/cells/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/usage" \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const cellUsage = await combee.usage.cell(cell.id);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell_usage = combee.usage.cell(cell.id)
+    ```
+  </Tab>
+</Tabs>
+
+## Credits & Pricing
+
+Amounts are integer base units (microcredits) returned as decimal strings — never floats.
+
+### Balance
+
+`GET /v1/credits/balance`
+
+Response `200 OK`:
+
+```json
+{ "available": "50000000", "reserved": "0", "currency": "CREDIT", "updated_at": 1755000000 }
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl https://api.combee.cloud/v1/credits/balance \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const balance = await combee.credits.balance();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    balance = combee.credits.balance()
+    ```
+  </Tab>
+</Tabs>
+
+### Transactions
+
+`GET /v1/credits/transactions?limit=&cursor=`
+
+Append-only ledger, newest first. Paginated with `{ items, next_cursor }`.
+
+Response `200 OK`:
+
+```json
+{
+  "items": [
+    {
+      "id": "7f8e9d0c-...",
+      "tenant_id": "9c8b7a6f-...",
+      "txn_type": "voucher",
+      "amount_units": "50000000",
+      "pricing_version": null,
+      "reference_id": "voucher:ab12...",
+      "description": null,
+      "created_at": 1755000000,
+      "balance_after": "50000000"
+    }
+  ],
+  "next_cursor": null
+}
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl "https://api.combee.cloud/v1/credits/transactions?limit=100" \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const { items, nextCursor } = await combee.credits.transactions();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    page = combee.credits.transactions()
+    # {"items": [...], "next_cursor": ...}
+    ```
+  </Tab>
+</Tabs>
+
+### Redeem a voucher
+
+`POST /v1/credits/redeem`
+
+Single-use, idempotent, concurrency-safe: redeeming the same code twice does not add credits twice.
+
+Body: `{ "code": "CMB-84PA-X2KD-7MQR" }` → Response `200 OK`:
+
+```json
+{ "credits_added": "50000000", "balance": "100000000", "already_redeemed": false }
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/credits/redeem \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"code": "CMB-84PA-X2KD-7MQR"}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const result = await combee.credits.redeem('CMB-84PA-X2KD-7MQR');
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    result = combee.credits.redeem("CMB-84PA-X2KD-7MQR")
+    ```
+  </Tab>
+</Tabs>
+
+### Pricing
+
+`GET /v1/pricing`
+
+The currently effective pricing table (read-only; authoritative pricing lives server-side).
+
+Response `200 OK`:
+
+```json
+{
+  "version": 1,
+  "effective_at": 1755000000,
+  "units": {
+    "kv_read": {
+      "unit_size": 1000,
+      "price_units": 10,
+      "price_per_unit": "10 microcredits / 1000 kv_read"
+    }
+  }
+}
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl https://api.combee.cloud/v1/pricing \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const pricing = await combee.pricing.get();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    pricing = combee.pricing.get()
+    ```
+  </Tab>
+</Tabs>
+
+## Backups & Restore
+
+Backups live in object storage, outside the Cell — deleting the Cell keeps existing backups.
+
+### Create a snapshot backup
+
+`POST /v1/databases/{id}/backup`
+
+Consistent point-in-time image of the Cell.
+
+Response `200 OK`:
+
+```json
+{ "key": "snapshots/2f1c4a0e-.../backup-20260801T000000Z", "size_bytes": 40960, "created_at": 1755000000 }
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/backup \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const backup = await cell.backups.create();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    backup = cell.backups.create()
+    ```
+  </Tab>
+</Tabs>
+
+### Create an incremental backup
+
+`POST /v1/databases/{id}/backup/incr`
+
+Archives the database plus the current WAL, shortening recovery time.
+
+Response `200 OK` — same shape as a snapshot backup, `type` depends on the implementation.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/backup/incr \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const incr = await cell.backups.createIncremental();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    incr = cell.backups.create_incremental()
+    ```
+  </Tab>
+</Tabs>
+
+### Restore a Cell
+
+`POST /v1/databases/{id}/restore`
+
+Restores the Cell from a backup. Body `{ "version": "snapshots/..." }` is optional — omit it to
+restore the latest backup. Atomic: the Cell switches to the restored data as a unit.
+
+Response `204 No Content`.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # Latest backup
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/restore \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{}'
+
+    # Specific version
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/restore \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"version": "snapshots/2f1c4a0e-.../backup-20260801T000000Z"}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.backups.restoreLatest();
+    await cell.backups.restore('snapshots/2f1c4a0e-.../backup-20260801T000000Z');
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.backups.restore_latest()
+    cell.backups.restore("snapshots/2f1c4a0e-.../backup-20260801T000000Z")
+    ```
+  </Tab>
+</Tabs>
+
+## Replication & Failover
+
+Each Cell can have **one replica**.
+
+### Get replication status
+
+`GET /v1/databases/{id}/replication`
+
+Response `200 OK`:
+
+```json
+{ "db": "2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b", "replica_node": "node-b" }
+```
+
+`replica_node` is `null` when replication is not enabled.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/replication \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const status = await cell.replication.get();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    status = cell.replication.get()
+    ```
+  </Tab>
+</Tabs>
+
+### Enable replication
+
+`POST /v1/databases/{id}/replication`
+
+Body: `{ "replica_node": "node-b" }` → Response `200 OK`:
+
+```json
+{ "db": "2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b", "replica_node": "node-b" }
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/replication \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"replica_node": "node-b"}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.replication.enable('node-b');
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.replication.enable("node-b")
+    ```
+  </Tab>
+</Tabs>
+
+### Disable replication
+
+`DELETE /v1/databases/{id}/replication`
+
+Response `204 No Content`.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X DELETE https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/replication \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.replication.disable();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.replication.disable()
+    ```
+  </Tab>
+</Tabs>
+
+### Trigger failover
+
+`POST /v1/databases/{id}/failover`
+
+Manually promotes the replica to primary. Normally failover runs automatically when the primary misses
+heartbeats; use this endpoint when you want to force it. Not exposed in the SDKs yet — call it directly.
+
+Response `200 OK` — the updated Cell record.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/failover \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    // Not exposed in @combee/sdk yet — call the endpoint directly:
+    const res = await fetch(
+      `https://api.combee.cloud/v1/databases/${cell.id}/failover`,
+      { method: 'POST', headers: { 'x-api-key': process.env.COMBEE_API_KEY! } },
+    );
+    const record = await res.json();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    # 尚未在 SDK 中封装,直接用 httpx 调用:
+    import os, httpx
+
+    resp = httpx.post(
+        f"https://api.combee.cloud/v1/databases/{cell.id}/failover",
+        headers={"x-api-key": os.environ["COMBEE_API_KEY"]},
+    )
+    print(resp.json())
+    ```
+  </Tab>
+</Tabs>
+
+## Waitlist
+
+### Join the waitlist
+
+`POST /v1/waitlist`
+
+Public Beta sign-up. This is the only endpoint that does **not** require an `x-api-key` (permissive CORS
+so it can be called from any website).
+
+Body: `{ "email": "ada@example.com" }` → Response `200 OK`:
+
+```json
+{ "ok": true, "created_at": 1755000000 }
+```
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/waitlist \
+      -H "Content-Type: application/json" \
+      -d '{"email": "ada@example.com"}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    // Not exposed in @combee/sdk — call the endpoint directly:
+    const res = await fetch('https://api.combee.cloud/v1/waitlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'ada@example.com' }),
+    });
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    # 尚未在 SDK 中封装,直接用 httpx 调用:
+    import httpx
+
+    resp = httpx.post(
+        "https://api.combee.cloud/v1/waitlist",
+        json={"email": "ada@example.com"},
+    )
+    print(resp.json())
+    ```
+  </Tab>
+</Tabs>
+
+## OpenAPI document
+
+The machine-readable spec is served at `GET /openapi.json` (no authentication):
+
+```bash
+curl https://api.combee.cloud/openapi.json
+```

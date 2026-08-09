@@ -1,0 +1,14 @@
+{
+  "title": "Docs",
+  "pages": [
+    "getting-started",
+    "core-concepts",
+    "sql",
+    "kv",
+    "sdks",
+    "platform",
+    "reliability",
+    "reference",
+    "self-hosting"
+  ]
+}

@@ -24,6 +24,7 @@ async fn spawn_data_node_with_token(token: Option<String>) -> (String, tempfile:
         kv_cache_capacity: 100_000,
         kv_durability: KvDurability::Normal,
         sql_timeout: Some(std::time::Duration::from_secs(30)),
+        quota: Default::default(),
     }));
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();

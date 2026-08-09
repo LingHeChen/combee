@@ -13,7 +13,7 @@ crates/
 ├── data-node/    # SQLite Runtime + KV Runtime + Active DB Manager + TTL GC + backup/replica/failover
 └── api-server/   # Axum HTTP API(Auth / Lifecycle / SQL / KV / control plane)
 tests/            # integration tests(+ tests/release/*, tests/control_plane.rs, tests/tenancy.rs …)
-docs/             # design / testing / release readiness
+artifacts/engineering/ # 内部工程文档(设计/测试/发布就绪);用户文档站另行构建
 ```
 
 ## Dev setup
@@ -34,7 +34,7 @@ Requires Rust 1.85+(edition 2024). Optional: Docker for `docker compose`
 2. `cargo clippy --workspace --all-targets` — 0 warnings;
 3. `cargo fmt --all -- --check` — clean;
 4. For behavior changes, add tests under `tests/` documenting **purpose and expected
-   result**(see `docs/TESTING.md` for the style);
+   result**(see `artifacts/engineering/TESTING.md` for the style);
 5. Update `CHANGELOG.md` under `[Unreleased]`;
 6. If it touches the release gate, run `./scripts/release-test.sh`.
 

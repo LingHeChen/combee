@@ -1,0 +1,37 @@
+---
+title: Credits
+description: Track your credit balance and transactions.
+since: 0.1.0-beta
+status: stable
+---
+
+Credits are the unit of consumption on Combee. The ledger is append-only and the balance can be
+reconstructed from transaction history.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl https://api.combee.cloud/v1/credits/balance \
+      -H "x-api-key: $COMBEE_API_KEY"
+
+    curl "https://api.combee.cloud/v1/credits/transactions?limit=100" \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const balance = await combee.credits.balance();
+    const { items } = await combee.credits.transactions();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    balance = combee.credits.balance()
+    transactions = combee.credits.transactions()
+    ```
+  </Tab>
+</Tabs>
+
+- Amounts use integer base units (microcredits) — never floats.
+- `transactions` is paginated with a cursor (`limit`, default 100).
+- Online payment is **not available** in v0.1.0-beta; use [Vouchers](./vouchers) to add credits.

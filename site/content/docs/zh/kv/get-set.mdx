@@ -1,0 +1,56 @@
+---
+title: GET / SET
+description: 读写字符串值。
+since: 0.1.0-beta
+status: stable
+---
+
+KV 的值是字符串。`GET` 在 key 不存在时返回 `null`。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # SET(带 TTL)
+    curl -X PUT https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/greeting \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"value": "hello", "ttl_seconds": 60}'
+    # → {"written": true}
+
+    # GET
+    curl https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/greeting \
+      -H "x-api-key: $COMBEE_API_KEY"
+    # → {"exists": true, "value": "hello", "ttl_seconds": 59}
+
+    # GET 不存在的 key → {"exists": false, "value": null}
+    curl https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/nope \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const written = await cell.kv.set('greeting', 'hello', { ttl: 60 });
+    const value = await cell.kv.get('greeting'); // 'hello'
+    const missing = await cell.kv.get('nope'); // null
+
+    // JSON helpers
+    await cell.kv.setJson('config', { theme: 'dark' });
+    const config = await cell.kv.getJson<{ theme: string }>('config');
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    written = cell.kv.set("greeting", "hello", ttl=60)
+    value = cell.kv.get("greeting")   # 'hello'
+    missing = cell.kv.get("nope")     # None
+
+    # JSON helpers
+    cell.kv.set_json("config", {"theme": "dark"})
+    config = cell.kv.get_json("config")
+    ```
+  </Tab>
+</Tabs>
+
+- `SET` 会覆盖已有值;条件写入用[NX / XX](./nx-xx)。
+- TTL 可选,单位**秒**;见[TTL](./ttl)。
+- `DEL` 删除 key:`cell.kv.delete('greeting')` 返回该 key 是否存在。

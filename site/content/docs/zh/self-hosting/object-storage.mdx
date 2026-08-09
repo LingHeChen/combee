@@ -1,0 +1,22 @@
+---
+title: 对象存储
+description: 为备份与复制配置 S3 兼容存储。
+since: 0.1.0-beta
+status: stable
+---
+
+对象存储支撑 Cell 备份、恢复与副本拉取。任何 S3 兼容服务都可以(MinIO、AWS S3、R2 …)。
+
+| 变量 | 说明 |
+|---|---|
+| `COMBEE_S3_ENDPOINT` | 端点 URL,如 `http://minio:9000` |
+| `COMBEE_S3_ACCESS_KEY` | 访问 key |
+| `COMBEE_S3_SECRET_KEY` | 密钥 |
+| `COMBEE_S3_BUCKET` | 桶名(默认 `combee-backups`) |
+| `COMBEE_S3_REGION` | 区域(默认 `us-east-1`) |
+
+备份运行前桶必须存在;Docker Compose 会自动创建(`minio-init`)。
+
+<Callout type="warn">
+  没有对象存储就没有**备份、恢复、复制 / 故障转移**——副本从其中拉取归档。
+</Callout>

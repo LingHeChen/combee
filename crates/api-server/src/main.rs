@@ -15,12 +15,18 @@ use combee_metadata::{InMemoryStore, MetadataStore, PostgresStore};
 use tracing_subscriber::EnvFilter;
 
 fn init_tracing() {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new("info,combee=debug")),
-        )
-        .init();
+    // 结构化日志:默认 JSON(COMBEE_LOG_FORMAT=text 切回人类可读)
+    let fmt = tracing_subscriber::fmt().with_env_filter(
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,combee=debug")),
+    );
+    if std::env::var("COMBEE_LOG_FORMAT").as_deref() == Ok("text") {
+        fmt.init();
+    } else {
+        fmt.json().with_span_list(false).init();
+    }
+    // root span:所有事件自动带 service 字段
+    let root = tracing::info_span!("service", service = "combee-api");
+    let _root_guard = root.enter();
 }
 
 #[tokio::main]
@@ -40,11 +46,34 @@ async fn main() {
         }
     };
 
+    // 启动时注入预配置的 API key(COMBEE_API_KEYS + COMBEE_ADMIN_API_KEY)
+    let mut bootstrap_keys = config.api_keys.clone();
+    if !config.admin_api_key.is_empty() {
+        bootstrap_keys.push(config.admin_api_key.clone());
+    }
+    if !bootstrap_keys.is_empty() {
+        tracing::info!("bootstrapping {} preconfigured api keys", bootstrap_keys.len());
+        metadata
+            .bootstrap_api_keys(&bootstrap_keys)
+            .await
+            .unwrap_or_else(|e| panic!("bootstrap api keys: {e}"));
+    }
+
     // Data Node 客户端路由:
     // - COMBEE_MULTI_NODE=1:多节点模式,Data Node agent 注册 + 心跳,placement 全走 registry;
     // - COMBEE_DATA_NODE_URL 非空:单远程节点(未注册时兜底该地址);
     // - 默认:进程内本地 Data Node。
-    let registry = Arc::new(NodeRegistry::new());
+    // 注册表:Postgres 模式用 PG 作为共享 authority(多 API 副本一致),否则内存模式。
+    let registry = match config.metadata_mode {
+        MetadataMode::Postgres => {
+            tracing::info!("node registry: shared (postgres-backed)");
+            Arc::new(NodeRegistry::with_pg(metadata.clone()))
+        }
+        MetadataMode::InMemory => {
+            tracing::info!("node registry: in-memory");
+            Arc::new(NodeRegistry::new())
+        }
+    };
     let local_shutdown: Option<Arc<LocalDataNodeClient>>;
     let multi_node = std::env::var("COMBEE_MULTI_NODE").as_deref() == Ok("1");
     let provider: Arc<dyn DataNodeProvider> = if multi_node {
@@ -106,7 +135,10 @@ async fn main() {
         control_plane_token: config.control_plane_token.clone(),
         usage: usage_meter,
         pricing: pricing_manager,
-        admin_token: None,
+        admin_token: config.admin_token.clone(),
+        admin_api_key: (!config.admin_api_key.is_empty()).then_some(config.admin_api_key.clone()),
+        quota: Default::default(),
+        concurrency: Default::default(),
     };
     let app = build_app(state);
 

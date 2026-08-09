@@ -233,8 +233,9 @@ async fn boundary_inputs_do_not_crash() {
         None,
     )
     .await;
+    // 默认配额 max_kv_value_bytes=256KB → 1MB 应被拒绝(QuotaExceeded)
     assert!(
-        status == StatusCode::OK || status == StatusCode::PAYLOAD_TOO_LARGE,
+        status == StatusCode::OK || status == StatusCode::TOO_MANY_REQUESTS,
         "1MB value: {status}"
     );
 

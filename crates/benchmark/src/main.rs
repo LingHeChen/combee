@@ -124,6 +124,7 @@ fn bench_node(data_dir: &std::path::Path, max_active: usize, durability: KvDurab
         kv_cache_capacity: 1_000_000,
         kv_durability: durability,
         sql_timeout: Some(std::time::Duration::from_secs(30)),
+        quota: Default::default(),
     })
 }
 

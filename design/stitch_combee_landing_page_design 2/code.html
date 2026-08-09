@@ -1,0 +1,355 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Combee | One app. One Cell. SQL + KV included.</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-fixed": "#d9e3f6",
+                        "secondary": "#bdc7d9",
+                        "tertiary-fixed": "#ffddb8",
+                        "inverse-primary": "#5f5e5e",
+                        "tertiary-container": "#130800",
+                        "on-secondary-fixed": "#121c2a",
+                        "on-secondary-fixed-variant": "#3d4756",
+                        "on-tertiary": "#472a00",
+                        "on-tertiary-fixed-variant": "#653e00",
+                        "primary": "#c9c6c5",
+                        "outline-variant": "#444748",
+                        "on-background": "#e2e2e2",
+                        "tertiary": "#ffb95f",
+                        "on-error-container": "#ffdad6",
+                        "primary-fixed": "#e5e2e1",
+                        "surface-container": "#1e2020",
+                        "on-primary-fixed-variant": "#474646",
+                        "outline": "#8e9192",
+                        "tertiary-fixed-dim": "#ffb95f",
+                        "inverse-on-surface": "#2f3130",
+                        "surface-dim": "#121414",
+                        "surface-container-low": "#1a1c1c",
+                        "secondary-container": "#404a59",
+                        "surface-bright": "#383939",
+                        "on-primary": "#313030",
+                        "on-tertiary-fixed": "#2a1700",
+                        "primary-fixed-dim": "#c9c6c5",
+                        "surface-tint": "#c9c6c5",
+                        "surface-container-lowest": "#0c0f0e",
+                        "inverse-surface": "#e2e2e2",
+                        "error": "#ffb4ab",
+                        "error-container": "#93000a",
+                        "surface-container-high": "#282a2a",
+                        "secondary-fixed-dim": "#bdc7d9",
+                        "background": "#121414",
+                        "surface-container-highest": "#333535",
+                        "on-primary-fixed": "#1c1b1b",
+                        "on-surface": "#e2e2e2",
+                        "surface-variant": "#333535",
+                        "surface": "#121414",
+                        "on-secondary": "#27313f",
+                        "on-tertiary-container": "#aa6c00",
+                        "on-surface-variant": "#c4c7c7",
+                        "primary-container": "#0a0a0a",
+                        "on-primary-container": "#7b7979",
+                        "on-secondary-container": "#afb9cb",
+                        "on-error": "#690005"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "gutter": "16px",
+                        "margin-mobile": "16px",
+                        "container-max": "1280px",
+                        "margin-desktop": "32px",
+                        "unit": "4px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Geist"],
+                        "body-sm": ["Geist"],
+                        "body-lg": ["Geist"],
+                        "mono-label": ["JetBrains Mono"],
+                        "headline-lg-mobile": ["Geist"],
+                        "mono-code": ["JetBrains Mono"],
+                        "headline-md": ["Geist"],
+                        "display-lg": ["Geist"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "400" }],
+                        "mono-label": ["13px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "mono-code": ["14px", { "lineHeight": "22px", "letterSpacing": "0em", "fontWeight": "400" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "500" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.04em", "fontWeight": "700" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-color: #0B0B0C;
+            color: #e2e2e2;
+        }
+        .hex-bg {
+            background-image: radial-gradient(#1F2937 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+        .glow-amber {
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.1);
+        }
+    </style>
+</head>
+<body class="font-sans antialiased min-h-screen flex flex-col hex-bg">
+<!-- TopNavBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-xl border-b border-[#1F2937] flat no shadows">
+<div class="flex justify-between items-center h-16 px-gutter max-w-container-max mx-auto">
+<div class="flex items-center gap-2 font-headline-md text-headline-md font-bold text-on-surface tracking-tighter"><img alt="Combee Logo" class="h-8 w-auto" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAcNLzNvef4_bZtA_S0ir898AGnH6W9dA8MZQoSZ808JS-PbkxJKCO4yhwf-Ue33QWER5uEjeYw8iu_99yvNAQNmxLrtFlh2ElAkT4CCJLZin3iuBGMl1q7JI2TDirrNLT0GMX6wHwQi4nDURb4tBf--ejyHZ4xzEMPFq2pk8-GerWZQZlcxlVlAar5Z52jUvAtzj5nH6VGySHyNU2Q1w9TJH0bHJU-66F4bD3YRSP-L_l_Z_Azzdb7atQnlAvDw8DR0PQ"><span class="">Combee</span></div>
+<nav class="hidden md:flex items-center space-x-8">
+<a class="text-tertiary font-bold border-b-2 border-tertiary pb-1 font-mono-label text-mono-label hover:text-tertiary transition-all duration-200" href="#">Product</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors font-mono-label text-mono-label hover:text-tertiary transition-all duration-200" href="#">Architecture</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors font-mono-label text-mono-label hover:text-tertiary transition-all duration-200" href="#">Benchmarks</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors font-mono-label text-mono-label hover:text-tertiary transition-all duration-200" href="#">Docs</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors font-mono-label text-mono-label hover:text-tertiary transition-all duration-200" href="#">GitHub</a>
+</nav>
+<button class="bg-[#F59E0B] text-[#0B0B0C] font-mono-label text-mono-label px-4 py-2 rounded scale-95 active:scale-90 transition-transform">Get Started</button>
+</div>
+</header>
+<!-- Main Content -->
+<main class="flex-grow pt-24 bg-[#0B0B0C]/90">
+<!-- Hero Section -->
+<section class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-20 relative overflow-hidden">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+<div class="z-10">
+<h1 class="font-display-lg text-display-lg text-on-surface mb-6">One app. One Cell.<br>SQL + KV included.</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant mb-8 max-w-xl">
+                        Combee is a serverless data runtime for AI-generated and lightweight applications. Create isolated data Cells on demand without provisioning a PostgreSQL or Redis instance for every app.
+                    </p>
+<div class="flex flex-wrap gap-4">
+<button class="bg-[#F59E0B] text-[#0B0B0C] font-mono-label text-mono-label px-6 py-3 rounded">Get Started</button>
+<button class="border border-[#1F2937] text-[#FAFAF9] font-mono-label text-mono-label px-6 py-3 rounded hover:bg-[#1F2937] transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined" style="font-size: 18px;">code</span> View on GitHub
+                        </button>
+</div>
+</div>
+<div class="relative z-10">
+<div class="bg-[#111111] border border-[#1F2937] rounded-lg overflow-hidden glow-amber">
+<div class="flex items-center px-4 py-2 border-b border-[#1F2937] bg-[#0A0A0A]">
+<div class="flex gap-2">
+<div class="w-3 h-3 rounded-full bg-outline-variant"></div>
+<div class="w-3 h-3 rounded-full bg-outline-variant"></div>
+<div class="w-3 h-3 rounded-full bg-outline-variant"></div>
+</div>
+<span class="ml-4 font-mono-label text-mono-label text-on-surface-variant">index.ts</span>
+</div>
+<div class="p-6 overflow-x-auto">
+<pre class="font-mono-code text-mono-code text-on-surface"><code class="text-tertiary">const</code> cell <span class="text-outline">=</span> <code class="text-tertiary">await</code> combee.cells.<span class="text-[#F59E0B]">create</span>()
+
+<code class="text-tertiary">await</code> cell.sql.<span class="text-[#F59E0B]">query</span>(
+  <span class="text-secondary">"INSERT INTO users (name) VALUES (?)"</span>, 
+  [<span class="text-secondary">"Alice"</span>]
+)
+
+<code class="text-tertiary">await</code> cell.kv.<span class="text-[#F59E0B]">set</span>(
+  <span class="text-secondary">"session:abc"</span>, 
+  user, 
+  { ttl: <span class="text-[#F59E0B]">3600</span> }
+)</pre>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Metrics Strip -->
+<section class="border-y border-[#1F2937] bg-[#111111]">
+<div class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-8">
+<div class="grid grid-cols-2 md:grid-cols-4 gap-6 text-center divide-x divide-[#1F2937]">
+<div class="px-4">
+<div class="font-headline-lg text-headline-lg text-tertiary mb-2">1M+</div>
+<div class="font-mono-label text-mono-label text-on-surface-variant uppercase">Logical Cells</div>
+</div>
+<div class="px-4">
+<div class="font-headline-lg text-headline-lg text-tertiary mb-2">~25 MB</div>
+<div class="font-mono-label text-mono-label text-on-surface-variant uppercase">Runtime RSS (32 Cells)</div>
+</div>
+<div class="px-4">
+<div class="font-headline-lg text-headline-lg text-tertiary mb-2">SQL+KV</div>
+<div class="font-mono-label text-mono-label text-on-surface-variant uppercase">In One Cell</div>
+</div>
+<div class="px-4">
+<div class="font-headline-lg text-headline-lg text-tertiary mb-2">Auto</div>
+<div class="font-mono-label text-mono-label text-on-surface-variant uppercase">Backup &amp; Failover</div>
+</div>
+</div>
+<div class="text-center mt-6">
+<span class="font-mono-label text-mono-label text-outline-variant text-[11px]">* Local/container test data benchmarks.</span>
+</div>
+</div>
+</section>
+<!-- Why Combee -->
+<section class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-20 border-b border-[#1F2937]">
+<div class="text-center max-w-3xl mx-auto mb-16">
+<h2 class="font-headline-lg text-headline-lg text-on-surface mb-4">From Instance to Cell</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Traditional databases provision heavyweight instances per tenant. Combee provisions lightweight, isolated Cells that activate on-demand, sharing the underlying infrastructure resources securely.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+<div class="bg-[#111111] border border-[#1F2937] p-8 rounded-lg">
+<div class="w-12 h-12 rounded-lg bg-[#F59E0B]/10 flex items-center justify-center mb-6">
+<span class="material-symbols-outlined text-[#F59E0B]">memory</span>
+</div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-3">On-Demand Activation</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Cells sleep when idle, reducing cost to zero. They wake in milliseconds upon receiving a connection, perfectly matching serverless workloads.</p>
+</div>
+<div class="bg-[#111111] border border-[#1F2937] p-8 rounded-lg">
+<div class="w-12 h-12 rounded-lg bg-[#F59E0B]/10 flex items-center justify-center mb-6">
+<span class="material-symbols-outlined text-[#F59E0B]">lock</span>
+</div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-3">Tenant Isolation</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Each Cell is a logically isolated namespace with dedicated access controls. A single physical node can host thousands of secure, isolated Cells.</p>
+</div>
+<div class="bg-[#111111] border border-[#1F2937] p-8 rounded-lg">
+<div class="w-12 h-12 rounded-lg bg-[#F59E0B]/10 flex items-center justify-center mb-6">
+<span class="material-symbols-outlined text-[#F59E0B]">dns</span>
+</div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-3">Multi-Node Capable</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Deploy across a fleet of physical nodes. The Combee router intelligently distributes Cells and handles zero-downtime migrations.</p>
+</div>
+</div>
+</section>
+<!-- Architecture -->
+<section class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-20 border-b border-[#1F2937]">
+<div class="mb-12">
+<h2 class="font-headline-lg text-headline-lg text-on-surface mb-4">Architecture</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl">A clean, high-performance infrastructure designed for immense density and reliability.</p>
+</div>
+<div class="bg-[#111111] border border-[#1F2937] rounded-xl p-8 md:p-12">
+<div class="flex flex-col md:flex-row items-center justify-between gap-8">
+<!-- Clients -->
+<div class="flex flex-col items-center gap-4 w-full md:w-1/5">
+<div class="font-mono-label text-mono-label text-on-surface-variant">Clients</div>
+<div class="border border-[#1F2937] bg-[#0B0B0C] p-4 rounded text-center w-full">Edge Functions</div>
+<div class="border border-[#1F2937] bg-[#0B0B0C] p-4 rounded text-center w-full">AI Agents</div>
+</div>
+<div class="hidden md:block material-symbols-outlined text-outline-variant">arrow_forward</div>
+<!-- Router -->
+<div class="flex flex-col items-center gap-4 w-full md:w-1/5">
+<div class="font-mono-label text-mono-label text-on-surface-variant">API / Router</div>
+<div class="border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-6 rounded-lg text-center w-full relative glow-amber">
+<span class="material-symbols-outlined text-[#F59E0B] mb-2">router</span>
+<div class="font-mono-label text-mono-label text-[#F59E0B]">Combee Router</div>
+</div>
+</div>
+<div class="hidden md:block material-symbols-outlined text-outline-variant">arrow_forward</div>
+<!-- Data Nodes -->
+<div class="flex flex-col items-center gap-4 w-full md:w-2/5">
+<div class="font-mono-label text-mono-label text-on-surface-variant">Data Nodes</div>
+<div class="border border-[#1F2937] bg-[#0B0B0C] p-6 rounded-lg w-full">
+<div class="flex items-center gap-2 mb-4 font-mono-label text-mono-label text-on-surface">
+<span class="material-symbols-outlined text-outline-variant">dns</span> Node 1 (Primary)
+                        </div>
+<div class="flex justify-center gap-4">
+<img alt="Cell" class="w-10 h-10 opacity-80" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCziDBkiVZPMiIrNxncSz-7qPd3CLU8f6AqNah5yslpvYV-eU8JdAQAywYU6WraLfSSSvTTM6hd0MrRswj2IdlKPO1OZhPVzRVf1o7vjQ0YrNiTVOPUN-Q1apEvFmi75esbNnDb6Vzd1PZUz7PPMRZsengQ-FxcGRVbuc2rmqpYgynKrccJSxTowEgJ0LQF0BXT6Ogsdi3IxzeAS7dKVnbE9KZJhLjaj7X8lu4BJ4XbKs5zgXR9sACm8vl8fRWBXrjd8EA">
+<img alt="Cell" class="w-10 h-10 opacity-80" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDRrdYjIHVV29Y_t06AGVZngJ_KBSfBu3DjnTNsLwPtxFdRv6dX8sV6rcP4osqNgiGY1cPhDfffaMxvqmkSLTiezdz_zZ6Qbd_v1QFYfCJZdEVIqxkXS8kJETMoayRbLp71ooOyuRlRYjmCE3yVrSmCGLwVMo1bWHHSeRLZjz2KHY1Jatv4mHnbu15TlPjuFxDJhEGRIyl_zgPjRfkx5I2ajFHE67PZgMpdu51yr3DWOBKjDdSoJvsAZ31iIXmmYCfBuVg">
+<img alt="Cell" class="w-10 h-10 opacity-80" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBbhWkBlKn1mQM13u-ff1tvyrn1gCZKf17gSn68eoLQE8F_LQVrtrZk-CENwrDLqrboXFkzYZW3hZcK80O68m8CujI0IoobCKrtmgZrOqY6oVkOA5frjtOXHqPdPVYl4JSnE09CFw9ORlTqMTwYPhClQxJ2grBDSt0aG1zCqCIGnh2BolSq2imOS_W5SePH0x52lSix2xjENuECduQx19ddxH6WD3Mr80QcmOhYFu20xaSu0W_K1g5ykIiJgPk0VsO9TXI">
+</div>
+</div>
+</div>
+<!-- Storage -->
+<div class="flex flex-col items-center gap-2 w-full mt-8 md:mt-0 pt-8 md:pt-0 border-t md:border-t-0 border-[#1F2937]">
+<span class="material-symbols-outlined text-outline-variant">cloud_download</span>
+<div class="font-mono-label text-mono-label text-on-surface-variant">S3 / Object Storage</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Reliability -->
+<section class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-20 border-b border-[#1F2937]">
+<div class="mb-12">
+<h2 class="font-headline-lg text-headline-lg text-on-surface mb-4">Cell Lifecycle &amp; Reliability</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl">Data safety is guaranteed through a robust Write-Ahead Log (WAL) architecture.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+<div class="border border-[#1F2937] bg-[#111111] p-6 rounded-lg">
+<div class="font-mono-code text-mono-code text-tertiary mb-4">01 // Primary</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Cell handles active read/write traffic. Transactions are committed locally.</p>
+</div>
+<div class="border border-[#1F2937] bg-[#111111] p-6 rounded-lg">
+<div class="font-mono-code text-mono-code text-tertiary mb-4">02 // WAL Streaming</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Changes are continuously streamed via WAL to local disk and replicas.</p>
+</div>
+<div class="border border-[#1F2937] bg-[#111111] p-6 rounded-lg">
+<div class="font-mono-code text-mono-code text-tertiary mb-4">03 // S3 Backup</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Periodic snapshots and WAL archives are securely persisted to S3 storage.</p>
+</div>
+<div class="border border-[#1F2937] bg-[#111111] p-6 rounded-lg">
+<div class="font-mono-code text-mono-code text-tertiary mb-4">04 // Auto Failover</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">If a node fails, the Cell is instantly restored on a healthy node from S3 or Replica.</p>
+</div>
+</div>
+</section>
+<!-- Use Cases -->
+<section class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-20 border-b border-[#1F2937]">
+<h2 class="font-headline-lg text-headline-lg text-on-surface mb-12 text-center">Built for Modern Architectures</h2>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+<div class="border border-[#1F2937] bg-[#111111] p-6 rounded-lg hover:border-[#F59E0B]/50 transition-colors">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-2">AI Agents</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Spawn a temporary Cell for an agent's reasoning scratchpad and memory, then destroy it when done.</p>
+</div>
+<div class="border border-[#1F2937] bg-[#111111] p-6 rounded-lg hover:border-[#F59E0B]/50 transition-colors">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-2">Website Builders</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Give every user-generated site its own isolated database Cell without managing thousands of Postgres instances.</p>
+</div>
+<div class="border border-[#1F2937] bg-[#111111] p-6 rounded-lg hover:border-[#F59E0B]/50 transition-colors">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-2">Preview Envs</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Instantly clone production schemas into lightweight Cells for every Pull Request.</p>
+</div>
+<div class="border border-[#1F2937] bg-[#111111] p-6 rounded-lg hover:border-[#F59E0B]/50 transition-colors">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-2">Small SaaS</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Achieve perfect multi-tenant isolation by assigning one Cell per customer tenant.</p>
+</div>
+</div>
+</section>
+<!-- Pricing Philosophy -->
+<section class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-20">
+<div class="bg-gradient-to-br from-[#111111] to-[#0A0A0A] border border-[#1F2937] p-12 rounded-2xl text-center">
+<h2 class="font-display-lg text-display-lg text-on-surface mb-6">Pricing Philosophy</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto mb-8">
+            Pay for usage, not idle instances. Combee is designed to make multi-tenant data architecture economically viable at any scale.
+        </p>
+<button class="bg-[#F59E0B] text-[#0B0B0C] font-mono-label text-mono-label px-8 py-4 rounded font-bold hover:bg-[#F59E0B]/90 transition-colors">View Pricing Details</button>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-surface-container-lowest w-full py-12 border-t border-outline-variant flat no shadows">
+<div class="max-w-container-max mx-auto px-margin-desktop grid grid-cols-1 md:grid-cols-2 gap-8">
+<div>
+<div class="flex items-center gap-2 font-mono-label text-mono-label font-bold text-on-surface mb-4"><img alt="Combee Logo" class="h-6 w-auto" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD9_qEssZAmS486C9RvPymte3ngcBd1JApq0CoGmjpxxnqD9psFt7CQVkY3ciuaXKdFrVAzbtCe50V27YtsLYbDsTSbu1vUwDlZSz_0CNYnKOx2jMzXr8ra60u0bbso21csTMiVADZpiudKoAKUNfqg3N3acEN0FNs_6mIlvsRrtNqD9YzGPLcvnN9Rz6ML-hLL5R32UjukdAt1NT5cv5rUyIC7wqSnOIk2tDdt-nzNA84zGHly6owBE0og--_BsVUhXSc"><span class="">Combee</span></div>
+<p class="font-body-sm text-body-sm text-tertiary">© 2024 Combee Runtime. Distributed under the MIT License.</p>
+</div>
+<div class="flex flex-wrap gap-6 md:justify-end">
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-tertiary-fixed-dim transition-colors opacity-80 hover:opacity-100" href="#">Documentation</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-tertiary-fixed-dim transition-colors opacity-80 hover:opacity-100" href="#">API Reference</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-tertiary-fixed-dim transition-colors opacity-80 hover:opacity-100" href="#">Status</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-tertiary-fixed-dim transition-colors opacity-80 hover:opacity-100" href="#">Changelog</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-tertiary-fixed-dim transition-colors opacity-80 hover:opacity-100" href="#">Terms</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-tertiary-fixed-dim transition-colors opacity-80 hover:opacity-100" href="#">Privacy</a>
+</div>
+</div>
+</footer>
+
+
+</body></html>

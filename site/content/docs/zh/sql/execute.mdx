@@ -1,0 +1,40 @@
+---
+title: 执行
+description: 执行写语句与 DDL,返回受影响行数。
+since: 0.1.0-beta
+status: stable
+---
+
+`execute` 用于修改数据的语句(`INSERT`、`UPDATE`、`DELETE`、`CREATE TABLE` …)。返回受影响行数。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/sql \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"sql": "CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT)"}'
+
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/sql \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"sql": "INSERT INTO posts (title) VALUES (?)", "params": ["Hello"]}'
+    # → {"columns": [], "rows": [], "rows_affected": 1, "truncated": false}
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.sql.execute(`CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT)`);
+    const result = await cell.sql.execute(`INSERT INTO posts (title) VALUES (?)`, ['Hello']);
+    // result.rows_affected === 1
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.sql.execute("CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT)")
+    result = cell.sql.execute("INSERT INTO posts (title) VALUES (?)", ["Hello"])
+    ```
+  </Tab>
+</Tabs>
+
+多条语句需要原子性时,使用[事务](./transactions)。

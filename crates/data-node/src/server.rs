@@ -22,6 +22,29 @@ use crate::DataNode;
 /// 1. 携带租户 `x-api-key` 一律拒绝;
 /// 2. 配置 token 时必须提供 `Authorization: Bearer <token>` 或 `x-control-token: <token>`;
 /// 3. 未配置则放行。
+pub(crate) async fn rpc_request_id(
+    req: axum::http::Request<axum::body::Body>,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    if let Some(rid) = req
+        .headers()
+        .get("x-request-id")
+        .and_then(|v| v.to_str().ok())
+    {
+        // RPC 层结构化日志:request_id 已从 API/BFF 贯穿到 DataNode
+        tracing::debug!(
+            service = "combee-data-node",
+            event = "rpc.request",
+            request_id = %rid,
+            path = %req.uri(),
+        );
+        let span = tracing::info_span!("rpc", request_id = %rid);
+        let _g = span.enter();
+        return next.run(req).await;
+    }
+    next.run(req).await
+}
+
 pub(crate) async fn rpc_auth(
     State(token): State<Option<String>>,
     req: axum::http::Request<axum::body::Body>,
@@ -73,6 +96,9 @@ pub fn router(node: Arc<DataNode>, control_token: Option<String>) -> Router {
         .route("/rpc/incremental_backup", post(rpc_incremental_backup))
         .route("/rpc/restore", post(rpc_restore))
         .route("/rpc/storage_bytes", post(rpc_storage_bytes))
+        .route("/rpc/kv_scan", post(rpc_kv_scan))
+        .route("/rpc/reset_database", post(rpc_reset_database))
+        .layer(axum::middleware::from_fn(rpc_request_id))
         .layer(axum::middleware::from_fn_with_state(
             control_token.clone(),
             rpc_auth,
@@ -257,5 +283,25 @@ async fn rpc_storage_bytes(
     Json(rpc): Json<combee_common::rpc::RpcDb>,
 ) -> Json<RpcResponse<u64>> {
     let r = node.storage_bytes(rpc.db).await;
+    Json(RpcResponse::from_result(r))
+}
+
+/// RPC:KV 前缀扫描(浏览)。
+async fn rpc_kv_scan(
+    State(node): State<Arc<DataNode>>,
+    Json(rpc): Json<combee_common::rpc::RpcKvScan>,
+) -> Json<RpcResponse<combee_common::rpc::RpcKvScanResult>> {
+    let r = node
+        .kv_scan(rpc.db, rpc.prefix, rpc.limit, rpc.cursor)
+        .await;
+    Json(RpcResponse::from_result(r))
+}
+
+/// RPC:重置 Cell 数据(删除文件与缓存)。
+async fn rpc_reset_database(
+    State(node): State<Arc<DataNode>>,
+    Json(rpc): Json<combee_common::rpc::RpcDb>,
+) -> Json<RpcResponse<()>> {
+    let r = node.reset_database(rpc.db).await;
     Json(RpcResponse::from_result(r))
 }

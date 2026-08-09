@@ -55,6 +55,7 @@ async fn make_app() -> (Router, Arc<UsageMeter>, Arc<dyn MetadataStore>, TempDir
         kv_cache_capacity: 100_000,
         kv_durability: KvDurability::Normal,
         sql_timeout: Some(Duration::from_secs(5)),
+        quota: Default::default(),
     }));
     let client = Arc::new(LocalDataNodeClient::new(node));
     let provider: Arc<dyn DataNodeProvider> = Arc::new(LocalProvider::new(client));
@@ -71,6 +72,8 @@ async fn make_app() -> (Router, Arc<UsageMeter>, Arc<dyn MetadataStore>, TempDir
             std::time::Duration::from_secs(3600),
         ),
         admin_token: None,
+        quota: Default::default(),
+        concurrency: Default::default(),
     };
     (build_app(state), meter, metadata, dir)
 }

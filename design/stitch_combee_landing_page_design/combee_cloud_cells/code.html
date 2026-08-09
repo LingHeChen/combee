@@ -1,0 +1,322 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Combee Cloud - Cells</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary-fixed-variant": "#3d4756",
+                      "surface-container-highest": "#333535",
+                      "on-surface": "#e2e2e2",
+                      "inverse-on-surface": "#2f3130",
+                      "primary-container": "#0a0a0a",
+                      "on-primary": "#313030",
+                      "primary-fixed-dim": "#c9c6c5",
+                      "tertiary-fixed": "#ffddb8",
+                      "surface-container-low": "#1a1c1c",
+                      "surface-bright": "#383939",
+                      "on-tertiary-fixed-variant": "#653e00",
+                      "tertiary": "#ffb95f",
+                      "background": "#121414",
+                      "surface-dim": "#121414",
+                      "inverse-primary": "#5f5e5e",
+                      "on-primary-fixed-variant": "#474646",
+                      "error": "#ffb4ab",
+                      "primary": "#c9c6c5",
+                      "on-background": "#e2e2e2",
+                      "on-tertiary-container": "#aa6c00",
+                      "on-error": "#690005",
+                      "on-primary-fixed": "#1c1b1b",
+                      "on-surface-variant": "#c4c7c7",
+                      "error-container": "#93000a",
+                      "surface-container-lowest": "#0c0f0e",
+                      "outline-variant": "#444748",
+                      "secondary-container": "#404a59",
+                      "surface-variant": "#333535",
+                      "surface": "#121414",
+                      "surface-tint": "#c9c6c5",
+                      "tertiary-container": "#130800",
+                      "on-error-container": "#ffdad6",
+                      "surface-container": "#1e2020",
+                      "inverse-surface": "#e2e2e2",
+                      "on-secondary-fixed": "#121c2a",
+                      "secondary-fixed": "#d9e3f6",
+                      "on-tertiary": "#472a00",
+                      "secondary": "#bdc7d9",
+                      "on-primary-container": "#7b7979",
+                      "outline": "#8e9192",
+                      "primary-fixed": "#e5e2e1",
+                      "tertiary-fixed-dim": "#ffb95f",
+                      "secondary-fixed-dim": "#bdc7d9",
+                      "on-tertiary-fixed": "#2a1700",
+                      "surface-container-high": "#282a2a",
+                      "on-secondary-container": "#afb9cb",
+                      "on-secondary": "#27313f"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "margin-desktop": "32px",
+                      "container-max": "1280px",
+                      "unit": "4px",
+                      "gutter": "16px",
+                      "margin-mobile": "16px"
+              },
+              "fontFamily": {
+                      "body-lg": ["Geist"],
+                      "display-lg": ["Geist"],
+                      "body-sm": ["Geist"],
+                      "headline-md": ["Geist"],
+                      "headline-lg": ["Geist"],
+                      "mono-code": ["JetBrains Mono"],
+                      "headline-lg-mobile": ["Geist"],
+                      "mono-label": ["JetBrains Mono"]
+              },
+              "fontSize": {
+                      "body-lg": ["16px", {"lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "400"}],
+                      "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.04em", "fontWeight": "700"}],
+                      "body-sm": ["14px", {"lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400"}],
+                      "headline-md": ["20px", {"lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "500"}],
+                      "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                      "mono-code": ["14px", {"lineHeight": "22px", "letterSpacing": "0em", "fontWeight": "400"}],
+                      "headline-lg-mobile": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                      "mono-label": ["13px", {"lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500"}]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+        body { background-color: theme('colors.background'); color: theme('colors.on-surface'); }
+        .glass-panel { background: rgba(17, 17, 17, 0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+        .amber-glow:hover { box-shadow: 0 0 20px rgba(245, 158, 11, 0.1); }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+<!-- SideNavBar -->
+<nav class="bg-surface-container-low border-r border-outline-variant docked left-0 h-screen w-64 flex flex-col py-6 px-4 gap-2 z-20 flex-shrink-0">
+<div class="flex items-center gap-3 mb-8 px-2">
+<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDCgAf0sBJmV8tmpfcSf2xz5Nwq0dwYQdNIRBI6BViRD-2KKrQ5PcvqlZ4XNnuILWwDSPSBH9AICieYJSr8XRSaMJH4XNuAsof41wfkc3ECcSWjkkXrpXR9ZsmPd2MIE7twY2nTP-aDcWR5gAibZpu4bThyesKbo3pCmscj4v-YSGvICKga4_LiFZkYnDAXPEYmhWUTFyJ7O7u3ZjNAn6hsdlj4UEqqykJK6WFKkWPF5kMjUZTlE_E3YcPS3YjglDT4iP4" alt="Combee Cloud Logo" class="h-8 w-8 object-contain">
+<div>
+<h1 class="text-headline-md font-headline-md font-bold text-on-surface">Combee Cloud</h1>
+<p class="font-mono-label text-mono-label text-on-surface-variant">v2.4.0-stable</p>
+</div>
+</div>
+<button class="mb-6 w-full py-2 px-4 bg-tertiary text-primary-container font-headline-md text-headline-md rounded hover:bg-tertiary-fixed transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined">add</span>
+            Create Cell
+        </button>
+<div class="flex flex-col gap-1 flex-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 font-mono-label text-mono-label" href="#">
+<span class="material-symbols-outlined">dashboard</span> Overview
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded bg-tertiary-container text-tertiary font-bold border-r-2 border-tertiary font-mono-label text-mono-label scale-[0.99] transition-transform" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">hive</span> Cells
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 font-mono-label text-mono-label" href="#">
+<span class="material-symbols-outlined">key</span> API Keys
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 font-mono-label text-mono-label" href="#">
+<span class="material-symbols-outlined">bar_chart</span> Usage
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 font-mono-label text-mono-label" href="#">
+<span class="material-symbols-outlined">account_balance_wallet</span> Credits
+            </a>
+</div>
+<div class="mt-auto flex flex-col gap-1 border-t border-outline-variant pt-4">
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 font-mono-label text-mono-label" href="#">
+<span class="material-symbols-outlined">menu_book</span> Docs
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 font-mono-label text-mono-label" href="#">
+<span class="material-symbols-outlined">contact_support</span> Support
+            </a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col min-w-0 bg-background relative overflow-hidden">
+<!-- TopNavBar -->
+<header class="bg-surface-dim/80 backdrop-blur-md border-b border-outline-variant docked top-0 w-full z-10 flex justify-between items-center h-16 px-gutter ml-auto">
+<div class="flex items-center gap-8">
+<div class="font-mono-code text-mono-code uppercase tracking-widest text-on-surface"><div class="flex items-center gap-2"><img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDD9l2veHCRUlrB4fyYOD-tLLqTOfIVzu98cLEd84pLofczJr8xa9SttsdFrNy4zaoAFr39XCXztXKnNLyd90YvRhz6iUw6mlvJR-p6d_1u0KRkiz_VrjIw2myEQPoCcixZOHnNPbH9vdO5oOYilatbDABY1QYJnZCqMUFrdCvVJQYzn9nAyYowfqnOrNoQRe6xh8Z4fFCYWeHDewmGGox8nJODNboVf3pabwlFUYOtj2nv5s4EMfdadHIWqqGKTzVZc-8" alt="" class="h-6 w-6 object-contain"><span class="">Combee Cloud</span></div></div>
+<nav class="hidden md:flex items-center gap-6 mt-2">
+<a class="text-on-surface-variant hover:text-on-surface pb-2 font-body-sm text-body-sm transition-all duration-200" href="#">Projects</a>
+<a class="text-on-surface-variant hover:text-on-surface pb-2 font-body-sm text-body-sm transition-all duration-200" href="#">Regions</a>
+<a class="text-on-surface-variant hover:text-on-surface pb-2 font-body-sm text-body-sm transition-all duration-200" href="#">Network</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:text-tertiary transition-all duration-200">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-tertiary transition-all duration-200">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<img alt="User profile avatar" class="w-8 h-8 rounded-full border border-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBIZ8mIMr32C-FL2He7qh7hPQ0Oq5Dg_6K1QUv64KS-pg6EaQDQn-U4mHzY7zLELn2R8nZdJ2x9HoTIt6oiziJQq3My8oQVBfPDcodeNiuLz7OB9s6ByT_DT-MMkVLhrlQP7CEet8FFwRslsr-8U0V-0lJJNJMsXe-1HUGgpQvtmcTqlD3Wop0ePmu-76O2XnDwRExwG4lU8mlpOBioSsC1y4bNcgRQ2x4dL9chwScyzXa09TALk9z6WQ">
+</div>
+</header>
+<!-- Page Content -->
+<div class="flex-1 overflow-y-auto p-margin-desktop">
+<div class="max-w-container-max mx-auto space-y-8">
+<!-- Header -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Cells</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant mt-1">Create and manage lightweight data Cells.</p>
+</div>
+<div class="flex items-center gap-3 w-full md:w-auto">
+<div class="relative flex-1 md:w-64 group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
+<input class="w-full bg-primary-container border border-outline-variant rounded-md py-2 pl-9 pr-3 font-mono-code text-mono-code text-on-surface focus:border-tertiary focus:ring-1 focus:ring-tertiary/30 transition-all outline-none placeholder:text-on-surface-variant/50" placeholder="Search Cells..." type="text">
+</div>
+<select class="bg-primary-container border border-outline-variant rounded-md py-2 px-3 font-mono-code text-mono-code text-on-surface focus:border-tertiary focus:ring-1 focus:ring-tertiary/30 outline-none appearance-none">
+<option>All Status</option>
+<option>Active</option>
+<option>Idle</option>
+</select>
+<select class="bg-primary-container border border-outline-variant rounded-md py-2 px-3 font-mono-code text-mono-code text-on-surface focus:border-tertiary focus:ring-1 focus:ring-tertiary/30 outline-none appearance-none">
+<option>All Regions</option>
+<option>Tokyo</option>
+<option>Frankfurt</option>
+<option>US-East</option>
+</select>
+</div>
+</div>
+<!-- Grid Data -->
+<div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+<!-- Cell Card 1 -->
+<div class="bg-surface-container-low border border-outline-variant rounded-lg p-6 relative overflow-hidden group amber-glow transition-all duration-300">
+<div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-tertiary/20 to-transparent"></div>
+<div class="flex justify-between items-start mb-4">
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface group-hover:text-tertiary transition-colors">prod-eu-cache-01</h3>
+<p class="font-mono-code text-mono-code text-on-surface-variant text-xs mt-1">ID: cll_8f92a1b4</p>
+</div>
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#1F2937]/50 border border-[#1F2937]">
+<span class="material-symbols-outlined text-[10px] text-tertiary animate-pulse" style="font-variation-settings: 'FILL' 1;">hexagon</span>
+<span class="font-mono-label text-mono-label text-xs text-on-surface">Active</span>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4 mt-6 border-t border-outline-variant/30 pt-4">
+<div>
+<p class="font-mono-label text-mono-label text-[11px] text-on-surface-variant uppercase tracking-wider mb-1">Region</p>
+<p class="font-body-sm text-body-sm text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm">public</span> Frankfurt
+                                </p>
+</div>
+<div>
+<p class="font-mono-label text-mono-label text-[11px] text-on-surface-variant uppercase tracking-wider mb-1">Storage Usage</p>
+<p class="font-body-sm text-body-sm text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm">database</span> 4.2 GB
+                                </p>
+</div>
+<div>
+<p class="font-mono-label text-mono-label text-[11px] text-on-surface-variant uppercase tracking-wider mb-1">Requests (24h)</p>
+<p class="font-body-sm text-body-sm text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm">swap_vert</span> 1.2M
+                                </p>
+</div>
+<div>
+<p class="font-mono-label text-mono-label text-[11px] text-on-surface-variant uppercase tracking-wider mb-1">Last Active</p>
+<p class="font-body-sm text-body-sm text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm">schedule</span> 2 min ago
+                                </p>
+</div>
+</div>
+</div>
+<!-- Cell Card 2 -->
+<div class="bg-surface-container-low border border-outline-variant rounded-lg p-6 relative overflow-hidden group hover:ring-1 hover:ring-tertiary/30 transition-all duration-300">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface group-hover:text-tertiary transition-colors">dev-ap-worker-02</h3>
+<p class="font-mono-code text-mono-code text-on-surface-variant text-xs mt-1">ID: cll_3c77d9e1</p>
+</div>
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#1F2937]/50 border border-[#1F2937]">
+<span class="material-symbols-outlined text-[10px] text-outline" style="font-variation-settings: 'FILL' 1;">hexagon</span>
+<span class="font-mono-label text-mono-label text-xs text-on-surface-variant">Idle</span>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4 mt-6 border-t border-outline-variant/30 pt-4">
+<div>
+<p class="font-mono-label text-mono-label text-[11px] text-on-surface-variant uppercase tracking-wider mb-1">Region</p>
+<p class="font-body-sm text-body-sm text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm">public</span> Tokyo
+                                </p>
+</div>
+<div>
+<p class="font-mono-label text-mono-label text-[11px] text-on-surface-variant uppercase tracking-wider mb-1">Storage Usage</p>
+<p class="font-body-sm text-body-sm text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm">database</span> 128 MB
+                                </p>
+</div>
+<div>
+<p class="font-mono-label text-mono-label text-[11px] text-on-surface-variant uppercase tracking-wider mb-1">Requests (24h)</p>
+<p class="font-body-sm text-body-sm text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm">swap_vert</span> 450
+                                </p>
+</div>
+<div>
+<p class="font-mono-label text-mono-label text-[11px] text-on-surface-variant uppercase tracking-wider mb-1">Last Active</p>
+<p class="font-body-sm text-body-sm text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm">schedule</span> 4 hrs ago
+                                </p>
+</div>
+</div>
+</div>
+<!-- Cell Card 3 -->
+<div class="bg-surface-container-low border border-outline-variant rounded-lg p-6 relative overflow-hidden group amber-glow transition-all duration-300">
+<div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-tertiary/20 to-transparent"></div>
+<div class="flex justify-between items-start mb-4">
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface group-hover:text-tertiary transition-colors">prod-us-stream-11</h3>
+<p class="font-mono-code text-mono-code text-on-surface-variant text-xs mt-1">ID: cll_99b0f44c</p>
+</div>
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#1F2937]/50 border border-[#1F2937]">
+<span class="material-symbols-outlined text-[10px] text-tertiary animate-pulse" style="font-variation-settings: 'FILL' 1;">hexagon</span>
+<span class="font-mono-label text-mono-label text-xs text-on-surface">Active</span>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4 mt-6 border-t border-outline-variant/30 pt-4">
+<div>
+<p class="font-mono-label text-mono-label text-[11px] text-on-surface-variant uppercase tracking-wider mb-1">Region</p>
+<p class="font-body-sm text-body-sm text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm">public</span> US-East
+                                </p>
+</div>
+<div>
+<p class="font-mono-label text-mono-label text-[11px] text-on-surface-variant uppercase tracking-wider mb-1">Storage Usage</p>
+<p class="font-body-sm text-body-sm text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm">database</span> 1.8 GB
+                                </p>
+</div>
+<div>
+<p class="font-mono-label text-mono-label text-[11px] text-on-surface-variant uppercase tracking-wider mb-1">Requests (24h)</p>
+<p class="font-body-sm text-body-sm text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm">swap_vert</span> 890k
+                                </p>
+</div>
+<div>
+<p class="font-mono-label text-mono-label text-[11px] text-on-surface-variant uppercase tracking-wider mb-1">Last Active</p>
+<p class="font-body-sm text-body-sm text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm">schedule</span> Just now
+                                </p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+
+
+</body></html>

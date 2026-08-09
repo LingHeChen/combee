@@ -96,8 +96,8 @@ impl UsageMeter {
         for (key, delta) in batch {
             match self.metadata.usage_add(&key, delta).await {
                 Ok(()) => flushed += 1,
-                Err(e) => {
-                    warn!(metric = %key.metric.as_str(), bucket = key.bucket_start, "usage flush item failed: {e}; re-queueing");
+                Err(_e) => {
+                    warn!(service = "combee-api", event = "usage.flush.failed", metric = %key.metric.as_str(), bucket = key.bucket_start, error_code = "USAGE_FLUSH_FAILED");
                     let mut c = self.counters.lock().unwrap();
                     *c.entry(key).or_insert(0) += delta;
                 }

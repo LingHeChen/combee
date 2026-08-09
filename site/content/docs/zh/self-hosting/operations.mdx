@@ -1,0 +1,33 @@
+---
+title: 运维
+description: 备份、恢复、节点注册与管理任务。
+since: 0.1.0-beta
+status: stable
+---
+
+## 备份与恢复(curl)
+
+```bash
+# 快照
+curl -X POST http://127.0.0.1:8080/v1/databases/<id>/backup
+
+# WAL 增量
+curl -X POST http://127.0.0.1:8080/v1/databases/<id>/backup/incr
+
+# 恢复最新
+curl -X POST http://127.0.0.1:8080/v1/databases/<id>/restore
+```
+
+## Data Node
+
+- Data Node 自行向 API Server 注册并发送心跳(`COMBEE_CONTROL_PLANE_TOKEN` 认证);健康的节点会被
+  选来承载新 Cell。
+- 主节点心跳超时后,副本自动提升(见[复制 / 故障转移](../reliability/replication-failover))。
+
+## 管理接口
+
+运营端点(`/admin/*`)由 `COMBEE_ADMIN_TOKEN` 保护,**不属于**公共 API——SDK 不暴露它们。
+
+## 持久性
+
+`COMBEE_KV_DURABILITY=strict` 是生产数据的稳妥默认;`fast` 用持久性换写延迟。按负载选择。

@@ -1,0 +1,46 @@
+---
+title: Transactions
+description: Run multiple statements atomically with a single transaction call.
+since: 0.1.0-beta
+status: stable
+---
+
+`transaction` runs a list of statements in one atomic unit — either all commit, or none do.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/transaction \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "statements": [
+          {"sql": "UPDATE accounts SET balance = balance - 100 WHERE id = ?", "params": [1]},
+          {"sql": "UPDATE accounts SET balance = balance + 100 WHERE id = ?", "params": [2]}
+        ]
+      }'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const results = await cell.sql.transaction([
+      { sql: `UPDATE accounts SET balance = balance - 100 WHERE id = ?`, params: [1] },
+      { sql: `UPDATE accounts SET balance = balance + 100 WHERE id = ?`, params: [2] },
+    ]);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    results = cell.sql.transaction([
+        {"sql": "UPDATE accounts SET balance = balance - 100 WHERE id = ?", "params": [1]},
+        {"sql": "UPDATE accounts SET balance = balance + 100 WHERE id = ?", "params": [2]},
+    ])
+    ```
+  </Tab>
+</Tabs>
+
+Rules:
+
+- Every statement is a `{ sql, params }` object.
+- The whole batch is wrapped in a server-side transaction.
+- Reads and writes can be mixed; each statement executes in order.

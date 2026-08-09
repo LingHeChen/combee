@@ -27,6 +27,7 @@ fn node(data_dir: &std::path::Path, os_dir: &std::path::Path) -> DataNode {
         kv_cache_capacity: 10_000,
         kv_durability: KvDurability::Normal,
         sql_timeout: Some(std::time::Duration::from_secs(30)),
+        quota: Default::default(),
     })
     .with_object_store(store)
 }
@@ -145,6 +146,7 @@ async fn replication_api_sets_replica() {
             kv_cache_capacity: 1_000,
             kv_durability: KvDurability::Normal,
             sql_timeout: Some(std::time::Duration::from_secs(30)),
+            quota: Default::default(),
         },
     ))));
     let provider: Arc<dyn DataNodeProvider> = Arc::new(LocalProvider::new(local));
@@ -163,6 +165,8 @@ async fn replication_api_sets_replica() {
             std::time::Duration::from_secs(3600),
         ),
         admin_token: None,
+        quota: Default::default(),
+        concurrency: Default::default(),
     });
 
     // 创建 db

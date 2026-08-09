@@ -1,0 +1,51 @@
+---
+title: 错误与超时
+description: SQL 错误如何呈现,超时会发生什么。
+since: 0.1.0-beta
+status: stable
+---
+
+SQL 失败映射到统一的错误模型:
+
+- 语法 / 约束错误 → HTTP `400`,`error.code: "sql"` → SDK 抛出 `SqlError`。
+- 语句运行过久 → `SqlTimeoutError`(客户端侧超时)。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/sql \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"sql": "SELECT * FROM missing_table"}' -i
+    # HTTP/1.1 400 Bad Request
+    # x-request-id: 3f1c4a0e-...
+    # {"code": "sql", "error": "no such table: missing_table"}
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    import { SqlError } from '@combee/sdk';
+
+    try {
+      await cell.sql.query(`SELECT * FROM missing_table`);
+    } catch (err) {
+      if (err instanceof SqlError) {
+        console.error(err.message, err.requestId);
+      }
+    }
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    from combee import SqlError
+
+    try:
+        cell.sql.query("SELECT * FROM missing_table")
+    except SqlError as err:
+        print(err)
+    ```
+  </Tab>
+</Tabs>
+
+每个错误响应都会回显 `x-request-id`;SDK 错误对象以 `requestId` 暴露,便于精确反馈问题。
+完整映射表见[错误码](../reference/error-codes)。

@@ -1,0 +1,418 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Combee Cloud - SQL Workspace</title>
+<!-- Google Fonts: Geist & JetBrains Mono -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration (Brand Anchors) -->
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary-fixed-variant": "#3d4756",
+                      "surface-container-highest": "#333535",
+                      "on-surface": "#e2e2e2",
+                      "inverse-on-surface": "#2f3130",
+                      "primary-container": "#0a0a0a",
+                      "on-primary": "#313030",
+                      "primary-fixed-dim": "#c9c6c5",
+                      "tertiary-fixed": "#ffddb8",
+                      "surface-container-low": "#1a1c1c",
+                      "surface-bright": "#383939",
+                      "on-tertiary-fixed-variant": "#653e00",
+                      "tertiary": "#ffb95f",
+                      "background": "#121414",
+                      "surface-dim": "#121414",
+                      "inverse-primary": "#5f5e5e",
+                      "on-primary-fixed-variant": "#474646",
+                      "error": "#ffb4ab",
+                      "primary": "#c9c6c5",
+                      "on-background": "#e2e2e2",
+                      "on-tertiary-container": "#aa6c00",
+                      "on-error": "#690005",
+                      "on-primary-fixed": "#1c1b1b",
+                      "on-surface-variant": "#c4c7c7",
+                      "error-container": "#93000a",
+                      "surface-container-lowest": "#0c0f0e",
+                      "outline-variant": "#444748",
+                      "secondary-container": "#404a59",
+                      "surface-variant": "#333535",
+                      "surface": "#121414",
+                      "surface-tint": "#c9c6c5",
+                      "tertiary-container": "#130800",
+                      "on-error-container": "#ffdad6",
+                      "surface-container": "#1e2020",
+                      "inverse-surface": "#e2e2e2",
+                      "on-secondary-fixed": "#121c2a",
+                      "secondary-fixed": "#d9e3f6",
+                      "on-tertiary": "#472a00",
+                      "secondary": "#bdc7d9",
+                      "on-primary-container": "#7b7979",
+                      "outline": "#8e9192",
+                      "primary-fixed": "#e5e2e1",
+                      "tertiary-fixed-dim": "#ffb95f",
+                      "secondary-fixed-dim": "#bdc7d9",
+                      "on-tertiary-fixed": "#2a1700",
+                      "surface-container-high": "#282a2a",
+                      "on-secondary-container": "#afb9cb",
+                      "on-secondary": "#27313f"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "margin-desktop": "32px",
+                      "container-max": "1280px",
+                      "unit": "4px",
+                      "gutter": "16px",
+                      "margin-mobile": "16px"
+              },
+              "fontFamily": {
+                      "body-lg": ["Geist"],
+                      "display-lg": ["Geist"],
+                      "body-sm": ["Geist"],
+                      "headline-md": ["Geist"],
+                      "headline-lg": ["Geist"],
+                      "mono-code": ["JetBrains Mono"],
+                      "headline-lg-mobile": ["Geist"],
+                      "mono-label": ["JetBrains Mono"]
+              },
+              "fontSize": {
+                      "body-lg": ["16px", {"lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "400"}],
+                      "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.04em", "fontWeight": "700"}],
+                      "body-sm": ["14px", {"lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400"}],
+                      "headline-md": ["20px", {"lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "500"}],
+                      "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                      "mono-code": ["14px", {"lineHeight": "22px", "letterSpacing": "0em", "fontWeight": "400"}],
+                      "headline-lg-mobile": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                      "mono-label": ["13px", {"lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500"}]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+        /* Base overrides for strict styling */
+        body {
+            background-color: theme('colors.primary-container');
+            color: theme('colors.on-background');
+        }
+        
+        /* Custom scrollbar for developer feel */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: theme('colors.outline-variant');
+            border-radius: theme('borderRadius.DEFAULT');
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: theme('colors.outline');
+        }
+
+        /* Syntax Highlighting Mock Colors */
+        .sql-keyword { color: #c678dd; } /* Purple-ish */
+        .sql-function { color: #61afef; } /* Blue-ish */
+        .sql-string { color: #98c379; } /* Green-ish */
+        .sql-punctuation { color: theme('colors.on-surface-variant'); }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden selection:bg-tertiary selection:text-tertiary-container">
+<!-- Shared Component: SideNavBar -->
+<aside class="flex flex-col h-full py-6 px-4 gap-2 bg-surface-container-low dark:bg-surface-container-low text-tertiary dark:text-tertiary font-headline-md text-headline-md docked left-0 h-screen w-64 border-r border-outline-variant shrink-0 z-20 relative">
+<!-- Brand Header -->
+<div class="flex items-center gap-3 mb-8 px-2">
+<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuBhF2EyMVwEtO7c3BbPgLQQz5IvMz3lkB-kJPJmpmwiqIOPg2u8VZ7dYgZvLz7kR4aPfIQKoUG23LjL572Zaj3Zk4j8kIj3cTJcz0QPpKj_y_d7DSJQc4iEFKE5yAzPoVvWtd90etRRLTpTiT7cHfOsBb_OffuxG-CNX4IRkMoSq6BvZb5YkRB1WgPI6k8RTEZX2yqk6GOd83aCY-aPIFcCcjZ9sy7b6ezwWT99oIdM09rzWCQLzRW9zJKwTUpLC-U7zEY" alt="Combee Cloud Logo" class="h-8 w-8 object-contain">
+<div>
+<h1 class="text-headline-md font-headline-md font-bold text-on-surface dark:text-on-surface tracking-tight">Combee Cloud</h1>
+<p class="font-mono-label text-mono-label text-on-surface-variant text-xs mt-1">v2.4.0-stable</p>
+</div>
+</div>
+<!-- Navigation Tabs -->
+<nav class="flex-1 flex flex-col gap-1 font-mono-label text-mono-label">
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-lg group-active:scale-[0.99] transition-transform" data-icon="dashboard">dashboard</span>
+                Overview
+            </a>
+<!-- Active Tab: Cells -->
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT bg-tertiary-container text-tertiary font-bold border-r-2 border-tertiary scale-[0.99] transition-transform group" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="hive" data-weight="fill" style="font-variation-settings: 'FILL' 1;">hive</span>
+                Cells
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-lg group-active:scale-[0.99] transition-transform" data-icon="key">key</span>
+                API Keys
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-lg group-active:scale-[0.99] transition-transform" data-icon="bar_chart">bar_chart</span>
+                Usage
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-lg group-active:scale-[0.99] transition-transform" data-icon="account_balance_wallet">account_balance_wallet</span>
+                Credits
+            </a>
+</nav>
+<!-- CTA -->
+<div class="mt-4 mb-6 px-2">
+<button class="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-DEFAULT bg-surface-variant border border-outline-variant text-on-surface font-mono-label text-mono-label hover:bg-surface-container-highest transition-colors duration-150">
+<span class="material-symbols-outlined text-sm" data-icon="add">add</span>
+                Create Cell
+            </button>
+</div>
+<!-- Footer Navigation -->
+<div class="mt-auto flex flex-col gap-1 font-mono-label text-mono-label pt-4 border-t border-outline-variant border-opacity-50">
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-lg group-active:scale-[0.99] transition-transform" data-icon="menu_book">menu_book</span>
+                Docs
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-lg group-active:scale-[0.99] transition-transform" data-icon="contact_support">contact_support</span>
+                Support
+            </a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col min-w-0 bg-primary-container relative">
+<!-- Shared Component: TopNavBar -->
+<header class="flex justify-between items-center h-16 px-gutter w-full ml-auto bg-surface-dim/80 dark:bg-surface-dim/80 backdrop-blur-md text-tertiary dark:text-tertiary border-b border-outline-variant shrink-0 z-10 sticky top-0">
+<!-- Contextual Breadcrumb / Sub-nav -->
+<div class="flex items-center gap-6 h-full">
+<div class="flex items-center gap-2 mr-4">
+<span class="material-symbols-outlined text-on-surface-variant text-sm" data-icon="database">database</span>
+<span class="font-mono-code text-mono-code text-on-surface">cell-prod-001</span>
+</div>
+<nav class="hidden md:flex h-full items-end gap-6 font-body-sm text-body-sm">
+<a class="text-on-surface-variant hover:text-on-surface pb-2 border-b-2 border-transparent transition-all duration-200" href="#">Overview</a>
+<!-- Active Sub-tab -->
+<a class="text-tertiary border-b-2 border-tertiary pb-2 transition-all duration-200" href="#">SQL Workspace</a>
+<a class="text-on-surface-variant hover:text-on-surface pb-2 border-b-2 border-transparent transition-all duration-200" href="#">Metrics</a>
+<a class="text-on-surface-variant hover:text-on-surface pb-2 border-b-2 border-transparent transition-all duration-200" href="#">Settings</a>
+</nav>
+</div>
+<!-- Global TopNav Actions -->
+<div class="flex items-center gap-4">
+<div class="relative hidden lg:block">
+<span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm" data-icon="search">search</span>
+<input class="bg-surface border border-outline-variant rounded-DEFAULT pl-8 pr-3 py-1 text-on-surface font-body-sm text-body-sm focus:ring-1 focus:ring-tertiary/30 outline-none w-64 placeholder-on-surface-variant/50" placeholder="Search resources..." type="text">
+<div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+<kbd class="font-mono-label text-[10px] bg-surface-variant px-1 rounded text-on-surface-variant">⌘</kbd>
+<kbd class="font-mono-label text-[10px] bg-surface-variant px-1 rounded text-on-surface-variant">K</kbd>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2 text-on-surface-variant hover:text-tertiary transition-all duration-200 focus:ring-1 focus:ring-tertiary/30 outline-none rounded-DEFAULT">
+<span class="material-symbols-outlined text-lg" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:text-tertiary transition-all duration-200 focus:ring-1 focus:ring-tertiary/30 outline-none rounded-DEFAULT">
+<span class="material-symbols-outlined text-lg" data-icon="settings">settings</span>
+</button>
+<div class="ml-2 w-8 h-8 rounded-DEFAULT bg-surface-variant border border-outline-variant overflow-hidden shrink-0">
+<!-- Simulated Profile Avatar -->
+<div class="w-full h-full bg-gradient-to-br from-tertiary/20 to-surface-container-highest flex items-center justify-center text-tertiary font-mono-code text-xs">
+                            DV
+                        </div>
+</div>
+</div>
+</div>
+</header>
+<!-- Workspace Canvas -->
+<div class="flex-1 flex overflow-hidden p-unit gap-unit bg-primary-container">
+<!-- Left Pane: Schema Explorer (Sidebar/Helper) -->
+<aside class="w-64 flex flex-col bg-surface border border-outline-variant rounded-DEFAULT overflow-hidden shrink-0">
+<div class="px-4 py-3 border-b border-outline-variant flex items-center justify-between bg-surface-container-lowest">
+<span class="font-mono-label text-mono-label text-on-surface tracking-wider uppercase">Schema</span>
+<button class="text-on-surface-variant hover:text-tertiary">
+<span class="material-symbols-outlined text-[16px]" data-icon="refresh">refresh</span>
+</button>
+</div>
+<div class="flex-1 overflow-y-auto p-2">
+<!-- Table Item -->
+<div class="mb-1">
+<button class="w-full flex items-center gap-2 px-2 py-1.5 rounded text-left hover:bg-surface-container-highest transition-colors group">
+<span class="material-symbols-outlined text-[14px] text-tertiary" data-icon="table_chart">table_chart</span>
+<span class="font-mono-code text-mono-code text-on-surface flex-1">public.users</span>
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity" data-icon="chevron_right">chevron_right</span>
+</button>
+<!-- Expanded Columns mock -->
+<div class="pl-7 pr-2 py-1 flex flex-col gap-1 border-l border-outline-variant ml-3 mt-1 mb-2">
+<div class="flex items-center justify-between font-mono-code text-[12px] text-on-surface-variant hover:text-on-surface cursor-pointer">
+<span class="">id</span><span class="text-[10px] text-on-primary-container">uuid</span>
+</div>
+<div class="flex items-center justify-between font-mono-code text-[12px] text-on-surface-variant hover:text-on-surface cursor-pointer">
+<span class="">email</span><span class="text-[10px] text-on-primary-container">varchar</span>
+</div>
+<div class="flex items-center justify-between font-mono-code text-[12px] text-on-surface-variant hover:text-on-surface cursor-pointer">
+<span class="">created_at</span><span class="text-[10px] text-on-primary-container">timestamptz</span>
+</div>
+</div>
+</div>
+<!-- Table Item -->
+<div class="mb-1">
+<button class="w-full flex items-center gap-2 px-2 py-1.5 rounded text-left hover:bg-surface-container-highest transition-colors group">
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant" data-icon="table_chart">table_chart</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant flex-1">public.sessions</span>
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity" data-icon="chevron_right">chevron_right</span>
+</button>
+</div>
+<!-- Table Item -->
+<div class="mb-1">
+<button class="w-full flex items-center gap-2 px-2 py-1.5 rounded text-left hover:bg-surface-container-highest transition-colors group">
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant" data-icon="table_chart">table_chart</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant flex-1">public.audit_logs</span>
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity" data-icon="chevron_right">chevron_right</span>
+</button>
+</div>
+</div>
+</aside>
+<!-- Right Pane: Split Editor & Results -->
+<div class="flex-1 flex flex-col gap-unit overflow-hidden">
+<!-- Top Split: SQL Editor -->
+<div class="flex-[3] flex flex-col bg-surface border border-outline-variant rounded-DEFAULT overflow-hidden relative shadow-[inset_0_0_20px_rgba(0,0,0,0.2)]">
+<!-- Editor Toolbar -->
+<div class="px-4 py-2 border-b border-outline-variant flex items-center justify-between bg-surface-container-lowest">
+<div class="flex items-center gap-4">
+<!-- Tab -->
+<div class="flex items-center gap-2 bg-surface-container-highest px-3 py-1 rounded-DEFAULT border border-outline-variant border-b-tertiary">
+<span class="material-symbols-outlined text-[14px] text-tertiary" data-icon="code">code</span>
+<span class="font-mono-code text-mono-code text-on-surface text-[13px]">query_1.sql</span>
+<button class="text-on-surface-variant hover:text-on-surface ml-1"><span class="material-symbols-outlined text-[12px]" data-icon="close">close</span></button>
+</div>
+<!-- Add Tab -->
+<button class="text-on-surface-variant hover:text-tertiary transition-colors">
+<span class="material-symbols-outlined text-[16px]" data-icon="add">add</span>
+</button>
+</div>
+<!-- Action Controls -->
+<div class="flex items-center gap-3">
+<button class="flex items-center gap-1.5 px-3 py-1.5 rounded-DEFAULT text-on-surface-variant border border-outline-variant hover:bg-surface-container-highest hover:text-on-surface transition-colors font-mono-label text-[12px]">
+<span class="material-symbols-outlined text-[14px]" data-icon="history">history</span>
+                                History
+                            </button>
+<button class="flex items-center gap-1.5 px-3 py-1.5 rounded-DEFAULT text-on-surface-variant border border-outline-variant hover:bg-surface-container-highest hover:text-on-surface transition-colors font-mono-label text-[12px]">
+<span class="material-symbols-outlined text-[14px]" data-icon="delete_sweep">delete_sweep</span>
+                                Clear
+                            </button>
+<button class="flex items-center gap-1.5 px-4 py-1.5 rounded-DEFAULT bg-tertiary text-on-primary-fixed border border-transparent hover:bg-tertiary-fixed font-mono-label text-[12px] shadow-[0_0_15px_rgba(255,185,95,0.15)] transition-all">
+<span class="material-symbols-outlined text-[14px]" data-icon="play_arrow" data-weight="fill">play_arrow</span>
+                                Run
+                            </button>
+</div>
+</div>
+<!-- Editor Canvas -->
+<div class="flex-1 flex bg-surface-container-lowest overflow-hidden font-mono-code text-mono-code leading-relaxed">
+<!-- Line Numbers -->
+<div class="w-12 bg-surface border-r border-outline-variant/50 flex flex-col items-end py-4 px-2 text-on-surface-variant/50 select-none text-[13px]">
+<span class="">1</span>
+<span class="">2</span>
+<span class="">3</span>
+<span class="">4</span>
+</div>
+<!-- Code Area (Simulated) -->
+<div class="flex-1 p-4 overflow-auto whitespace-pre text-[14px] focus:outline-none">
+<span class="sql-keyword">SELECT</span> 
+    id<span class="sql-punctuation">,</span>
+    email<span class="sql-punctuation">,</span>
+    created_at<span class="sql-punctuation">,</span>
+<span class="sql-function">COUNT</span><span class="sql-punctuation">(</span><span class="sql-keyword">*</span><span class="sql-punctuation">)</span> <span class="sql-keyword">OVER</span> <span class="sql-punctuation">()</span> <span class="sql-keyword">AS</span> total_users
+<span class="sql-keyword">FROM</span> 
+    public<span class="sql-punctuation">.</span>users
+<span class="sql-keyword">WHERE</span> 
+    status <span class="sql-punctuation">=</span> <span class="sql-string">'active'</span>
+<span class="sql-keyword">ORDER BY</span> 
+    created_at <span class="sql-keyword">DESC</span><span class="sql-punctuation">;</span>
+</div>
+</div>
+</div>
+<!-- Bottom Split: Results Table -->
+<div class="flex-[2] flex flex-col bg-surface border border-outline-variant rounded-DEFAULT overflow-hidden">
+<!-- Results Metrics Header -->
+<div class="px-4 py-2 border-b border-outline-variant flex items-center justify-between bg-surface-container-lowest">
+<div class="flex items-center gap-6 font-mono-label text-[12px] text-on-surface-variant">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-sm bg-tertiary"></span> <!-- Hex motif implied by sm rounded -->
+<span class="text-on-surface">Success</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="timer">timer</span>
+<span class="">0.042s</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="dataset">dataset</span>
+<span class="">250 rows</span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-1 text-on-surface-variant hover:text-on-surface transition-colors rounded hover:bg-surface-container-highest">
+<span class="material-symbols-outlined text-[16px]" data-icon="download">download</span>
+</button>
+<button class="p-1 text-on-surface-variant hover:text-on-surface transition-colors rounded hover:bg-surface-container-highest">
+<span class="material-symbols-outlined text-[16px]" data-icon="fullscreen">fullscreen</span>
+</button>
+</div>
+</div>
+<!-- Data Table -->
+<div class="flex-1 overflow-auto bg-surface">
+<table class="w-full text-left font-mono-code text-[13px] whitespace-nowrap">
+<thead class="sticky top-0 bg-surface-container-high text-on-surface border-b border-outline-variant shadow-sm z-10">
+<tr>
+<th class="px-4 py-2 font-medium border-r border-outline-variant/30">id</th>
+<th class="px-4 py-2 font-medium border-r border-outline-variant/30">email</th>
+<th class="px-4 py-2 font-medium border-r border-outline-variant/30">created_at</th>
+<th class="px-4 py-2 font-medium">total_users</th>
+</tr>
+</thead>
+<tbody class="text-on-surface-variant divide-y divide-outline-variant/30">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-highest/50 transition-colors">
+<td class="px-4 py-1.5 border-r border-outline-variant/30 text-tertiary-fixed-dim">usr_9f8e7d...</td>
+<td class="px-4 py-1.5 border-r border-outline-variant/30 text-on-surface">dev@combee.cloud</td>
+<td class="px-4 py-1.5 border-r border-outline-variant/30">2023-10-27 14:32:01+00</td>
+<td class="px-4 py-1.5">250</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-highest/50 transition-colors">
+<td class="px-4 py-1.5 border-r border-outline-variant/30 text-tertiary-fixed-dim">usr_1a2b3c...</td>
+<td class="px-4 py-1.5 border-r border-outline-variant/30 text-on-surface">ops@combee.cloud</td>
+<td class="px-4 py-1.5 border-r border-outline-variant/30">2023-10-26 09:15:44+00</td>
+<td class="px-4 py-1.5">250</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-highest/50 transition-colors">
+<td class="px-4 py-1.5 border-r border-outline-variant/30 text-tertiary-fixed-dim">usr_5x6y7z...</td>
+<td class="px-4 py-1.5 border-r border-outline-variant/30 text-on-surface">test@example.com</td>
+<td class="px-4 py-1.5 border-r border-outline-variant/30">2023-10-25 18:00:22+00</td>
+<td class="px-4 py-1.5">250</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-container-highest/50 transition-colors">
+<td class="px-4 py-1.5 border-r border-outline-variant/30 text-tertiary-fixed-dim">usr_k9m8n7...</td>
+<td class="px-4 py-1.5 border-r border-outline-variant/30 text-on-surface">admin@combee.cloud</td>
+<td class="px-4 py-1.5 border-r border-outline-variant/30">2023-10-24 11:45:00+00</td>
+<td class="px-4 py-1.5">250</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</main>
+
+
+</body></html>

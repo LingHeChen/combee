@@ -29,6 +29,21 @@ rpc_req!(RpcTransaction, { db: DatabaseId, req: TransactionRequest, generation: 
 
 rpc_req!(RpcKvGet, { db: DatabaseId, key: String });
 
+// KV 扫描(浏览):按 key 前缀列出 key,`cursor` 为上一页最后一个 key。
+rpc_req!(RpcKvScan, {
+    db: DatabaseId,
+    prefix: String,
+    limit: u32,
+    cursor: String,
+});
+
+/// KV 扫描结果:keys 已按字典序排列;`next_cursor` 为空表示已到末尾。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RpcKvScanResult {
+    pub keys: Vec<String>,
+    pub next_cursor: String,
+}
+
 rpc_req!(RpcKvSet, { db: DatabaseId, key: String, req: KvSetRequest, generation: i64 });
 
 rpc_req!(RpcKvKeys, { db: DatabaseId, keys: Vec<String> });

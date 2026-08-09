@@ -126,6 +126,15 @@ fn check_statement(sql: &str) -> Result<()> {
 
 /// 执行单条 SQL。查询返回列 + 行;DML/DDL 返回受影响行数。
 pub fn execute_sql(conn: &Connection, req: &SqlRequest) -> Result<SqlResult> {
+    execute_sql_quota(conn, req, None)
+}
+
+/// 带配额执行(rows / result bytes 截断)。
+pub fn execute_sql_quota(
+    conn: &Connection,
+    req: &SqlRequest,
+    quota: Option<&combee_common::config::QuotaConfig>,
+) -> Result<SqlResult> {
     check_statement(&req.sql)?;
     let values = to_sql_values(&req.params)?;
     let refs: Vec<&dyn rusqlite::ToSql> =
@@ -133,6 +142,9 @@ pub fn execute_sql(conn: &Connection, req: &SqlRequest) -> Result<SqlResult> {
 
     let mut stmt = conn.prepare(&req.sql).map_err(sql_err)?;
     let columns: Vec<String> = stmt.column_names().iter().map(|s| s.to_string()).collect();
+
+    let max_rows = quota.map(|q| q.max_sql_rows).unwrap_or(0);
+    let max_bytes = quota.map(|q| q.max_sql_result_bytes).unwrap_or(0);
 
     if columns.is_empty() {
         // DML / DDL:先释放 statement,再执行。
@@ -142,19 +154,37 @@ pub fn execute_sql(conn: &Connection, req: &SqlRequest) -> Result<SqlResult> {
             columns: vec![],
             rows: vec![],
             rows_affected: affected as u64,
+            truncated: false,
         })
     } else {
         let mut rows_out = Vec::new();
+        let mut total_bytes = 0usize;
+        let mut truncated = false;
         {
             let mut rows_iter = stmt.query(refs.as_slice()).map_err(sql_err)?;
             while let Some(row) = rows_iter.next().map_err(sql_err)? {
-                rows_out.push(row_to_json(row, &columns)?);
+                if max_rows > 0 && rows_out.len() >= max_rows {
+                    truncated = true;
+                    break;
+                }
+                let json_row = row_to_json(row, &columns)?;
+                if max_bytes > 0 {
+                    total_bytes += serde_json::to_vec(&json_row)
+                        .map_err(|e| CombeeError::Sql(e.to_string()))?
+                        .len();
+                    if total_bytes > max_bytes {
+                        truncated = true;
+                        break;
+                    }
+                }
+                rows_out.push(json_row);
             }
         }
         Ok(SqlResult {
             columns,
             rows: rows_out,
             rows_affected: 0,
+            truncated,
         })
     }
 }
@@ -163,6 +193,7 @@ pub fn execute_sql(conn: &Connection, req: &SqlRequest) -> Result<SqlResult> {
 pub fn execute_transaction(
     conn: &mut Connection,
     req: &TransactionRequest,
+    quota: Option<&combee_common::config::QuotaConfig>,
 ) -> Result<Vec<SqlResult>> {
     if req.statements.is_empty() {
         return Err(CombeeError::InvalidRequest(
@@ -172,7 +203,7 @@ pub fn execute_transaction(
     let tx = conn.transaction().map_err(sql_err)?;
     let mut results = Vec::with_capacity(req.statements.len());
     for st in &req.statements {
-        results.push(execute_sql(&tx, st)?);
+        results.push(execute_sql_quota(&tx, st, quota)?);
     }
     tx.commit().map_err(sql_err)?;
     Ok(results)
@@ -426,7 +457,7 @@ mod tests {
                 },
             ],
         };
-        let results = execute_transaction(&mut conn, &ok).unwrap();
+        let results = execute_transaction(&mut conn, &ok, None).unwrap();
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].rows_affected, 1);
 
@@ -443,7 +474,7 @@ mod tests {
                 },
             ],
         };
-        assert!(execute_transaction(&mut conn, &bad).is_err());
+        assert!(execute_transaction(&mut conn, &bad, None).is_err());
         let n: i64 = conn
             .query_row("SELECT COUNT(*) FROM t", [], |r| r.get(0))
             .unwrap();
@@ -455,7 +486,7 @@ mod tests {
         let (mut conn, _d) = sql_conn();
         let req = TransactionRequest { statements: vec![] };
         assert!(matches!(
-            execute_transaction(&mut conn, &req),
+            execute_transaction(&mut conn, &req, None),
             Err(CombeeError::InvalidRequest(_))
         ));
     }
@@ -470,7 +501,7 @@ mod tests {
             }],
         };
         assert!(matches!(
-            execute_transaction(&mut conn, &req),
+            execute_transaction(&mut conn, &req, None),
             Err(CombeeError::Forbidden(_))
         ));
     }

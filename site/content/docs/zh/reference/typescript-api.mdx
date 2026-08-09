@@ -1,0 +1,473 @@
+---
+title: TypeScript API
+description: "@combee/sdk 完整 API 参考——每个方法都带签名与示例。"
+since: 0.1.0-beta
+status: stable
+---
+
+官方 TypeScript SDK 是 `@combee/sdk`。下面每个方法都对应 [REST API](./rest-api) 中记录的端点
+(那里有 curl 示例)。
+
+## 安装
+
+```bash
+npm install @combee/sdk
+```
+
+## 客户端
+
+```ts
+import { Combee } from '@combee/sdk';
+
+const combee = new Combee({
+  baseUrl: 'https://api.combee.cloud',
+  apiKey: process.env.COMBEE_API_KEY!,
+  timeoutMs: 30_000, // 可选,默认 30 秒
+});
+```
+
+| 选项 | 类型 | 说明 |
+|---|---|---|
+| `baseUrl` | `string` | API 基础地址 |
+| `apiKey` | `string` | 在 [API Keys](../platform/api-keys) 中创建的 key |
+| `timeoutMs` | `number` | 请求超时(毫秒,默认 `30000`) |
+
+### `combee.cell(id): Cell`
+
+按 id 本地绑定一个 Cell——首次调用方法前不发请求。
+
+```ts
+const cell = combee.cell('2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b');
+await cell.sql.query(`SELECT 1`);
+```
+
+## Cells — `combee.cells`
+
+### `create(input?): Promise<Cell>`
+
+创建新的 Cell。**严格**:`name` 在账号内已被占用时抛出 `CellAlreadyExistsError`(409)。
+需要幂等的“存在即复用”,用 [`ensure`](#ensurename-promisecell)。
+REST:[`POST /v1/databases`](./rest-api#创建-cell)。
+
+```ts
+const cell = await combee.cells.create({ name: 'my-app' });
+console.log(cell.id, cell.name);
+```
+
+| 输入 | 类型 | 说明 |
+|---|---|---|
+| `name` | `string` | 可选;租户内唯一名称(须匹配 `^[a-z0-9][a-z0-9-_]{0,62}$`);省略时生成 `cell-<short-id>` |
+| `region` | `string` | 预留 |
+
+错误:`CellAlreadyExistsError`(409)、`InvalidCellNameError`(400)。
+
+### `ensure(name): Promise<Cell>`
+
+按名称幂等“存在即创建,否则复用”。应用启动推荐用它。
+REST:[`PUT /v1/databases/by-name/{name}`](./rest-api#确保-cell-存在)。
+
+```ts
+const cell = await combee.cells.ensure('my-app');
+```
+
+### `getByName(name): Promise<Cell>`
+
+按名称查找 Cell;不存在时抛出 `CellNotFoundError`(404)。
+REST:[`GET /v1/databases/by-name/{name}`](./rest-api#按名称查询-cell)。
+
+```ts
+const cell = await combee.cells.getByName('my-app');
+```
+
+### `get(id): Promise<Cell>`
+
+返回 Cell 句柄并验证其存在(通过 list 端点)。
+
+```ts
+const cell = await combee.cells.get('2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b');
+```
+
+### `list(limit?, cursor?): Promise<Page<CellInfo>>`
+
+列出账号的 Cells。REST:[`GET /v1/databases`](./rest-api#列出-cells)。
+
+```ts
+const { items } = await combee.cells.list();
+for (const cell of items) {
+  console.log(cell.id, cell.state);
+}
+```
+
+### `delete(id): Promise<void>`
+
+永久删除 Cell。REST:[`DELETE /v1/databases/{id}`](./rest-api#删除-cell)。
+
+```ts
+await combee.cells.delete(cell.id);
+```
+
+## Cell — `cell`
+
+### `info(): Promise<CellInfo>`
+
+获取 Cell 元数据(`id`、`tenant_id`、`state`、`created_at`、`storage_node_id`)。
+
+```ts
+const info = await cell.info();
+```
+
+### `delete(): Promise<void>`
+
+删除当前 Cell。
+
+```ts
+await cell.delete();
+```
+
+### `rename(name): Promise<CellInfo>`
+
+重命名 Cell;`id` 保持不变。名称被占用时抛出 `CellNameConflictError`(409),
+名称非法时抛出 `InvalidCellNameError`(400)。REST:[`PATCH /v1/databases/{id}`](./rest-api#重命名-cell)。
+
+```ts
+const updated = await cell.rename('blog-prod-v2');
+console.log(updated.name);
+```
+
+### `reset(): Promise<CellInfo>`
+
+清空全部 SQL 与 KV 数据;`id` 和 `name` 保持不变。破坏性操作——无法撤销。
+REST:[`POST /v1/databases/{id}/reset`](./rest-api#重置-cell)。
+
+```ts
+await cell.reset();
+```
+
+## SQL — `cell.sql`
+
+### `query<T>(sql, params?): Promise<SqlQueryResult<T>>`
+
+执行只读语句(`SELECT`、`WITH`、`PRAGMA`、`EXPLAIN`),把每行映射为对象。
+REST:[`POST /v1/databases/{id}/sql`](./rest-api#执行单条语句)。
+
+```ts
+const { columns, rows } = await cell.sql.query<{ id: number; title: string }>(
+  `SELECT id, title FROM posts WHERE id = ?`,
+  [1],
+);
+```
+
+### `execute(sql, params?): Promise<SqlExecuteResult>`
+
+执行写语句或 DDL。返回 `{ rows_affected, last_insert_rowid }`。
+REST:[`POST /v1/databases/{id}/sql`](./rest-api#执行单条语句)。
+
+```ts
+await cell.sql.execute(`CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT)`);
+const result = await cell.sql.execute(`INSERT INTO posts (title) VALUES (?)`, ['Hello']);
+console.log(result.rows_affected); // 1
+```
+
+### `transaction(statements): Promise<SqlExecuteResult[]>`
+
+原子执行一组语句。REST:[`POST /v1/databases/{id}/transaction`](./rest-api#执行事务)。
+
+```ts
+const results = await cell.sql.transaction([
+  { sql: `UPDATE accounts SET balance = balance - 100 WHERE id = ?`, params: [1] },
+  { sql: `UPDATE accounts SET balance = balance + 100 WHERE id = ?`, params: [2] },
+]);
+```
+
+## KV — `cell.kv`
+
+所有 key 由 SDK 自动做 URL 编码。
+
+### `get(key): Promise<string | null>`
+
+REST:[`GET /v1/databases/{id}/kv/{key}`](./rest-api#读取值)。
+
+```ts
+const value = await cell.kv.get('greeting'); // 'hello',缺失时为 null
+```
+
+### `getJson<T>(key): Promise<T | null>`
+
+`get` + `JSON.parse`。
+
+```ts
+const config = await cell.kv.getJson<{ theme: string }>('config');
+```
+
+### `set(key, value, opts?): Promise<boolean>`
+
+REST:[`PUT /v1/databases/{id}/kv/{key}`](./rest-api#写入值)。返回是否真正写入
+(`nx` / `xx` 条件不满足时为 `false`)。
+
+| 选项 | 类型 | 说明 |
+|---|---|---|
+| `ttl` | `number` | TTL(秒);省略 = 持久 key |
+| `condition` | `'nx' \| 'xx'` | 条件写入(见 [NX / XX](../kv/nx-xx)) |
+
+```ts
+const written = await cell.kv.set('greeting', 'hello', { ttl: 60 });
+const acquired = await cell.kv.set('lock:deploy', 'running', { condition: 'nx', ttl: 30 });
+```
+
+### `setJson(key, value, opts?): Promise<boolean>`
+
+`JSON.stringify` + `set`。
+
+```ts
+await cell.kv.setJson('config', { theme: 'dark' });
+```
+
+### `delete(key): Promise<boolean>`
+
+REST:[`DELETE /v1/databases/{id}/kv/{key}`](./rest-api#删除值)。返回 key 是否存在过。
+
+```ts
+const deleted = await cell.kv.delete('greeting');
+```
+
+### `exists(key): Promise<boolean>`
+
+REST:[`POST /v1/databases/{id}/kv/ops/exists`](./rest-api#检查存在性)。
+
+```ts
+const exists = await cell.kv.exists('greeting');
+```
+
+### `mget(keys): Promise<Array<string | null>>`
+
+REST:[`POST /v1/databases/{id}/kv/ops/mget`](./rest-api#批量读取)。
+
+```ts
+const values = await cell.kv.mget(['a', 'b', 'missing']); // ['1', '2', null]
+```
+
+### `mset(entries): Promise<void>`
+
+原子批量写入。REST:[`POST /v1/databases/{id}/kv/ops/mset`](./rest-api#批量写入)。
+
+```ts
+await cell.kv.mset({ a: '1', b: '2' });
+```
+
+### `ttl(key): Promise<KvTtl>`
+
+REST:[`POST /v1/databases/{id}/kv/ops/ttl`](./rest-api#剩余存活时间)。
+
+```ts
+const ttl = await cell.kv.ttl('greeting');
+// { state: 'expires', seconds: 299 } | { state: 'persistent' } | { state: 'missing' }
+```
+
+### `expire(key, seconds): Promise<boolean>`
+
+REST:[`POST /v1/databases/{id}/kv/ops/expire`](./rest-api#设置或移除过期时间)。
+
+```ts
+await cell.kv.expire('greeting', 60); // 重置为 60 秒
+```
+
+### `persist(key): Promise<boolean>`
+
+移除 TTL(永久保留)。
+
+```ts
+await cell.kv.persist('greeting');
+```
+
+### `incr(key, delta?): Promise<number>`
+
+REST:[`POST /v1/databases/{id}/kv/ops/incr`](./rest-api#自增--自减)。`delta` 缺省为 `1`。
+
+```ts
+const value = await cell.kv.incr('pageviews', 5); // 6
+```
+
+### `decr(key, delta?): Promise<number>`
+
+`incr(key, -delta)`。`delta` 缺省为 `1`。
+
+```ts
+const value = await cell.kv.decr('pageviews', 2); // 4
+```
+
+## Backups — `cell.backups`
+
+### `create(): Promise<BackupInfo>`
+
+全量快照备份。REST:[`POST /v1/databases/{id}/backup`](./rest-api#创建快照备份)。
+
+```ts
+const backup = await cell.backups.create();
+```
+
+### `createIncremental(): Promise<BackupInfo>`
+
+WAL 增量备份。REST:[`POST /v1/databases/{id}/backup/incr`](./rest-api#创建增量备份)。
+
+```ts
+const incr = await cell.backups.createIncremental();
+```
+
+### `restore(version?): Promise<void>`
+
+从指定备份对象 key 恢复。REST:[`POST /v1/databases/{id}/restore`](./rest-api#恢复-cell)。
+
+```ts
+await cell.backups.restore('snapshots/2f1c4a0e-.../backup-20260801T000000Z');
+```
+
+### `restoreLatest(): Promise<void>`
+
+恢复最新备份。
+
+```ts
+await cell.backups.restoreLatest();
+```
+
+## Replication — `cell.replication`
+
+### `get(): Promise<ReplicationStatus>`
+
+REST:[`GET /v1/databases/{id}/replication`](./rest-api#查询复制状态)。
+
+```ts
+const status = await cell.replication.get();
+// { enabled: true, replica_node: 'node-b', ... }
+```
+
+### `enable(replicaNode): Promise<void>`
+
+REST:[`POST /v1/databases/{id}/replication`](./rest-api#启用复制)。
+
+```ts
+await cell.replication.enable('node-b');
+```
+
+### `disable(): Promise<void>`
+
+REST:[`DELETE /v1/databases/{id}/replication`](./rest-api#禁用复制)。
+
+```ts
+await cell.replication.disable();
+```
+
+## API Keys — `combee.apiKeys`
+
+### `create(name?): Promise<CreatedApiKey>`
+
+REST:[`POST /v1/api-keys`](./rest-api#创建-api-key)。明文 `key` 只返回一次。
+
+```ts
+const key = await combee.apiKeys.create({ name: 'ci' });
+console.log(key.key); // 请立即保存——只显示一次
+```
+
+### `list(): Promise<ApiKeyInfo[]>`
+
+REST:[`GET /v1/api-keys`](./rest-api#列出-api-keys)。
+
+```ts
+const keys = await combee.apiKeys.list();
+```
+
+### `revoke(id): Promise<void>`
+
+REST:[`DELETE /v1/api-keys/{id}`](./rest-api#撤销-api-key)。
+
+```ts
+await combee.apiKeys.revoke(key.id);
+```
+
+## Usage — `combee.usage`
+
+### `summary(opts?): Promise<UsageSummary>`
+
+REST:[`GET /v1/usage/summary`](./rest-api#用量汇总)。
+
+```ts
+const summary = await combee.usage.summary({ from: '2026-08-01T00:00:00Z' });
+```
+
+### `cell(cellId, opts?): Promise<UsageSummary>`
+
+REST:[`GET /v1/cells/{id}/usage`](./rest-api#单-cell-用量)。
+
+```ts
+const cellUsage = await combee.usage.cell(cell.id);
+```
+
+### `timeseries(opts): Promise<Array<{ bucket_start: string; value: number }>>`
+
+REST:[`GET /v1/usage/timeseries`](./rest-api#用量时序)。
+
+| 选项 | 类型 | 说明 |
+|---|---|---|
+| `metric` | `string` | `kv_read` \| `kv_write` \| `sql_read` \| `sql_write` \| `requests` \| `bytes_in` \| `bytes_out` \| `storage_bytes` |
+| `interval` | `'minute' \| 'hour' \| 'day'` | 默认 `minute` |
+| `from` / `to` | `string` | RFC3339;默认最近 24h |
+
+```ts
+const series = await combee.usage.timeseries({ metric: 'kv_read', interval: 'hour' });
+```
+
+## Credits — `combee.credits`
+
+### `balance(): Promise<CreditBalance>`
+
+REST:[`GET /v1/credits/balance`](./rest-api#余额)。
+
+```ts
+const balance = await combee.credits.balance();
+// { available: '50000000', reserved: '0', currency: 'CREDIT', updated_at: 1755000000 }
+```
+
+### `transactions(limit?, cursor?): Promise<Page<CreditTransaction>>`
+
+REST:[`GET /v1/credits/transactions`](./rest-api#交易记录)。
+
+```ts
+const { items, nextCursor } = await combee.credits.transactions(100);
+```
+
+### `redeem(code): Promise<RedeemResult>`
+
+REST:[`POST /v1/credits/redeem`](./rest-api#兑换兑换券)。
+
+```ts
+const result = await combee.credits.redeem('CMB-84PA-X2KD-7MQR');
+// { credits_added: '50000000', balance: '100000000', already_redeemed: false }
+```
+
+## Pricing — `combee.pricing`
+
+### `get(): Promise<Pricing>`
+
+REST:[`GET /v1/pricing`](./rest-api#定价)。
+
+```ts
+const pricing = await combee.pricing.get();
+// { version: 1, effective_at: 1755000000, units: { ... } }
+```
+
+## 主要类型
+
+| 类型 | 结构 |
+|---|---|
+| `Page<T>` | `{ items: T[]; nextCursor: string \| null }` |
+| `SqlQueryResult<T>` | `{ columns: string[]; rows: T[] }` |
+| `SqlExecuteResult` | `{ rows_affected: number; last_insert_rowid?: number \| string \| null }` |
+| `KvTtl` | `{ state: 'expires'; seconds: number } \| { state: 'persistent' } \| { state: 'missing' }` |
+| `CellInfo` | `{ id; name; tenant_id; state; created_at; storage_node_id? }` |
+| `BackupInfo` | `{ id; type: 'snapshot' \| 'incremental'; created_at; size_bytes? }` |
+| `ReplicationStatus` | `{ enabled: boolean; primary_node?; replica_node?; generation? }` |
+
+## 错误
+
+所有错误继承 `CombeeError` 并携带 `requestId`。完整映射见 [Error Codes](./error-codes)
+(`SqlError`、`CellNotFoundError`、`CellAlreadyExistsError`、`CellNameConflictError`、...)。
+SDK 保守重试,绝不盲目重试写请求;默认超时 30 秒(`timeoutMs`)。

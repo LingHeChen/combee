@@ -1,0 +1,101 @@
+---
+title: TTL
+description: 使用 Combee KV TTL 自动过期键。
+since: 0.1.0-beta
+status: stable
+---
+
+Combee KV 支持定时过期。写入时可带 TTL,之后也可以用 `EXPIRE` 修改。
+
+## 写入时设置 TTL
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # 300 秒后过期
+    curl -X PUT https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/session:user:1 \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"value": "{\"name\": \"Ada\"}", "ttl_seconds": 300}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    // 300 秒后过期
+    await cell.kv.set('session:user:1', JSON.stringify({ name: 'Ada' }), { ttl: 300 });
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    # 300 秒后过期
+    cell.kv.set("session:user:1", '{"name": "Ada"}', ttl=300)
+    ```
+  </Tab>
+</Tabs>
+
+## 查看剩余时间
+
+`ttl()` 返回 key 的状态:
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # 剩余秒数;-1 = 持久;null = 不存在
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/ttl \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"keys": ["session:user:1"]}'
+    # → [299]
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const ttl = await cell.kv.ttl('session:user:1');
+    // { state: 'expires', seconds: 299 }  — 剩余秒数
+    // { state: 'persistent' }             — 无 TTL
+    // { state: 'missing' }                — key 不存在
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    ttl = cell.kv.ttl("session:user:1")
+    # {"state": "expires", "seconds": 299} — 剩余秒数
+    # {"state": "persistent"}             — 无 TTL
+    # {"state": "missing"}                — key 不存在
+    ```
+  </Tab>
+</Tabs>
+
+## 修改或移除 TTL
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # 重置为 60 秒
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/expire \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"key": "session:user:1", "ttl_seconds": 60}'
+
+    # 移除 TTL(永久保留)
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/expire \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"key": "session:user:1"}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.kv.expire('session:user:1', 60); // 重置为 60 秒
+    await cell.kv.persist('session:user:1');    // 移除 TTL(永久保留)
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.kv.expire("session:user:1", 60)   # 重置为 60 秒
+    cell.kv.persist("session:user:1")      # 移除 TTL(永久保留)
+    ```
+  </Tab>
+</Tabs>
+
+过期的 key 惰性清除——立即可读性消失,后台再执行垃圾回收。

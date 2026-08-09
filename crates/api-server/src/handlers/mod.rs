@@ -10,3 +10,5 @@ pub mod admin;
 pub mod credits;
 pub mod keys;
 pub mod usage;
+
+pub mod waitlist;

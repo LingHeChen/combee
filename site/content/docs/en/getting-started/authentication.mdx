@@ -1,0 +1,66 @@
+---
+title: Authentication
+description: Authenticate with Combee using an x-api-key header.
+since: 0.1.0-beta
+status: stable
+---
+
+Combee authenticates every public request with an **API key** sent in the `x-api-key` header.
+
+## API keys
+
+- Keys look like `cmb_sk_...`.
+- Create and revoke them from the [Platform → API Keys](../platform/api-keys) section.
+- A key is scoped to one account; it can access only that account's Cells.
+
+## Using a key
+
+Every SDK request sends the key automatically:
+
+<Tabs items={['TypeScript', 'Python']}>
+  <Tab value="TypeScript">
+    ```ts
+    const combee = new Combee({
+      baseUrl: 'https://api.combee.cloud',
+      apiKey: process.env.COMBEE_API_KEY!,
+    });
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    import os
+
+    combee = Combee(
+        base_url="https://api.combee.cloud",
+        api_key=os.environ["COMBEE_API_KEY"],
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## Security notes
+
+- **Never commit keys** to source control; use environment variables or a secret manager.
+- Combee stores only a hash of your key — the plaintext is shown once when created.
+- If a key leaks, [revoke](../platform/api-keys) it immediately; revocation takes effect on the next request.
+- Accessing another account's Cell is rejected — cross-tenant requests behave as **not found** (404) rather than leaking existence.
+
+## REST
+
+If you call the REST API directly, send the header on every request:
+
+<Tabs items={['curl', 'HTTP']}>
+  <Tab value="curl">
+    ```bash
+    curl https://api.combee.cloud/v1/databases \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="HTTP">
+    ```http
+    GET /v1/databases HTTP/1.1
+    Host: api.combee.cloud
+    x-api-key: cmb_sk_...
+    ```
+  </Tab>
+</Tabs>

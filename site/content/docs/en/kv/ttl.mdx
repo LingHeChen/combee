@@ -1,0 +1,101 @@
+---
+title: TTL
+description: Expire keys automatically using Combee KV TTL.
+since: 0.1.0-beta
+status: stable
+---
+
+Combee KV supports time-based expiry. Set a TTL when writing, or change it later with `EXPIRE`.
+
+## Set a TTL on write
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # Expires in 300 seconds
+    curl -X PUT https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/session:user:1 \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"value": "{\"name\": \"Ada\"}", "ttl_seconds": 300}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    // Expires in 300 seconds
+    await cell.kv.set('session:user:1', JSON.stringify({ name: 'Ada' }), { ttl: 300 });
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    # 300 秒后过期
+    cell.kv.set("session:user:1", '{"name": "Ada"}', ttl=300)
+    ```
+  </Tab>
+</Tabs>
+
+## Inspect remaining time
+
+`ttl()` returns the key state:
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # Remaining seconds; -1 = persistent; null = missing
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/ttl \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"keys": ["session:user:1"]}'
+    # → [299]
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const ttl = await cell.kv.ttl('session:user:1');
+    // { state: 'expires', seconds: 299 }  — remaining seconds
+    // { state: 'persistent' }             — no TTL
+    // { state: 'missing' }                — key does not exist
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    ttl = cell.kv.ttl("session:user:1")
+    # {"state": "expires", "seconds": 299} — 剩余秒数
+    # {"state": "persistent"}             — 无 TTL
+    # {"state": "missing"}                — key 不存在
+    ```
+  </Tab>
+</Tabs>
+
+## Change or remove the TTL
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # Reset to 60s
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/expire \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"key": "session:user:1", "ttl_seconds": 60}'
+
+    # Remove TTL (keep forever)
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/expire \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"key": "session:user:1"}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.kv.expire('session:user:1', 60); // reset to 60s
+    await cell.kv.persist('session:user:1');    // remove TTL (keep forever)
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.kv.expire("session:user:1", 60)   # 重置为 60 秒
+    cell.kv.persist("session:user:1")      # 移除 TTL(永久保留)
+    ```
+  </Tab>
+</Tabs>
+
+Expired keys are removed lazily — they stop being readable immediately and are garbage-collected in the background.

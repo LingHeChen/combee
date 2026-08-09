@@ -82,6 +82,8 @@ pub struct Config {
     pub s3_secret_key: String,
     pub s3_bucket: String,
     pub s3_region: String,
+    /// COS 等虚拟主机风格对象存储时设为 true(COS 默认虚拟主机风格)。
+    pub s3_virtual_hosted: bool,
     /// 共享 KV 内存缓存的条目上限。
     pub kv_cache_capacity: usize,
     /// KV 写入持久化强度。
@@ -101,6 +103,52 @@ pub struct Config {
     pub settlement_interval: Duration,
     /// Operator/Admin 令牌(`COMBEE_ADMIN_TOKEN`);未配置时 admin 接口 401。
     pub admin_token: Option<String>,
+    /// 预配置的 admin API key(可选):既是普通租户 key,也可调用 /admin/*。
+    pub admin_api_key: String,
+    /// 资源配额(安全护栏,非商业功能;0 = 不限)。
+    pub quota: QuotaConfig,
+}
+
+/// 资源配额(安全护栏):公网 signup 开放前的硬保护。
+#[derive(Debug, Clone)]
+pub struct QuotaConfig {
+    /// 最大请求体字节数(axum body limit)。
+    pub max_request_body_bytes: usize,
+    /// 最大 KV key 字节数。
+    pub max_kv_key_bytes: usize,
+    /// 最大 KV value 字节数。
+    pub max_kv_value_bytes: usize,
+    /// 单条 SQL 查询最大返回行数(超出截断并标记 truncated)。
+    pub max_sql_rows: usize,
+    /// 单条 SQL 查询最大返回字节数(JSON 序列化后估算;超出截断)。
+    pub max_sql_result_bytes: usize,
+    /// 每租户最大 Cell 数。
+    pub max_cells_per_tenant: usize,
+    /// 每租户最大并发请求数(0 = 不限)。
+    pub max_per_tenant_concurrency: usize,
+    /// 每 Cell 最大并发请求数(0 = 不限)。
+    pub max_per_cell_concurrency: usize,
+    /// 存储软上限字节(超过仅告警;0 = 不限)。
+    pub storage_soft_bytes: u64,
+    /// 存储硬上限字节(KV 写入超过则拒绝;0 = 不限)。
+    pub storage_hard_bytes: u64,
+}
+
+impl Default for QuotaConfig {
+    fn default() -> Self {
+        Self {
+            max_request_body_bytes: 5 * 1024 * 1024,
+            max_kv_key_bytes: 1024,
+            max_kv_value_bytes: 256 * 1024,
+            max_sql_rows: 10_000,
+            max_sql_result_bytes: 5 * 1024 * 1024,
+            max_cells_per_tenant: 1_000,
+            max_per_tenant_concurrency: 0,
+            max_per_cell_concurrency: 0,
+            storage_soft_bytes: 0,
+            storage_hard_bytes: 0,
+        }
+    }
 }
 
 impl Config {
@@ -138,6 +186,19 @@ impl Config {
             let v = env_str("COMBEE_ADMIN_TOKEN", "");
             if v.is_empty() { None } else { Some(v) }
         };
+        let admin_api_key = env_str("COMBEE_ADMIN_API_KEY", "");
+        let quota = QuotaConfig {
+            max_request_body_bytes: env_parse("COMBEE_MAX_REQUEST_BODY_BYTES", 5 * 1024 * 1024),
+            max_kv_key_bytes: env_parse("COMBEE_MAX_KV_KEY_BYTES", 1024),
+            max_kv_value_bytes: env_parse("COMBEE_MAX_KV_VALUE_BYTES", 256 * 1024),
+            max_sql_rows: env_parse("COMBEE_MAX_SQL_ROWS", 10_000),
+            max_sql_result_bytes: env_parse("COMBEE_MAX_SQL_RESULT_BYTES", 5 * 1024 * 1024),
+            max_cells_per_tenant: env_parse("COMBEE_MAX_CELLS_PER_TENANT", 1_000),
+            max_per_tenant_concurrency: env_parse("COMBEE_MAX_PER_TENANT_CONCURRENCY", 0),
+            max_per_cell_concurrency: env_parse("COMBEE_MAX_PER_CELL_CONCURRENCY", 0),
+            storage_soft_bytes: env_parse("COMBEE_STORAGE_SOFT_BYTES", 0),
+            storage_hard_bytes: env_parse("COMBEE_STORAGE_HARD_BYTES", 0),
+        };
         let kv_durability = env_str("COMBEE_KV_DURABILITY", "normal")
             .parse()
             .unwrap_or_default();
@@ -151,6 +212,8 @@ impl Config {
         let s3_secret_key = env_str("COMBEE_S3_SECRET_KEY", "");
         let s3_bucket = env_str("COMBEE_S3_BUCKET", "combee-backups");
         let s3_region = env_str("COMBEE_S3_REGION", "us-east-1");
+        // COS/MinIO 兼容:true = 虚拟主机风格(bucket.endpoint),false = path-style
+        let s3_virtual_hosted = env_parse("COMBEE_S3_VIRTUAL_HOSTED", false);
 
         Self {
             bind_addr,
@@ -167,6 +230,7 @@ impl Config {
             s3_secret_key,
             s3_bucket,
             s3_region,
+            s3_virtual_hosted,
             kv_cache_capacity,
             kv_durability,
             sql_timeout_secs,
@@ -175,6 +239,8 @@ impl Config {
             pricing_refresh_interval,
             settlement_interval,
             admin_token,
+            admin_api_key,
+            quota,
         }
     }
 }

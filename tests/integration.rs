@@ -1,7 +1,7 @@
 //! Combee V0 集成测试(HTTP 栈):database lifecycle、SQL、KV、TTL、
 //! lazy create、active-db 上限、auth 与访问控制。
 //!
-//! 公共 helper 见 `tests/common/mod.rs`,每个测试的目的与预期结果见 `docs/TESTING.md`。
+//! 公共 helper 见 `tests/common/mod.rs`,每个测试的目的与预期结果见 `artifacts/engineering/TESTING.md`。
 
 mod common;
 

@@ -14,12 +14,16 @@ use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new("info,combee=debug")),
-        )
-        .init();
+    let fmt = tracing_subscriber::fmt().with_env_filter(
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,combee=debug")),
+    );
+    if std::env::var("COMBEE_LOG_FORMAT").as_deref() == Ok("text") {
+        fmt.init();
+    } else {
+        fmt.json().with_span_list(false).init();
+    }
+    let root = tracing::info_span!("service", service = "combee-data-node");
+    let _root_guard = root.enter();
 
     let cfg = Config::from_env();
     let addr = std::env::var("COMBEE_DATA_NODE_ADDR")
@@ -34,6 +38,7 @@ async fn main() {
         &cfg.s3_secret_key,
         &cfg.s3_bucket,
         &cfg.s3_region,
+        cfg.s3_virtual_hosted,
     ) {
         Ok(store) => {
             tracing::info!("object storage enabled: {}", cfg.s3_endpoint);
@@ -46,6 +51,7 @@ async fn main() {
                     kv_cache_capacity: cfg.kv_cache_capacity,
                     kv_durability: cfg.kv_durability,
                     sql_timeout: Some(std::time::Duration::from_secs(30)),
+                    quota: cfg.quota.clone(),
                 })
                 .with_object_store(store),
             )
@@ -58,6 +64,7 @@ async fn main() {
             kv_cache_capacity: cfg.kv_cache_capacity,
             kv_durability: cfg.kv_durability,
             sql_timeout: Some(std::time::Duration::from_secs(30)),
+            quota: cfg.quota.clone(),
         })),
     };
 

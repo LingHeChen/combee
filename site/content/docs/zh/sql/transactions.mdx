@@ -1,0 +1,46 @@
+---
+title: 事务
+description: 用一次事务调用原子地执行多条语句。
+since: 0.1.0-beta
+status: stable
+---
+
+`transaction` 把一组语句作为一个原子单元执行——要么全部提交,要么全部回滚。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/transaction \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "statements": [
+          {"sql": "UPDATE accounts SET balance = balance - 100 WHERE id = ?", "params": [1]},
+          {"sql": "UPDATE accounts SET balance = balance + 100 WHERE id = ?", "params": [2]}
+        ]
+      }'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const results = await cell.sql.transaction([
+      { sql: `UPDATE accounts SET balance = balance - 100 WHERE id = ?`, params: [1] },
+      { sql: `UPDATE accounts SET balance = balance + 100 WHERE id = ?`, params: [2] },
+    ]);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    results = cell.sql.transaction([
+        {"sql": "UPDATE accounts SET balance = balance - 100 WHERE id = ?", "params": [1]},
+        {"sql": "UPDATE accounts SET balance = balance + 100 WHERE id = ?", "params": [2]},
+    ])
+    ```
+  </Tab>
+</Tabs>
+
+规则:
+
+- 每条语句是 `{ sql, params }` 对象。
+- 整批在服务端事务中执行。
+- 读写可混用;语句按顺序执行。

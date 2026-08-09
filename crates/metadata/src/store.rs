@@ -66,16 +66,31 @@ pub struct TenantRecord {
 pub struct ApiKeyRecord {
     pub id: Uuid,
     pub tenant_id: TenantId,
+    pub name: String,
     pub key_hash: String,
     pub created_at: u64,
     /// 撤销时间(unix 秒);None = 有效。
     pub revoked_at: Option<u64>,
 }
 
+/// 一条 Data Node 注册记录(共享 authority,多 API 副本可见)。
+#[derive(Debug, Clone, Serialize)]
+pub struct DataNodeRecord {
+    pub id: NodeId,
+    pub addr: String,
+    pub capacity: usize,
+    pub active_conns: usize,
+    /// 最近心跳(unix 秒)。
+    pub last_heartbeat_at: u64,
+    pub created_at: u64,
+}
+
 /// 一条 Cell 目录记录。
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DatabaseRecord {
     pub id: DatabaseId,
+    /// 租户内唯一的人类可读名;`create` 未提供时生成 `cell-<short-id>`。
+    pub name: String,
     pub tenant_id: TenantId,
     pub state: DatabaseState,
     /// 创建时间(unix 秒)。
@@ -106,10 +121,38 @@ pub trait MetadataStore: Send + Sync {
         tenant: TenantId,
         id: DatabaseId,
         storage_node: Option<NodeId>,
+        name: Option<&str>,
     ) -> Result<DatabaseRecord>;
+
+    /// 按名查询;不存在报 [`CombeeError::DatabaseNotFound`]。
+    async fn get_database_by_name(&self, tenant: TenantId, name: &str) -> Result<DatabaseRecord>;
+
+    /// 幂等 ensure:不存在则创建,存在则复用;并发安全(数据库唯一约束兜底)。
+    /// 返回 (record, created)。
+    async fn ensure_database_by_name(
+        &self,
+        tenant: TenantId,
+        name: &str,
+        storage_node: Option<NodeId>,
+    ) -> Result<(DatabaseRecord, bool)>;
+
+    /// 重命名(租户内唯一);冲突报 [`CombeeError::CellNameConflict`]。
+    async fn rename_database(
+        &self,
+        tenant: TenantId,
+        id: DatabaseId,
+        new_name: &str,
+    ) -> Result<DatabaseRecord>;
+
+    /// 重置:保留 id/name,generation +1,清空数据(data-node 删文件)。
+    async fn reset_database(&self, tenant: TenantId, id: DatabaseId) -> Result<DatabaseRecord>;
 
     /// 查询单条记录;不存在报 [`CombeeError::DatabaseNotFound`]。
     async fn get_database(&self, tenant: TenantId, id: DatabaseId) -> Result<DatabaseRecord>;
+
+    /// 按 id 查询(仅供已通过租户校验后的数据节点路由使用;
+    /// 不要用作公开数据访问入口,租户隔离由调用方先行校验保证)。
+    async fn get_database_by_id(&self, id: DatabaseId) -> Result<DatabaseRecord>;
 
     /// 列出该租户下全部记录。
     async fn list_databases(&self, tenant: TenantId) -> Result<Vec<DatabaseRecord>>;
@@ -144,7 +187,16 @@ pub trait MetadataStore: Send + Sync {
     async fn list_tenants(&self) -> Result<Vec<TenantRecord>>;
 
     /// 为该租户注册一个 API key(存哈希)。返回记录。
-    async fn create_api_key(&self, tenant: TenantId, key_hash: String) -> Result<ApiKeyRecord>;
+    /// 启动时注入预配置的 API key(COMBEE_API_KEYS / COMBEE_ADMIN_API_KEY);
+    /// 每个 key 若不存在则创建独立租户 + key 记录;已存在则跳过。
+    async fn bootstrap_api_keys(&self, keys: &[String]) -> Result<()>;
+
+    async fn create_api_key(
+        &self,
+        tenant: TenantId,
+        key_hash: String,
+        name: &str,
+    ) -> Result<ApiKeyRecord>;
 
     /// 按哈希查找**未撤销**的 API key(认证用)。
     async fn lookup_api_key_by_hash(&self, key_hash: &str) -> Result<Option<ApiKeyRecord>>;
@@ -154,6 +206,24 @@ pub trait MetadataStore: Send + Sync {
 
     /// 撤销 API key。不存在报 NotFound。
     async fn revoke_api_key(&self, tenant: TenantId, key_id: Uuid) -> Result<()>;
+
+    // ---- Data Node 注册表(共享 authority;Postgres 模式下多 API 副本共享)----
+    /// 注册或更新节点(幂等;address/capacity/last_heartbeat 更新)。
+    async fn upsert_data_node(
+        &self,
+        id: NodeId,
+        addr: String,
+        capacity: usize,
+    ) -> Result<()>;
+
+    /// 上报心跳。未知节点返回 false。
+    async fn heartbeat_data_node(&self, id: NodeId, active_conns: usize) -> Result<bool>;
+
+    /// 注销节点。不存在返回 false。
+    async fn unregister_data_node(&self, id: NodeId) -> Result<bool>;
+
+    /// 全部节点记录(含心跳时间,用于健康判定)。
+    async fn list_data_nodes(&self) -> Result<Vec<DataNodeRecord>>;
 
     // ---- Usage Metering ----
 
@@ -234,11 +304,17 @@ pub trait MetadataStore: Send + Sync {
         payload: String,
     ) -> Result<Option<String>>;
 
+    /// 登记 Public Beta 候补邮箱(重复邮箱幂等)。
+    async fn create_waitlist_entry(&self, email: &str, now: i64) -> Result<()>;
+
+    /// 列出候补邮箱(管理用,按登记时间升序)。
+    async fn list_waitlist(&self, limit: i64) -> Result<Vec<WaitlistEntry>>;
+
     /// 批量创建目录记录(默认实现为逐条循环;PostgreSQL 后端会覆盖为批量 INSERT)。
     /// 已存在的记录静默跳过。
     async fn create_databases_batch(&self, tenant: TenantId, ids: &[DatabaseId]) -> Result<()> {
         for &id in ids {
-            let _ = self.create_database(tenant, id, None).await?;
+            let _ = self.create_database(tenant, id, None, None).await?;
         }
         Ok(())
     }
@@ -249,11 +325,19 @@ pub struct InMemoryStore {
     inner: Mutex<InMemoryInner>,
 }
 
+/// Public Beta 候补邮箱条目。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WaitlistEntry {
+    pub email: String,
+    pub created_at: i64,
+}
+
 #[derive(Default)]
 struct InMemoryInner {
     databases: HashMap<(TenantId, DatabaseId), DatabaseRecord>,
     tenants: HashMap<TenantId, TenantRecord>,
     api_keys: HashMap<Uuid, ApiKeyRecord>,
+    data_nodes: HashMap<NodeId, DataNodeRecord>,
     usage: HashMap<UsageKey, u64>,
     pricing_versions: HashMap<i64, PricingVersion>,
     pricing_rules: HashMap<i64, Vec<PricingRule>>,
@@ -263,6 +347,9 @@ struct InMemoryInner {
     vouchers: HashMap<uuid::Uuid, CreditVoucher>,
     voucher_by_hash: HashMap<String, uuid::Uuid>,
     idempotency: HashMap<String, (TenantId, String)>,
+    waitlist: Vec<WaitlistEntry>,
+    /// (tenant, name) → id;保证租户内名字唯一。
+    name_index: HashMap<(TenantId, String), DatabaseId>,
 }
 
 impl Default for InMemoryStore {
@@ -286,22 +373,119 @@ impl MetadataStore for InMemoryStore {
         tenant: TenantId,
         id: DatabaseId,
         storage_node: Option<NodeId>,
+        name: Option<&str>,
     ) -> Result<DatabaseRecord> {
         let mut inner = self.inner.lock().unwrap();
         if inner.databases.contains_key(&(tenant, id)) {
             return Err(CombeeError::DatabaseAlreadyExists(id));
         }
+        let name = match name {
+            Some(n) => {
+                if inner.name_index.contains_key(&(tenant, n.to_string())) {
+                    return Err(CombeeError::CellAlreadyExists(n.to_string()));
+                }
+                n.to_string()
+            }
+            None => format!(
+                "cell-{}",
+                id.to_string().replace('-', "").get(..8).unwrap_or("")
+            ),
+        };
         let record = DatabaseRecord {
             id,
             tenant_id: tenant,
+            name,
             state: DatabaseState::Created,
             created_at: DatabaseRecord::now_unix(),
             storage_node_id: storage_node,
             replica_node_id: None,
             generation: 0,
         };
+        inner.name_index.insert((tenant, record.name.clone()), id);
         inner.databases.insert((tenant, id), record.clone());
         Ok(record)
+    }
+
+    async fn get_database_by_name(&self, tenant: TenantId, name: &str) -> Result<DatabaseRecord> {
+        let inner = self.inner.lock().unwrap();
+        let id = inner
+            .name_index
+            .get(&(tenant, name.to_string()))
+            .ok_or(CombeeError::DatabaseNotFound(DatabaseId::new()))?;
+        inner
+            .databases
+            .get(&(tenant, *id))
+            .cloned()
+            .ok_or(CombeeError::DatabaseNotFound(*id))
+    }
+
+    async fn ensure_database_by_name(
+        &self,
+        tenant: TenantId,
+        name: &str,
+        storage_node: Option<NodeId>,
+    ) -> Result<(DatabaseRecord, bool)> {
+        let mut inner = self.inner.lock().unwrap();
+        if let Some(id) = inner.name_index.get(&(tenant, name.to_string())) {
+            let rec = inner
+                .databases
+                .get(&(tenant, *id))
+                .cloned()
+                .ok_or(CombeeError::DatabaseNotFound(*id))?;
+            return Ok((rec, false));
+        }
+        let id = DatabaseId::new();
+        let record = DatabaseRecord {
+            id,
+            tenant_id: tenant,
+            name: name.to_string(),
+            state: DatabaseState::Created,
+            created_at: DatabaseRecord::now_unix(),
+            storage_node_id: storage_node,
+            replica_node_id: None,
+            generation: 0,
+        };
+        inner.name_index.insert((tenant, name.to_string()), id);
+        inner.databases.insert((tenant, id), record.clone());
+        Ok((record, true))
+    }
+
+    async fn rename_database(
+        &self,
+        tenant: TenantId,
+        id: DatabaseId,
+        new_name: &str,
+    ) -> Result<DatabaseRecord> {
+        let mut inner = self.inner.lock().unwrap();
+        let rec = inner
+            .databases
+            .get(&(tenant, id))
+            .ok_or(CombeeError::DatabaseNotFound(id))?;
+        let old_name = rec.name.clone();
+        if inner
+            .name_index
+            .contains_key(&(tenant, new_name.to_string()))
+        {
+            return Err(CombeeError::CellNameConflict(new_name.to_string()));
+        }
+        let mut rec = rec.clone();
+        rec.name = new_name.to_string();
+        inner.name_index.remove(&(tenant, old_name));
+        inner.name_index.insert((tenant, new_name.to_string()), id);
+        inner.databases.insert((tenant, id), rec.clone());
+        Ok(rec)
+    }
+
+    async fn reset_database(&self, tenant: TenantId, id: DatabaseId) -> Result<DatabaseRecord> {
+        let mut inner = self.inner.lock().unwrap();
+        let mut rec = inner
+            .databases
+            .get(&(tenant, id))
+            .ok_or(CombeeError::DatabaseNotFound(id))?
+            .clone();
+        rec.generation += 1;
+        inner.databases.insert((tenant, id), rec.clone());
+        Ok(rec)
     }
 
     async fn get_database(&self, tenant: TenantId, id: DatabaseId) -> Result<DatabaseRecord> {
@@ -309,6 +493,16 @@ impl MetadataStore for InMemoryStore {
         inner
             .databases
             .get(&(tenant, id))
+            .cloned()
+            .ok_or(CombeeError::DatabaseNotFound(id))
+    }
+
+    async fn get_database_by_id(&self, id: DatabaseId) -> Result<DatabaseRecord> {
+        let inner = self.inner.lock().unwrap();
+        inner
+            .databases
+            .values()
+            .find(|rec| rec.id == id)
             .cloned()
             .ok_or(CombeeError::DatabaseNotFound(id))
     }
@@ -330,6 +524,8 @@ impl MetadataStore for InMemoryStore {
         if inner.databases.remove(&(tenant, id)).is_none() {
             return Err(CombeeError::DatabaseNotFound(id));
         }
+        // 同步清理名字索引,保证删除后 ensure 同名重建
+        inner.name_index.retain(|_, v| *v != id);
         Ok(())
     }
 
@@ -403,17 +599,84 @@ impl MetadataStore for InMemoryStore {
         Ok(v)
     }
 
-    async fn create_api_key(&self, tenant: TenantId, key_hash: String) -> Result<ApiKeyRecord> {
+    async fn create_api_key(
+        &self,
+        tenant: TenantId,
+        key_hash: String,
+        name: &str,
+    ) -> Result<ApiKeyRecord> {
         let mut inner = self.inner.lock().unwrap();
         let record = ApiKeyRecord {
             id: Uuid::new_v4(),
             tenant_id: tenant,
+            name: name.to_string(),
             key_hash,
             created_at: DatabaseRecord::now_unix(),
             revoked_at: None,
         };
         inner.api_keys.insert(record.id, record.clone());
         Ok(record)
+    }
+
+    async fn bootstrap_api_keys(&self, keys: &[String]) -> Result<()> {
+        for key in keys {
+            let hash = combee_common::api_key::hash(key);
+            if self.lookup_api_key_by_hash(&hash).await?.is_some() {
+                continue;
+            }
+            let tenant = TenantId::new();
+            self.create_tenant(tenant).await?;
+            self.create_api_key(tenant, hash, "bootstrap").await?;
+        }
+        Ok(())
+    }
+
+    async fn upsert_data_node(&self, id: NodeId, addr: String, capacity: usize) -> Result<()> {
+        let mut inner = self.inner.lock().unwrap();
+        let now = DatabaseRecord::now_unix();
+        match inner.data_nodes.get_mut(&id) {
+            Some(rec) => {
+                rec.addr = addr;
+                rec.capacity = capacity;
+                rec.last_heartbeat_at = now;
+            }
+            None => {
+                inner.data_nodes.insert(
+                    id,
+                    DataNodeRecord {
+                        id,
+                        addr,
+                        capacity,
+                        active_conns: 0,
+                        last_heartbeat_at: now,
+                        created_at: now,
+                    },
+                );
+            }
+        }
+        Ok(())
+    }
+
+    async fn heartbeat_data_node(&self, id: NodeId, active_conns: usize) -> Result<bool> {
+        let mut inner = self.inner.lock().unwrap();
+        match inner.data_nodes.get_mut(&id) {
+            Some(rec) => {
+                rec.active_conns = active_conns;
+                rec.last_heartbeat_at = DatabaseRecord::now_unix();
+                Ok(true)
+            }
+            None => Ok(false),
+        }
+    }
+
+    async fn unregister_data_node(&self, id: NodeId) -> Result<bool> {
+        let mut inner = self.inner.lock().unwrap();
+        Ok(inner.data_nodes.remove(&id).is_some())
+    }
+
+    async fn list_data_nodes(&self) -> Result<Vec<DataNodeRecord>> {
+        let inner = self.inner.lock().unwrap();
+        Ok(inner.data_nodes.values().cloned().collect())
     }
 
     async fn lookup_api_key_by_hash(&self, key_hash: &str) -> Result<Option<ApiKeyRecord>> {
@@ -725,6 +988,25 @@ impl MetadataStore for InMemoryStore {
         inner.idempotency.insert(key.to_string(), (tenant, payload));
         Ok(None)
     }
+
+    async fn create_waitlist_entry(&self, email: &str, now: i64) -> Result<()> {
+        let mut inner = self.inner.lock().unwrap();
+        if inner.waitlist.iter().all(|e| e.email != email) {
+            inner.waitlist.push(WaitlistEntry {
+                email: email.to_string(),
+                created_at: now,
+            });
+        }
+        Ok(())
+    }
+
+    async fn list_waitlist(&self, limit: i64) -> Result<Vec<WaitlistEntry>> {
+        let inner = self.inner.lock().unwrap();
+        let mut v = inner.waitlist.clone();
+        v.sort_by_key(|e| e.created_at);
+        v.truncate(limit.clamp(1, 1000) as usize);
+        Ok(v)
+    }
 }
 
 #[cfg(test)]
@@ -745,7 +1027,7 @@ mod tests {
         let t = tenant(1);
         let id = DatabaseId::new();
 
-        let record = store.create_database(t, id, None).await.unwrap();
+        let record = store.create_database(t, id, None, None).await.unwrap();
         assert_eq!(record.id, id);
         assert_eq!(record.tenant_id, t);
         assert_eq!(record.state, DatabaseState::Created);
@@ -767,8 +1049,8 @@ mod tests {
         let store = InMemoryStore::new();
         let t = tenant(1);
         let id = DatabaseId::new();
-        store.create_database(t, id, None).await.unwrap();
-        let err = store.create_database(t, id, None).await.unwrap_err();
+        store.create_database(t, id, None, None).await.unwrap();
+        let err = store.create_database(t, id, None, None).await.unwrap_err();
         assert!(matches!(err, CombeeError::DatabaseAlreadyExists(_)));
     }
 
@@ -794,7 +1076,7 @@ mod tests {
         let t_b = tenant(2);
         let id = DatabaseId::new();
 
-        store.create_database(t_a, id, None).await.unwrap();
+        store.create_database(t_a, id, None, None).await.unwrap();
 
         // B 看不到 A 的库
         assert!(matches!(
@@ -804,7 +1086,7 @@ mod tests {
         assert!(store.list_databases(t_b).await.unwrap().is_empty());
 
         // B 可以创建同 id 的库(键是 (tenant, id))
-        store.create_database(t_b, id, None).await.unwrap();
+        store.create_database(t_b, id, None, None).await.unwrap();
         assert_eq!(store.list_databases(t_a).await.unwrap().len(), 1);
         assert_eq!(store.list_databases(t_b).await.unwrap().len(), 1);
 
@@ -821,7 +1103,10 @@ mod tests {
         let primary = NodeId::new();
         let replica = NodeId::new();
         let id = DatabaseId::new();
-        store.create_database(t, id, Some(primary)).await.unwrap();
+        store
+            .create_database(t, id, Some(primary), None)
+            .await
+            .unwrap();
 
         // 设置副本
         let rec = store.set_replica_node(t, id, Some(replica)).await.unwrap();
@@ -851,8 +1136,8 @@ mod tests {
         let id1 = DatabaseId::new();
         let id2 = DatabaseId::new();
         // 同秒创建两个,顺序必须确定(created_at 相同则按 id 升序)
-        store.create_database(t, id2, None).await.unwrap();
-        store.create_database(t, id1, None).await.unwrap();
+        store.create_database(t, id2, None, None).await.unwrap();
+        store.create_database(t, id1, None, None).await.unwrap();
 
         let list = store.list_databases(t).await.unwrap();
         assert_eq!(list.len(), 2);

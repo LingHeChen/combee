@@ -1,0 +1,50 @@
+---
+title: API Keys
+description: Create, list, and revoke API keys.
+since: 0.1.0-beta
+status: stable
+---
+
+API keys authenticate your SDK and REST requests. They are scoped to your account.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # 创建(明文 key 只返回一次)
+    curl -X POST https://api.combee.cloud/v1/api-keys \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{}'
+
+    # 列出
+    curl https://api.combee.cloud/v1/api-keys \
+      -H "x-api-key: $COMBEE_API_KEY"
+
+    # 撤销
+    curl -X DELETE https://api.combee.cloud/v1/api-keys/1a2b3c4d-... \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const key = await combee.apiKeys.create({ name: 'ci' });
+    // key.key is shown ONCE — save it now.
+
+    const keys = await combee.apiKeys.list();
+    await combee.apiKeys.revoke(key.id);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    key = combee.api_keys.create(name="ci")
+    # key["key"] 只显示一次——请立即保存。
+
+    keys = combee.api_keys.list()
+    combee.api_keys.revoke(key["id"])
+    ```
+  </Tab>
+</Tabs>
+
+- Keys look like `cmb_sk_...`; Combee stores only a hash.
+- **Revocation is immediate**: revoked keys are rejected on the next request.
+- The plaintext key is returned only at creation time — there is no way to view it later.

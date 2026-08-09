@@ -1,0 +1,64 @@
+---
+title: Python
+description: The official Python SDK (combee).
+since: 0.1.0-beta
+status: stable
+---
+
+The official Python SDK is published on PyPI as **`combee`**. It ships both sync and async
+(`a`-prefixed) APIs.
+
+## Install
+
+```bash
+pip install combee
+```
+
+## Quick example (sync)
+
+```python
+from combee import Combee
+
+combee = Combee(
+    base_url="https://api.combee.cloud",
+    api_key="cmb_sk_...",
+)
+
+cell = combee.cells.create(name="blog-prod")
+
+cell.sql.execute("CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT)")
+result = cell.sql.query("SELECT * FROM posts")
+
+cell.kv.set("session:user:1", '{"name": "Ada"}', ttl=300)
+session = cell.kv.get("session:user:1")
+```
+
+## Async
+
+Every method has an async twin (`aget`, `aset`, `acreate`, `asummary`, ...):
+
+```python
+from combee import AsyncCombee
+
+async with AsyncCombee(base_url=..., api_key=...) as combee:
+    cell = await combee.cells.acreate(name="blog-prod")
+    value = await cell.kv.aget("session:user:1")
+```
+
+## Surface
+
+| Namespace | Sync / Async methods |
+|---|---|
+| `combee.cells` | `create` / `acreate`, `ensure` / `aensure`, `get` / `aget`, `get_by_name` / `aget_by_name`, `list` / `alist`, `delete` / `adelete` |
+| `cell` | `info` / `ainfo`, `rename` / `arename`, `reset` / `areset`, `delete` / `adelete` |
+| `cell.sql` | `query` / `aquery`, `execute` / `aexecute`, `transaction` / `atransaction` |
+| `cell.kv` | `get` / `aget`, `set` / `aset`, `delete` / `adelete`, `incr` / `aincr`(其余 KV 方法仅同步:`get_json` / `set_json` / `exists` / `mget` / `mset` / `ttl` / `expire` / `persist` / `decr`) |
+| `cell.backups` | `create` / `create_incremental` / `restore` / `restore_latest`(同步;暂无异步) |
+| `cell.replication` | `get` / `enable` / `disable`(同步;暂无异步) |
+| `combee.api_keys` | `create` / `acreate`, `list` / `alist`, `revoke` / `arevoke` |
+| `combee.usage` | `summary` / `asummary`, `cell` / `acell`, `timeseries` / `atimeseries` |
+| `combee.credits` | `balance` / `abalance`, `transactions` / `atransactions`, `redeem` / `aredeem` |
+
+## Errors
+
+All errors inherit `CombeeError` and carry a `requestId`. See [Error Codes](../reference/error-codes).

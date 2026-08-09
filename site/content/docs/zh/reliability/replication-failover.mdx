@@ -1,0 +1,46 @@
+---
+title: 复制 / 故障转移
+description: 单副本与自动提升。
+since: 0.1.0-beta
+status: stable
+---
+
+每个 Cell 可以有**一个副本**。副本持续拉取主节点的归档变更;当主节点心跳超时,副本自动提升,路由自动切换。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # 查询状态
+    curl https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/replication \
+      -H "x-api-key: $COMBEE_API_KEY"
+
+    # 启用(指定副本节点)
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/replication \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"replica_node": "node-b"}'
+
+    # 禁用
+    curl -X DELETE https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/replication \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const status = await cell.replication.get();
+    await cell.replication.enable('node-b'); // 副本节点 id
+    await cell.replication.disable();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    status = cell.replication.get()
+    cell.replication.enable("node-b")
+    cell.replication.disable()
+    ```
+  </Tab>
+</Tabs>
+
+- 提升由 **generation fencing** 保护:错过故障转移的旧主节点会被拒绝写入,防止 split-brain。
+- v0.1.0-beta **不支持**多副本(>1)。
+- 复制依赖对象存储(副本从中拉取);未配置 S3 时没有复制 / 故障转移。

@@ -1,0 +1,43 @@
+---
+title: Restore
+description: Recover a Cell from a backup.
+since: 0.1.0-beta
+status: stable
+---
+
+Restore replaces a Cell's data with a backup version.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # 最新备份
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/restore \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{}'
+
+    # 指定版本
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/restore \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"version": "snapshots/2f1c4a0e-.../backup-20260801T000000Z"}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.backups.restoreLatest();            // latest backup
+    await cell.backups.restore('2026-08-01T00:00:00Z'); // specific version
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.backups.restore_latest()                     # 最新备份
+    cell.backups.restore("2026-08-01T00:00:00Z")      # 指定版本
+    ```
+  </Tab>
+</Tabs>
+
+- Restore is atomic: the Cell switches to the restored data as a unit.
+- It can recover a Cell even after all Data Node local data is lost — as long as the object storage
+  backup exists.
+- Take a fresh [backup](./backups) before restoring if the current state matters.

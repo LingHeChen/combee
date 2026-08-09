@@ -1,0 +1,57 @@
+---
+title: TypeScript
+description: The official TypeScript SDK (@combee/sdk).
+since: 0.1.0-beta
+status: stable
+---
+
+The official TypeScript SDK is published as **`@combee/sdk`**.
+
+## Install
+
+```bash
+npm install @combee/sdk
+```
+
+## Quick example
+
+```ts
+import { Combee } from '@combee/sdk';
+
+const combee = new Combee({
+  baseUrl: 'https://api.combee.cloud',
+  apiKey: process.env.COMBEE_API_KEY!,
+});
+
+const cell = await combee.cells.create({ name: 'blog-prod' });
+
+await cell.sql.execute(`CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT)`);
+const { rows } = await cell.sql.query(`SELECT * FROM posts`);
+
+await cell.kv.set('session:user:1', JSON.stringify({ name: 'Ada' }), { ttl: 300 });
+const session = await cell.kv.get('session:user:1');
+```
+
+## Surface
+
+| Namespace | Methods |
+|---|---|
+| `combee.cells` | `create` / `ensure` / `get` / `getByName` / `list` |
+| `cell` | `info` / `rename` / `reset` / `delete` |
+| `cell.sql` | `query` / `execute` / `transaction` |
+| `cell.kv` | `get` / `set` / `delete` / `exists` / `mget` / `mset` / `ttl` / `expire` / `persist` / `incr` / `decr` / `getJson` / `setJson` |
+| `cell.backups` | `create` / `createIncremental` / `restore` / `restoreLatest` |
+| `cell.replication` | `get` / `enable` / `disable` |
+| `combee.apiKeys` | `create` / `list` / `revoke` |
+| `combee.usage` | `summary` / `cell` / `timeseries` |
+| `combee.credits` | `balance` / `transactions` / `redeem` |
+
+## Errors
+
+All errors extend `CombeeError` and carry a `requestId`. See [Error Codes](../reference/error-codes)
+for the full mapping (`SqlError`, `CellNotFoundError`, `CellAlreadyExistsError`, `CellNameConflictError`, ...).
+
+## Timeouts & retries
+
+- Default timeout is 30 seconds (`timeoutMs` option).
+- The SDK retries conservatively and never blindly retries write requests.

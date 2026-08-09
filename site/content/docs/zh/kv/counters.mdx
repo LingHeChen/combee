@@ -1,0 +1,57 @@
+---
+title: 计数器
+description: 原子 INCR / DECR 计数器。
+since: 0.1.0-beta
+status: stable
+---
+
+用 `INCR` / `DECR` 做原子计数器——访问量、限流、点赞、库存……
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X PUT https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/pageviews \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"value": "0"}'
+
+    # INCR → {"value": 1}
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/incr \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"key": "pageviews"}'
+
+    # INCR 5 → {"value": 6}
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/incr \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"key": "pageviews", "delta": 5}'
+
+    # DECR 2(delta 为负)→ {"value": 4}
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/ops/incr \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"key": "pageviews", "delta": -2}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.kv.set('pageviews', '0');
+    const v1 = await cell.kv.incr('pageviews'); // 1
+    const v2 = await cell.kv.incr('pageviews', 5); // 6
+    const v3 = await cell.kv.decr('pageviews', 2); // 4
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.kv.set("pageviews", "0")
+    v1 = cell.kv.incr("pageviews")        # 1
+    v2 = cell.kv.incr("pageviews", 5)     # 6
+    v3 = cell.kv.decr("pageviews", 2)     # 4
+    ```
+  </Tab>
+</Tabs>
+
+- 计数器以整数字符串存储,原子更新——并发自增不会丢更新。
+- 对不存在的 key 做 `INCR` 从 `0` 开始(结果是 `1`)。
+- 计数器可以带 TTL(例如按分钟限流的窗口)。

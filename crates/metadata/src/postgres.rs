@@ -15,7 +15,9 @@ use sqlx::Row;
 use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
 use uuid::Uuid;
 
-use crate::store::{ApiKeyRecord, DatabaseRecord, DatabaseState, MetadataStore, TenantRecord};
+use crate::store::{DataNodeRecord, 
+    ApiKeyRecord, DatabaseRecord, DatabaseState, MetadataStore, TenantRecord, WaitlistEntry,
+};
 
 const SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS tenants (
@@ -26,9 +28,23 @@ CREATE TABLE IF NOT EXISTS tenants (
 CREATE TABLE IF NOT EXISTS api_keys (
     id UUID PRIMARY KEY,
     tenant_id UUID NOT NULL,
+    name TEXT NOT NULL DEFAULT 'default',
     key_hash TEXT NOT NULL UNIQUE,
     created_at BIGINT NOT NULL,
     revoked_at BIGINT
+);
+ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS name TEXT NOT NULL DEFAULT 'default';
+CREATE TABLE IF NOT EXISTS waitlist (
+    email TEXT PRIMARY KEY,
+    created_at BIGINT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS data_nodes (
+    id UUID PRIMARY KEY,
+    address TEXT NOT NULL,
+    capacity BIGINT NOT NULL DEFAULT 100,
+    active_conns BIGINT NOT NULL DEFAULT 0,
+    created_at BIGINT NOT NULL,
+    last_heartbeat_at BIGINT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS usage_buckets (
     tenant_id UUID NOT NULL,
@@ -110,6 +126,10 @@ const MIGRATE_REPLICA_NODE: &str =
 /// 兼容旧库的迁移:补 generation 列(fencing)。
 const MIGRATE_GENERATION: &str =
     "ALTER TABLE databases ADD COLUMN IF NOT EXISTS generation BIGINT NOT NULL DEFAULT 0";
+/// 兼容旧库的迁移:补 name 列 + 租户内唯一索引(by-name ensure / rename 用)。
+const MIGRATE_DB_NAME: &str = "ALTER TABLE databases ADD COLUMN IF NOT EXISTS name TEXT";
+const MIGRATE_DB_NAME_UNIQUE: &str =
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_databases_tenant_name ON databases (tenant_id, name)";
 
 /// 批量 INSERT 的每批条数。
 const BATCH_SIZE: usize = 2_000;
@@ -144,6 +164,14 @@ impl PostgresStore {
             .execute(&pool)
             .await
             .map_err(|e| CombeeError::Internal(format!("postgres migrate: {e}")))?;
+        sqlx::raw_sql(MIGRATE_DB_NAME)
+            .execute(&pool)
+            .await
+            .map_err(|e| CombeeError::Internal(format!("postgres migrate: {e}")))?;
+        sqlx::raw_sql(MIGRATE_DB_NAME_UNIQUE)
+            .execute(&pool)
+            .await
+            .map_err(|e| CombeeError::Internal(format!("postgres migrate: {e}")))?;
         Ok(Self { pool })
     }
 
@@ -164,8 +192,15 @@ fn row_to_record(row: &PgRow) -> Result<DatabaseRecord> {
         .try_get("replica_node_id")
         .map_err(PostgresStore::internal)?;
     let generation: i64 = row.try_get("generation").map_err(PostgresStore::internal)?;
+    let name: String = row.try_get("name").unwrap_or_else(|_| {
+        format!(
+            "cell-{}",
+            id.to_string().replace('-', "").get(..8).unwrap_or("")
+        )
+    });
     Ok(DatabaseRecord {
         id: DatabaseId(id),
+        name,
         tenant_id: TenantId(tenant_id),
         state: DatabaseState::parse(&state)?,
         created_at: created_at as u64,
@@ -182,11 +217,17 @@ impl MetadataStore for PostgresStore {
         tenant: TenantId,
         id: DatabaseId,
         storage_node: Option<NodeId>,
+        name: Option<&str>,
     ) -> Result<DatabaseRecord> {
         let now = DatabaseRecord::now_unix() as i64;
+        let default_name = format!(
+            "cell-{}",
+            id.to_string().replace('-', "").get(..8).unwrap_or("")
+        );
+        let name = name.unwrap_or(&default_name);
         let inserted = sqlx::query(
-            "INSERT INTO databases (id, tenant_id, state, created_at, storage_node_id, generation)
-             VALUES ($1, $2, $3, $4, $5, 0)
+            "INSERT INTO databases (id, tenant_id, state, created_at, storage_node_id, generation, name)
+             VALUES ($1, $2, $3, $4, $5, 0, $6)
              ON CONFLICT (id) DO NOTHING",
         )
         .bind(id.0)
@@ -194,6 +235,7 @@ impl MetadataStore for PostgresStore {
         .bind(DatabaseState::Created.as_str())
         .bind(now)
         .bind(storage_node.map(|n| n.0))
+        .bind(name)
         .execute(&self.pool)
         .await
         .map_err(PostgresStore::internal)?;
@@ -203,9 +245,81 @@ impl MetadataStore for PostgresStore {
         self.get_database(tenant, id).await
     }
 
+    async fn get_database_by_name(&self, tenant: TenantId, name: &str) -> Result<DatabaseRecord> {
+        let row = sqlx::query(
+            "SELECT id, tenant_id, state, created_at, storage_node_id, replica_node_id, generation, name FROM databases WHERE tenant_id = $1 AND name = $2",
+        )
+        .bind(tenant.0)
+        .bind(name)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(PostgresStore::internal)?;
+        match row {
+            Some(row) => row_to_record(&row),
+            None => Err(CombeeError::DatabaseNotFound(DatabaseId::new())),
+        }
+    }
+
+    async fn ensure_database_by_name(
+        &self,
+        tenant: TenantId,
+        name: &str,
+        storage_node: Option<NodeId>,
+    ) -> Result<(DatabaseRecord, bool)> {
+        // 先查
+        if let Ok(rec) = self.get_database_by_name(tenant, name).await {
+            return Ok((rec, false));
+        }
+        // 不存在 → 创建;唯一约束兜底并发(冲突时再查一次)
+        let id = DatabaseId::new();
+        match self.create_database(tenant, id, storage_node, Some(name)).await {
+            Ok(rec) => Ok((rec, true)),
+            Err(CombeeError::DatabaseAlreadyExists(_)) => {
+                let rec = self.get_database_by_name(tenant, name).await?;
+                Ok((rec, false))
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    async fn rename_database(
+        &self,
+        tenant: TenantId,
+        id: DatabaseId,
+        new_name: &str,
+    ) -> Result<DatabaseRecord> {
+        let updated =
+            sqlx::query("UPDATE databases SET name = $1 WHERE id = $2 AND tenant_id = $3")
+                .bind(new_name)
+                .bind(id.0)
+                .bind(tenant.0)
+                .execute(&self.pool)
+                .await
+                .map_err(PostgresStore::internal)?;
+        if updated.rows_affected() == 0 {
+            return Err(CombeeError::DatabaseNotFound(id));
+        }
+        self.get_database(tenant, id).await
+    }
+
+    async fn reset_database(&self, tenant: TenantId, id: DatabaseId) -> Result<DatabaseRecord> {
+        let updated = sqlx::query(
+            "UPDATE databases SET generation = generation + 1 WHERE id = $1 AND tenant_id = $2",
+        )
+        .bind(id.0)
+        .bind(tenant.0)
+        .execute(&self.pool)
+        .await
+        .map_err(PostgresStore::internal)?;
+        if updated.rows_affected() == 0 {
+            return Err(CombeeError::DatabaseNotFound(id));
+        }
+        self.get_database(tenant, id).await
+    }
+
     async fn get_database(&self, tenant: TenantId, id: DatabaseId) -> Result<DatabaseRecord> {
         let row = sqlx::query(
-            "SELECT id, tenant_id, state, created_at, storage_node_id, replica_node_id, generation FROM databases WHERE id = $1 AND tenant_id = $2",
+            "SELECT id, tenant_id, state, created_at, storage_node_id, replica_node_id, generation, name FROM databases WHERE id = $1 AND tenant_id = $2",
         )
         .bind(id.0)
         .bind(tenant.0)
@@ -218,9 +332,23 @@ impl MetadataStore for PostgresStore {
         }
     }
 
+    async fn get_database_by_id(&self, id: DatabaseId) -> Result<DatabaseRecord> {
+        let row = sqlx::query(
+            "SELECT id, tenant_id, state, created_at, storage_node_id, replica_node_id, generation, name FROM databases WHERE id = $1",
+        )
+        .bind(id.0)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(PostgresStore::internal)?;
+        match row {
+            Some(row) => row_to_record(&row),
+            None => Err(CombeeError::DatabaseNotFound(id)),
+        }
+    }
+
     async fn list_databases(&self, tenant: TenantId) -> Result<Vec<DatabaseRecord>> {
         let rows = sqlx::query(
-            "SELECT id, tenant_id, state, created_at, storage_node_id, replica_node_id, generation FROM databases
+            "SELECT id, tenant_id, state, created_at, storage_node_id, replica_node_id, generation, name FROM databases
              WHERE tenant_id = $1 ORDER BY created_at, id",
         )
         .bind(tenant.0)
@@ -343,14 +471,20 @@ impl MetadataStore for PostgresStore {
             .collect()
     }
 
-    async fn create_api_key(&self, tenant: TenantId, key_hash: String) -> Result<ApiKeyRecord> {
+    async fn create_api_key(
+        &self,
+        tenant: TenantId,
+        key_hash: String,
+        name: &str,
+    ) -> Result<ApiKeyRecord> {
         let id = Uuid::new_v4();
         let now = DatabaseRecord::now_unix() as i64;
         sqlx::query(
-            "INSERT INTO api_keys (id, tenant_id, key_hash, created_at) VALUES ($1, $2, $3, $4)",
+            "INSERT INTO api_keys (id, tenant_id, name, key_hash, created_at) VALUES ($1, $2, $3, $4, $5)",
         )
         .bind(id)
         .bind(tenant.0)
+        .bind(name)
         .bind(&key_hash)
         .bind(now)
         .execute(&self.pool)
@@ -359,15 +493,88 @@ impl MetadataStore for PostgresStore {
         Ok(ApiKeyRecord {
             id,
             tenant_id: tenant,
+            name: name.to_string(),
             key_hash,
             created_at: now as u64,
             revoked_at: None,
         })
     }
 
+    async fn upsert_data_node(&self, id: NodeId, addr: String, capacity: usize) -> Result<()> {
+        let now = DatabaseRecord::now_unix() as i64;
+        sqlx::query(
+            "INSERT INTO data_nodes (id, address, capacity, active_conns, created_at, last_heartbeat_at)
+             VALUES ($1, $2, $3, 0, $4, $4)
+             ON CONFLICT (id) DO UPDATE SET address = EXCLUDED.address, capacity = EXCLUDED.capacity, last_heartbeat_at = $4",
+        )
+        .bind(id.0)
+        .bind(&addr)
+        .bind(capacity as i64)
+        .bind(now)
+        .execute(&self.pool)
+        .await
+        .map_err(PostgresStore::internal)?;
+        Ok(())
+    }
+
+    async fn heartbeat_data_node(&self, id: NodeId, active_conns: usize) -> Result<bool> {
+        let res = sqlx::query(
+            "UPDATE data_nodes SET active_conns = $2, last_heartbeat_at = $3 WHERE id = $1",
+        )
+        .bind(id.0)
+        .bind(active_conns as i64)
+        .bind(DatabaseRecord::now_unix() as i64)
+        .execute(&self.pool)
+        .await
+        .map_err(PostgresStore::internal)?;
+        Ok(res.rows_affected() > 0)
+    }
+
+    async fn unregister_data_node(&self, id: NodeId) -> Result<bool> {
+        let res = sqlx::query("DELETE FROM data_nodes WHERE id = $1")
+            .bind(id.0)
+            .execute(&self.pool)
+            .await
+            .map_err(PostgresStore::internal)?;
+        Ok(res.rows_affected() > 0)
+    }
+
+    async fn list_data_nodes(&self) -> Result<Vec<DataNodeRecord>> {
+        let rows = sqlx::query(
+            "SELECT id, address, capacity, active_conns, created_at, last_heartbeat_at FROM data_nodes",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(PostgresStore::internal)?;
+        Ok(rows
+            .iter()
+            .map(|r| DataNodeRecord {
+                id: NodeId(r.get::<Uuid, _>(0)),
+                addr: r.get::<String, _>(1),
+                capacity: r.get::<i64, _>(2) as usize,
+                active_conns: r.get::<i64, _>(3) as usize,
+                created_at: r.get::<i64, _>(4) as u64,
+                last_heartbeat_at: r.get::<i64, _>(5) as u64,
+            })
+            .collect())
+    }
+
+    async fn bootstrap_api_keys(&self, keys: &[String]) -> Result<()> {
+        for key in keys {
+            let hash = combee_common::api_key::hash(key);
+            if self.lookup_api_key_by_hash(&hash).await?.is_some() {
+                continue;
+            }
+            let tenant = TenantId::new();
+            self.create_tenant(tenant).await?;
+            self.create_api_key(tenant, hash, "bootstrap").await?;
+        }
+        Ok(())
+    }
+
     async fn lookup_api_key_by_hash(&self, key_hash: &str) -> Result<Option<ApiKeyRecord>> {
         let row = sqlx::query(
-            "SELECT id, tenant_id, key_hash, created_at, revoked_at FROM api_keys
+            "SELECT id, tenant_id, name, key_hash, created_at, revoked_at FROM api_keys
              WHERE key_hash = $1 AND revoked_at IS NULL",
         )
         .bind(key_hash)
@@ -378,6 +585,7 @@ impl MetadataStore for PostgresStore {
             Some(row) => Ok(Some(ApiKeyRecord {
                 id: row.try_get("id").map_err(PostgresStore::internal)?,
                 tenant_id: TenantId(row.try_get("tenant_id").map_err(PostgresStore::internal)?),
+                name: row.try_get("name").map_err(PostgresStore::internal)?,
                 key_hash: row.try_get("key_hash").map_err(PostgresStore::internal)?,
                 created_at: row
                     .try_get::<i64, _>("created_at")
@@ -393,7 +601,7 @@ impl MetadataStore for PostgresStore {
 
     async fn list_api_keys(&self, tenant: TenantId) -> Result<Vec<ApiKeyRecord>> {
         let rows = sqlx::query(
-            "SELECT id, tenant_id, key_hash, created_at, revoked_at FROM api_keys
+            "SELECT id, tenant_id, name, key_hash, created_at, revoked_at FROM api_keys
              WHERE tenant_id = $1 ORDER BY created_at",
         )
         .bind(tenant.0)
@@ -405,6 +613,7 @@ impl MetadataStore for PostgresStore {
                 Ok(ApiKeyRecord {
                     id: row.try_get("id").map_err(PostgresStore::internal)?,
                     tenant_id: TenantId(row.try_get("tenant_id").map_err(PostgresStore::internal)?),
+                    name: row.try_get("name").map_err(PostgresStore::internal)?,
                     key_hash: row.try_get("key_hash").map_err(PostgresStore::internal)?,
                     created_at: row
                         .try_get::<i64, _>("created_at")
@@ -816,9 +1025,15 @@ impl MetadataStore for PostgresStore {
         .execute(&mut *tx)
         .await
         .map_err(PostgresStore::internal)?;
+        // upsert:账户行可能不存在(首次入账),INSERT ON CONFLICT 保证总能返回新余额,
+        // 避免 UPDATE ... RETURNING 匹配 0 行导致 "no rows returned" 500。
         let balance: i64 = sqlx::query_scalar(
-            "UPDATE credit_accounts SET balance_units = balance_units + $2, updated_at = $3
-             WHERE tenant_id = $1 RETURNING balance_units",
+            "INSERT INTO credit_accounts (tenant_id, balance_units, reserved_units, updated_at)
+             VALUES ($1, $2, 0, $3)
+             ON CONFLICT (tenant_id) DO UPDATE
+               SET balance_units = credit_accounts.balance_units + EXCLUDED.balance_units,
+                   updated_at = EXCLUDED.updated_at
+             RETURNING balance_units",
         )
         .bind(txn.tenant_id.0)
         .bind(txn.amount_units)
@@ -921,9 +1136,15 @@ impl MetadataStore for PostgresStore {
         .execute(&mut *tx)
         .await
         .map_err(PostgresStore::internal)?;
-        sqlx::query_scalar::<_, i64>(
-            "UPDATE credit_accounts SET balance_units = balance_units + $2, updated_at = $3
-             WHERE tenant_id = $1 RETURNING balance_units",
+        // upsert:新租户首次入账时账户行可能不存在,
+        // INSERT ON CONFLICT 保证总能返回新余额,避免 UPDATE 0 行导致 "no rows returned" 500。
+        let _balance: i64 = sqlx::query_scalar(
+            "INSERT INTO credit_accounts (tenant_id, balance_units, reserved_units, updated_at)
+             VALUES ($1, $2, 0, $3)
+             ON CONFLICT (tenant_id) DO UPDATE SET
+               balance_units = credit_accounts.balance_units + EXCLUDED.balance_units,
+               updated_at = EXCLUDED.updated_at
+             RETURNING balance_units",
         )
         .bind(tenant.0)
         .bind(amount)
@@ -1003,6 +1224,33 @@ impl MetadataStore for PostgresStore {
         .await
         .map_err(PostgresStore::internal)?;
         Ok(row.map(|r| r.try_get("payload").unwrap_or_default()))
+    }
+
+    async fn create_waitlist_entry(&self, email: &str, now: i64) -> Result<()> {
+        sqlx::query("INSERT INTO waitlist (email, created_at) VALUES ($1, $2) ON CONFLICT (email) DO NOTHING")
+            .bind(email)
+            .bind(now)
+            .execute(&self.pool)
+            .await
+            .map_err(PostgresStore::internal)?;
+        Ok(())
+    }
+
+    async fn list_waitlist(&self, limit: i64) -> Result<Vec<WaitlistEntry>> {
+        let rows =
+            sqlx::query("SELECT email, created_at FROM waitlist ORDER BY created_at ASC LIMIT $1")
+                .bind(limit.clamp(1, 1000))
+                .fetch_all(&self.pool)
+                .await
+                .map_err(PostgresStore::internal)?;
+        rows.iter()
+            .map(|row| {
+                Ok(WaitlistEntry {
+                    email: row.try_get("email").map_err(PostgresStore::internal)?,
+                    created_at: row.try_get("created_at").map_err(PostgresStore::internal)?,
+                })
+            })
+            .collect()
     }
 }
 

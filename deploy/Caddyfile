@@ -1,0 +1,40 @@
+# Combee Cloud —— Caddy 反向代理配置
+# 配套文件:deploy/docker-compose.cloud.yml
+#
+# 所有域名与上游地址均来自环境变量(由 compose 的 caddy 服务注入,
+# 变量定义见 deploy/.env.example)。改 .env 即可,无需改本文件。
+#
+# 域名布局(默认):
+#   combee.cloud        → landing(COMBEE_LANDING_DOMAIN)
+#   docs.combee.cloud   → 文档站(COMBEE_DOCS_DOMAIN)
+#   api.combee.cloud    → Public API(COMBEE_API_DOMAIN)
+#
+# 本地测试无域名:把各域名块改为 `tls internal`(自签证书),并加 /etc/hosts 映射。
+
+{
+	email {$COMBEE_ACME_EMAIL}
+}
+
+# Landing page
+{$COMBEE_LANDING_DOMAIN} {
+	encode gzip
+	reverse_proxy {$COMBEE_UPSTREAM_LANDING}
+}
+
+# 文档站(Fumadocs)
+{$COMBEE_DOCS_DOMAIN} {
+	encode gzip
+	reverse_proxy {$COMBEE_UPSTREAM_DOCS}
+}
+
+# Public API
+{$COMBEE_API_DOMAIN} {
+	encode gzip
+	reverse_proxy {$COMBEE_UPSTREAM_API}
+}
+
+# Cloud Console(云端后台,主前端)
+{$COMBEE_CONSOLE_DOMAIN} {
+	encode gzip
+	reverse_proxy {$COMBEE_UPSTREAM_WEB}
+}

@@ -1,0 +1,57 @@
+---
+title: TypeScript
+description: 官方 TypeScript SDK(@combee/sdk)。
+since: 0.1.0-beta
+status: stable
+---
+
+官方 TypeScript SDK 发布为 **`@combee/sdk`**。
+
+## 安装
+
+```bash
+npm install @combee/sdk
+```
+
+## 快速示例
+
+```ts
+import { Combee } from '@combee/sdk';
+
+const combee = new Combee({
+  baseUrl: 'https://api.combee.cloud',
+  apiKey: process.env.COMBEE_API_KEY!,
+});
+
+const cell = await combee.cells.create({ name: 'blog-prod' });
+
+await cell.sql.execute(`CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT)`);
+const { rows } = await cell.sql.query(`SELECT * FROM posts`);
+
+await cell.kv.set('session:user:1', JSON.stringify({ name: 'Ada' }), { ttl: 300 });
+const session = await cell.kv.get('session:user:1');
+```
+
+## API 一览
+
+| 命名空间 | 方法 |
+|---|---|
+| `combee.cells` | `create` / `ensure` / `get` / `getByName` / `list` |
+| `cell` | `info` / `rename` / `reset` / `delete` |
+| `cell.sql` | `query` / `execute` / `transaction` |
+| `cell.kv` | `get` / `set` / `delete` / `exists` / `mget` / `mset` / `ttl` / `expire` / `persist` / `incr` / `decr` / `getJson` / `setJson` |
+| `cell.backups` | `create` / `createIncremental` / `restore` / `restoreLatest` |
+| `cell.replication` | `get` / `enable` / `disable` |
+| `combee.apiKeys` | `create` / `list` / `revoke` |
+| `combee.usage` | `summary` / `cell` / `timeseries` |
+| `combee.credits` | `balance` / `transactions` / `redeem` |
+
+## 错误
+
+所有错误继承 `CombeeError`,并携带 `requestId`。完整映射见[错误码](../reference/error-codes)
+(`SqlError`、`CellNotFoundError`、`AuthenticationError` …)。
+
+## 超时与重试
+
+- 默认超时 30 秒(`timeoutMs` 选项)。
+- SDK 保守重试,绝不盲目重试写请求。

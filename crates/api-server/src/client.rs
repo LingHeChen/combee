@@ -8,6 +8,7 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use combee_common::protocol::{
@@ -20,7 +21,7 @@ use combee_common::rpc::{
 };
 use combee_common::{CombeeError, DatabaseId, NodeId, Result};
 use combee_data_node::DataNode;
-use combee_metadata::{DEFAULT_TENANT, MetadataStore};
+use combee_metadata::MetadataStore;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
@@ -77,6 +78,16 @@ pub trait DataNodeClient: Send + Sync {
     async fn incremental_backup(&self, db: DatabaseId) -> Result<combee_common::rpc::BackupInfo>;
     /// Cell 磁盘占用(主库 + WAL,字节)。
     async fn storage_bytes(&self, db: DatabaseId) -> Result<u64>;
+    /// 重置:删除 Cell 数据文件与缓存(目录记录/元数据保留,generation 由 metadata 递增)。
+    async fn reset_database(&self, db: DatabaseId) -> Result<()>;
+    /// KV 前缀扫描(浏览):返回 keys 与下一页游标。
+    async fn kv_scan(
+        &self,
+        db: DatabaseId,
+        prefix: String,
+        limit: u32,
+        cursor: String,
+    ) -> Result<combee_common::rpc::RpcKvScanResult>;
     /// 当前打开的 SQLite 连接数(仅 Local 有意义;远程返回 0)。
     fn active_count(&self) -> usize;
 }
@@ -207,6 +218,20 @@ impl DataNodeClient for LocalDataNodeClient {
         self.node.storage_bytes(db).await
     }
 
+    async fn reset_database(&self, db: DatabaseId) -> Result<()> {
+        self.node.reset_database(db).await
+    }
+
+    async fn kv_scan(
+        &self,
+        db: DatabaseId,
+        prefix: String,
+        limit: u32,
+        cursor: String,
+    ) -> Result<combee_common::rpc::RpcKvScanResult> {
+        self.node.kv_scan(db, prefix, limit, cursor).await
+    }
+
     fn active_count(&self) -> usize {
         self.node.active_count()
     }
@@ -218,14 +243,24 @@ pub struct RemoteDataNodeClient {
     base: String,
     /// 控制面令牌;配置时每次 RPC 附带 `x-control-token`。
     control_token: Option<String>,
+    /// RPC 失败回调(如:失效该 Cell 的路由缓存,让下一次请求立即走新路由)。
+    on_error: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 
 impl RemoteDataNodeClient {
     pub fn new(base_url: String) -> Self {
-        Self::with_token(base_url, None)
+        Self::with_hooks(base_url, None, None)
     }
 
     pub fn with_token(base_url: String, control_token: Option<String>) -> Self {
+        Self::with_hooks(base_url, control_token, None)
+    }
+
+    pub fn with_hooks(
+        base_url: String,
+        control_token: Option<String>,
+        on_error: Option<Arc<dyn Fn() + Send + Sync>>,
+    ) -> Self {
         Self {
             http: reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(30))
@@ -233,6 +268,7 @@ impl RemoteDataNodeClient {
                 .expect("reqwest client"),
             base: base_url.trim_end_matches('/').to_string(),
             control_token,
+            on_error,
         }
     }
 
@@ -246,15 +282,33 @@ impl RemoteDataNodeClient {
         if let Some(token) = &self.control_token {
             req = req.header("x-control-token", token);
         }
+        // request_id 贯穿:从 task-local 读取并随 RPC 透传
+        if let Ok(rid) = crate::REQUEST_ID.try_with(|id| id.clone())
+            && !rid.is_empty()
+        {
+            req = req.header("x-request-id", &rid);
+        }
+        // 节点不可达 / 响应损坏属于路由类失败:触发 on_error(失效路由缓存),
+        // 让下一次请求立即从 authority 重新解析。业务错误(RPC 内错误码)不触发。
         let resp = req
             .send()
             .await
-            .map_err(|e| CombeeError::Internal(format!("data node rpc {path}: {e}")))?;
-        let rpc: RpcResponse<R> = resp
-            .json()
-            .await
-            .map_err(|e| CombeeError::Internal(format!("data node rpc {path} decode: {e}")))?;
+            .map_err(|e| {
+                self.notify_error();
+                CombeeError::Internal(format!("data node rpc {path}: {e}"))
+            })?;
+        let rpc: RpcResponse<R> = resp.json().await.map_err(|e| {
+            self.notify_error();
+            CombeeError::Internal(format!("data node rpc {path} decode: {e}"))
+        })?;
         rpc.into_result()
+    }
+
+    /// RPC 失败回调(RoutingProvider 用于失效该 Cell 的路由缓存)。
+    fn notify_error(&self) {
+        if let Some(f) = &self.on_error {
+            f();
+        }
     }
 }
 
@@ -411,6 +465,29 @@ impl DataNodeClient for RemoteDataNodeClient {
         self.call("rpc/storage_bytes", &RpcDb { db }).await
     }
 
+    async fn reset_database(&self, db: DatabaseId) -> Result<()> {
+        self.call("rpc/reset_database", &RpcDb { db }).await
+    }
+
+    async fn kv_scan(
+        &self,
+        db: DatabaseId,
+        prefix: String,
+        limit: u32,
+        cursor: String,
+    ) -> Result<combee_common::rpc::RpcKvScanResult> {
+        self.call(
+            "rpc/kv_scan",
+            &combee_common::rpc::RpcKvScan {
+                db,
+                prefix,
+                limit,
+                cursor,
+            },
+        )
+        .await
+    }
+
     fn active_count(&self) -> usize {
         0 // 远程无法同步读取,仅 Local 有意义
     }
@@ -458,7 +535,13 @@ pub struct RoutingProvider {
     /// 按节点缓存的远程客户端(节点重启换端口时需重建 registry 或重启 API Server)。
     clients: std::sync::Mutex<HashMap<NodeId, Arc<dyn DataNodeClient>>>,
     local: Option<Arc<dyn DataNodeClient>>,
+    /// Cell → 主节点的路由缓存(TTL),避免热路径每次查 PostgreSQL。
+    /// Arc:供 RPC 失败回调共享,以在失败时失效缓存。
+    route_cache: Arc<std::sync::Mutex<HashMap<DatabaseId, (NodeId, Instant)>>>,
 }
+
+/// 路由缓存有效期:failover 后最多这么久收敛(failover 本身也会触发失效)。
+const ROUTE_CACHE_TTL: Duration = Duration::from_secs(5);
 
 impl RoutingProvider {
     pub fn new(
@@ -471,26 +554,84 @@ impl RoutingProvider {
             metadata,
             clients: std::sync::Mutex::new(HashMap::new()),
             local,
+            route_cache: Arc::new(std::sync::Mutex::new(HashMap::new())),
         }
+    }
+}
+
+impl RoutingProvider {
+    /// 使某 Cell 的路由缓存失效(failover 后调用)。
+    pub fn invalidate_route(&self, db: DatabaseId) {
+        self.route_cache.lock().unwrap().remove(&db);
+    }
+
+    /// 创建绑定 Cell 的远程客户端;RPC 失败时自动失效该 Cell 的路由缓存,
+    /// 让下一次请求立即从 authority(PostgreSQL)重新解析。
+    fn make_client(
+        &self,
+        db: DatabaseId,
+        node_id: NodeId,
+        addr: String,
+    ) -> Arc<dyn DataNodeClient> {
+        let rc = self.route_cache.clone();
+        let on_error: Arc<dyn Fn() + Send + Sync> = Arc::new(move || {
+            tracing::debug!("rpc failure -> invalidate route cache for cell {db}");
+            rc.lock().unwrap().remove(&db);
+        });
+        let client: Arc<dyn DataNodeClient> =
+            Arc::new(RemoteDataNodeClient::with_hooks(addr, None, Some(on_error)));
+        self.clients.lock().unwrap().insert(node_id, client.clone());
+        client
     }
 }
 
 #[async_trait]
 impl DataNodeProvider for RoutingProvider {
     async fn client_for(&self, db: DatabaseId) -> Result<Arc<dyn DataNodeClient>> {
-        let record = self.metadata.get_database(DEFAULT_TENANT, db).await?;
-        match record.storage_node_id {
-            Some(node_id) => {
-                let addr = self.registry.addr(node_id).ok_or_else(|| {
-                    CombeeError::Internal(format!("data node {node_id} unavailable"))
-                })?;
-                let mut clients = self.clients.lock().unwrap();
-                if let Some(c) = clients.get(&node_id) {
+        // 热路径:路由缓存命中(新鲜)直接返回客户端,避免每次查 PostgreSQL。
+        // 注意:guard 在语句结束即释放,不能跨 await。
+        let cached = self.route_cache.lock().unwrap().get(&db).copied();
+        if let Some((node_id, at)) = cached {
+            if at.elapsed() < ROUTE_CACHE_TTL {
+                if let Some(c) = self.clients.lock().unwrap().get(&node_id) {
                     return Ok(c.clone());
                 }
-                let client: Arc<dyn DataNodeClient> = Arc::new(RemoteDataNodeClient::new(addr));
-                clients.insert(node_id, client.clone());
-                Ok(client)
+                if let Some(addr) = self.registry.addr(node_id).await {
+                    return Ok(self.make_client(db, node_id, addr));
+                }
+                // 节点不可用:清掉缓存项,走 authority 重新解析。
+                self.route_cache.lock().unwrap().remove(&db);
+            }
+        }
+
+        // authority:databases 表(PG)是 cell → node 的事实来源。
+        let record = self.metadata.get_database_by_id(db).await?;
+        match record.storage_node_id {
+            Some(node_id) => {
+                self.route_cache
+                    .lock()
+                    .unwrap()
+                    .insert(db, (node_id, Instant::now()));
+                let addr = match self.registry.addr(node_id).await {
+                    Some(a) => a,
+                    None => {
+                        // 节点不可用:失效缓存,从 authority 重新解析后重试一次。
+                        // 此时请求尚未发出,重试是安全的。
+                        self.route_cache.lock().unwrap().remove(&db);
+                        let rec2 = self.metadata.get_database_by_id(db).await?;
+                        let node2 = rec2.storage_node_id.ok_or_else(|| {
+                            CombeeError::Internal("database has no storage node assigned".into())
+                        })?;
+                        self.route_cache
+                            .lock()
+                            .unwrap()
+                            .insert(db, (node2, Instant::now()));
+                        self.registry.addr(node2).await.ok_or_else(|| {
+                            CombeeError::Internal(format!("data node {node2} unavailable"))
+                        })?
+                    }
+                };
+                Ok(self.make_client(db, node_id, addr))
             }
             None => self.local.clone().ok_or_else(|| {
                 CombeeError::Internal("database has no storage node assigned".into())
@@ -498,10 +639,12 @@ impl DataNodeProvider for RoutingProvider {
         }
     }
 
+
     async fn client_for_node(&self, node: NodeId) -> Result<Arc<dyn DataNodeClient>> {
         let addr = self
             .registry
             .addr(node)
+            .await
             .ok_or_else(|| CombeeError::Internal(format!("data node {node} unavailable")))?;
         let mut clients = self.clients.lock().unwrap();
         if let Some(c) = clients.get(&node) {

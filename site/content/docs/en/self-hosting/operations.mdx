@@ -1,0 +1,36 @@
+---
+title: Operations
+description: Backups, restore, node registration, and admin tasks.
+since: 0.1.0-beta
+status: stable
+---
+
+## Backups & restore (curl)
+
+```bash
+# snapshot
+curl -X POST http://127.0.0.1:8080/v1/databases/<id>/backup
+
+# WAL incremental
+curl -X POST http://127.0.0.1:8080/v1/databases/<id>/backup/incr
+
+# restore latest
+curl -X POST http://127.0.0.1:8080/v1/databases/<id>/restore
+```
+
+## Data Nodes
+
+- Data Nodes register themselves with the API Server and send heartbeats
+  (`COMBEE_CONTROL_PLANE_TOKEN` auth); a healthy node is picked for new Cells.
+- If the primary misses heartbeats, the replica is promoted automatically (see
+  [Replication / Failover](../reliability/replication-failover)).
+
+## Admin
+
+Operator endpoints (`/admin/*`) are protected by `COMBEE_ADMIN_TOKEN` and are **not** part of the
+public API — the SDK does not expose them.
+
+## Durability
+
+`COMBEE_KV_DURABILITY=strict` is the safe default for production data; `fast` trades durability for
+write latency. Choose per workload.

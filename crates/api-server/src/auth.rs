@@ -105,7 +105,13 @@ pub async fn internal_auth(State(state): State<AppState>, req: Request, next: Ne
 /// Operator/Admin 认证:`COMBEE_ADMIN_TOKEN`(与租户 key、control-plane token 三者互不相同)。
 /// 未配置 token 时 admin 接口一律 401(必须显式配置)。
 pub async fn admin_auth(State(state): State<AppState>, req: Request, next: Next) -> Response {
-    // 租户 key 永远不能调用 admin 接口
+    // 预配置的 admin API key(COMBEE_ADMIN_API_KEY)可以调用 admin 接口;
+    // 其余租户 key 永远不能调用 admin 接口。
+    if let Some(admin_key) = &state.admin_api_key {
+        if req.headers().get("x-api-key").and_then(|v| v.to_str().ok()) == Some(admin_key.as_str()) {
+            return next.run(req).await;
+        }
+    }
     if req.headers().contains_key("x-api-key") {
         return (
             StatusCode::UNAUTHORIZED,
@@ -160,13 +166,18 @@ pub async fn request_id(mut req: Request, next: Next) -> Response {
         .get("x-request-id")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
-        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+        .unwrap_or_else(|| format!("req_{}", uuid::Uuid::new_v4().simple()));
     req.extensions_mut().insert(crate::RequestId(id.clone()));
-    let mut response = next.run(req).await;
-    if let Ok(v) = id.parse() {
-        response.headers_mut().insert("x-request-id", v);
-    }
-    response
+    // task-local scope:同 task 的 handler / RPC 调用可读到 request_id
+    crate::REQUEST_ID
+        .scope(id.clone(), async {
+            let mut response = next.run(req).await;
+            if let Ok(v) = id.parse() {
+                response.headers_mut().insert("x-request-id", v);
+            }
+            response
+        })
+        .await
 }
 
 /// 认证中间件:校验 key(若启用)并注入 AuthContext。

@@ -1,0 +1,56 @@
+---
+title: GET / SET
+description: Read and write string values.
+since: 0.1.0-beta
+status: stable
+---
+
+KV values are strings. `GET` returns `null` when the key is missing.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # SET (with TTL)
+    curl -X PUT https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/greeting \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"value": "hello", "ttl_seconds": 60}'
+    # → {"written": true}
+
+    # GET
+    curl https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/greeting \
+      -H "x-api-key: $COMBEE_API_KEY"
+    # → {"exists": true, "value": "hello", "ttl_seconds": 59}
+
+    # GET a missing key → {"exists": false, "value": null}
+    curl https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/nope \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const written = await cell.kv.set('greeting', 'hello', { ttl: 60 });
+    const value = await cell.kv.get('greeting'); // 'hello'
+    const missing = await cell.kv.get('nope'); // null
+
+    // JSON helpers
+    await cell.kv.setJson('config', { theme: 'dark' });
+    const config = await cell.kv.getJson<{ theme: string }>('config');
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    written = cell.kv.set("greeting", "hello", ttl=60)
+    value = cell.kv.get("greeting")   # 'hello'
+    missing = cell.kv.get("nope")     # None
+
+    # JSON helpers
+    cell.kv.set_json("config", {"theme": "dark"})
+    config = cell.kv.get_json("config")
+    ```
+  </Tab>
+</Tabs>
+
+- `SET` overwrites existing values; use [NX / XX](./nx-xx) for conditional writes.
+- TTL is optional and in **seconds**; see [TTL](./ttl).
+- `DEL` removes a key: `cell.kv.delete('greeting')` returns whether it existed.

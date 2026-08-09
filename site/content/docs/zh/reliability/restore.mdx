@@ -1,0 +1,42 @@
+---
+title: 恢复
+description: 从备份恢复 Cell。
+since: 0.1.0-beta
+status: stable
+---
+
+恢复会用某个备份版本替换 Cell 的数据。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # 最新备份
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/restore \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{}'
+
+    # 指定版本
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/restore \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"version": "snapshots/2f1c4a0e-.../backup-20260801T000000Z"}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.backups.restoreLatest();            // 最新备份
+    await cell.backups.restore('2026-08-01T00:00:00Z'); // 指定版本
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.backups.restore_latest()                     # 最新备份
+    cell.backups.restore("2026-08-01T00:00:00Z")      # 指定版本
+    ```
+  </Tab>
+</Tabs>
+
+- 恢复是原子的:Cell 整体切换到恢复后的数据。
+- 即使 Data Node 本地数据全部丢失,只要对象存储里有备份就能恢复。
+- 如果当前状态重要,恢复前先创建一份[备份](./backups)。

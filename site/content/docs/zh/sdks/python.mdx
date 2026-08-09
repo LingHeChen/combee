@@ -1,0 +1,63 @@
+---
+title: Python
+description: 官方 Python SDK(combee)。
+since: 0.1.0-beta
+status: stable
+---
+
+官方 Python SDK 发布在 PyPI,包名 **`combee`**。同时提供同步与异步(`a` 前缀)两套 API。
+
+## 安装
+
+```bash
+pip install combee
+```
+
+## 快速示例(同步)
+
+```python
+from combee import Combee
+
+combee = Combee(
+    base_url="https://api.combee.cloud",
+    api_key="cmb_sk_...",
+)
+
+cell = combee.cells.create(name="blog-prod")
+
+cell.sql.execute("CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT)")
+result = cell.sql.query("SELECT * FROM posts")
+
+cell.kv.set("session:user:1", '{"name": "Ada"}', ttl=300)
+session = cell.kv.get("session:user:1")
+```
+
+## 异步
+
+每个方法都有异步孪生(`aget`、`aset`、`acreate`、`asummary` …):
+
+```python
+from combee import AsyncCombee
+
+async with AsyncCombee(base_url=..., api_key=...) as combee:
+    cell = await combee.cells.acreate(name="blog-prod")
+    value = await cell.kv.aget("session:user:1")
+```
+
+## API 一览
+
+| 命名空间 | 同步 / 异步方法 |
+|---|---|
+| `combee.cells` | `create` / `acreate`, `ensure` / `aensure`, `get` / `aget`, `get_by_name` / `aget_by_name`, `list` / `alist`, `delete` / `adelete` |
+| `cell` | `info` / `ainfo`, `rename` / `arename`, `reset` / `areset`, `delete` / `adelete` |
+| `cell.sql` | `query` / `aquery`, `execute` / `aexecute`, `transaction` / `atransaction` |
+| `cell.kv` | `get` / `aget`, `set` / `aset`, `delete` / `adelete`, `incr` / `aincr`(其余 KV 方法仅同步:`get_json` / `set_json` / `exists` / `mget` / `mset` / `ttl` / `expire` / `persist` / `decr`) |
+| `cell.backups` | `create` / `create_incremental` / `restore` / `restore_latest`(同步;暂无异步) |
+| `cell.replication` | `get` / `enable` / `disable`(同步;暂无异步) |
+| `combee.api_keys` | `create` / `acreate`, `list` / `alist`, `revoke` / `arevoke` |
+| `combee.usage` | `summary` / `asummary`, `cell` / `acell`, `timeseries` / `atimeseries` |
+| `combee.credits` | `balance` / `abalance`, `transactions` / `atransactions`, `redeem` / `aredeem` |
+
+## 错误
+
+所有错误继承 `CombeeError`,携带 `requestId`。见[错误码](../reference/error-codes)。

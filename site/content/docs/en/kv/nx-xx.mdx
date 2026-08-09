@@ -1,0 +1,59 @@
+---
+title: NX / XX
+description: Conditional writes with set-if-absent and set-if-present.
+since: 0.1.0-beta
+status: stable
+---
+
+`SET` supports two conditions:
+
+| Condition | Behavior |
+|---|---|
+| `NX` | Write only if the key does **not** exist (set-if-absent). |
+| `XX` | Write only if the key **already exists** (set-if-present). |
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # 仅当 'lock:deploy' 不存在时才写入(SET NX)
+    curl -X PUT https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/lock:deploy \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"value": "running", "ttl_seconds": 30, "nx": true}'
+    # → {"written": true} 表示获得锁
+
+    # 仅当 'config' 已存在时才更新(SET XX)
+    curl -X PUT https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/kv/config \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"value": "v2", "xx": true}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    // Only set if 'lock:deploy' does not exist
+    const acquired = await cell.kv.set('lock:deploy', 'running', { condition: 'nx', ttl: 30 });
+    if (acquired) {
+      // we hold the lock
+    }
+
+    // Only update if 'config' already exists
+    await cell.kv.set('config', 'v2', { condition: 'xx' });
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    # 仅当 'lock:deploy' 不存在时才写入
+    acquired = cell.kv.set("lock:deploy", "running", ttl=30, condition="nx")
+    if acquired:
+        # 我们持有锁
+        pass
+
+    # 仅当 'config' 已存在时才更新
+    cell.kv.set("config", "v2", condition="xx")
+    ```
+  </Tab>
+</Tabs>
+
+When the condition fails, the write is a no-op and returns `false` (nothing is written).
+This is the building block for distributed locks and one-time initialization.

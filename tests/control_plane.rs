@@ -31,7 +31,7 @@ async fn make_app(control_token: Option<&str>) -> (Router, TempDir) {
     let metadata: Arc<dyn MetadataStore> = Arc::new(InMemoryStore::new());
     // 预置一个租户 key(key 模式下 public 接口可用)
     metadata
-        .create_api_key(DEFAULT_TENANT, combee_common::api_key::hash("cmb_sk_test"))
+        .create_api_key(DEFAULT_TENANT, combee_common::api_key::hash("cmb_sk_test"), "default")
         .await
         .unwrap();
 
@@ -43,6 +43,7 @@ async fn make_app(control_token: Option<&str>) -> (Router, TempDir) {
         kv_cache_capacity: 100_000,
         kv_durability: KvDurability::Normal,
         sql_timeout: Some(Duration::from_secs(5)),
+        quota: Default::default(),
     }));
     let client = Arc::new(LocalDataNodeClient::new(node));
     let provider: Arc<dyn DataNodeProvider> = Arc::new(LocalProvider::new(client));
@@ -63,6 +64,8 @@ async fn make_app(control_token: Option<&str>) -> (Router, TempDir) {
         usage: usage_meter,
         pricing: pricing_meter,
         admin_token: None,
+        quota: Default::default(),
+        concurrency: Default::default(),
     };
     (build_app(state), dir)
 }

@@ -1,0 +1,50 @@
+---
+title: API Keys
+description: 创建、列出与吊销 API key。
+since: 0.1.0-beta
+status: stable
+---
+
+API key 用于认证 SDK 与 REST 请求,绑定你的账号。
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # 创建(明文 key 只返回一次)
+    curl -X POST https://api.combee.cloud/v1/api-keys \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{}'
+
+    # 列出
+    curl https://api.combee.cloud/v1/api-keys \
+      -H "x-api-key: $COMBEE_API_KEY"
+
+    # 撤销
+    curl -X DELETE https://api.combee.cloud/v1/api-keys/1a2b3c4d-... \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const key = await combee.apiKeys.create({ name: 'ci' });
+    // key.key 只显示一次——请立即保存。
+
+    const keys = await combee.apiKeys.list();
+    await combee.apiKeys.revoke(key.id);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    key = combee.api_keys.create(name="ci")
+    # key["key"] 只显示一次——请立即保存。
+
+    keys = combee.api_keys.list()
+    combee.api_keys.revoke(key["id"])
+    ```
+  </Tab>
+</Tabs>
+
+- key 形如 `cmb_sk_...`;Combee 只保存哈希。
+- **吊销立即生效**:被吊销的 key 在下一个请求就会被拒绝。
+- 明文 key 只在创建时返回一次——之后无法再查看。

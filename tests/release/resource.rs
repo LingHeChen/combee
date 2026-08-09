@@ -80,13 +80,18 @@ async fn large_sql_result_is_bounded() {
         None,
     )
     .await;
-    // 100k 行:返回(可能大)或明确失败,但不崩溃
+    // 100k 行:默认配额 max_sql_rows=10k → 成功但截断
     assert!(
         status.is_success() || status.is_client_error(),
         "unexpected {status}"
     );
     if status.is_success() {
-        assert_eq!(body["rows"].as_array().unwrap().len(), 100_000);
+        assert_eq!(
+            body["rows"].as_array().unwrap().len(),
+            10_000,
+            "默认配额截断到 max_sql_rows"
+        );
+        assert_eq!(body["truncated"], true, "标记截断");
     }
     // 服务仍可用
     let (s, _) = send(

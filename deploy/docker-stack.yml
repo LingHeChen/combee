@@ -1,0 +1,234 @@
+# Combee Cloud —— Docker Swarm 部署栈(支持滚动更新)
+# 与 deploy/docker-compose.cloud.yml 同构,但为 swarm 模式:
+#   - 必须使用已推送镜像(docker stack 不支持 build)
+#   - Caddyfile 通过 swarm config 注入
+#   - 无状态前端(landing/docs/web)replicas=2 + start-first(先起新再停旧,真无损)
+#   - 有状态/注册相关(api-server/data-node/postgres)单副本 + stop-first(数据安全,秒级窗口)
+#
+# 部署:
+#   docker swarm init
+#   docker stack deploy -c docker-stack.yml combee
+#
+# 更新(新镜像推送后):
+#   docker pull ccr.ccs.tencentyun.com/combee/<name>:latest   # 让 swarm 拉到新镜像
+#   docker stack deploy -c docker-stack.yml combee            # 按 update_config 滚动
+#
+# 查看/回滚:
+#   docker service ps combee_web --no-trunc
+#   docker service rollback combee_web
+#
+# 环境变量:与 docker-compose.cloud.yml 共用 deploy/.env(同目录读取)。
+
+services:
+  # ---- 反向代理(Caddy 自动 HTTPS)----
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - published: 80
+        target: 80
+      - published: 443
+        target: 443
+      - published: 443
+        target: 443
+        protocol: udp # HTTP/3
+    environment:
+      COMBEE_LANDING_DOMAIN: ${COMBEE_LANDING_DOMAIN:-combee.cloud}
+      COMBEE_DOCS_DOMAIN: ${COMBEE_DOCS_DOMAIN:-docs.combee.cloud}
+      COMBEE_API_DOMAIN: ${COMBEE_API_DOMAIN:-api.combee.cloud}
+      COMBEE_CONSOLE_DOMAIN: ${COMBEE_CONSOLE_DOMAIN:-console.combee.cloud}
+      COMBEE_ACME_EMAIL: ${COMBEE_ACME_EMAIL:-admin@combee.cloud}
+      COMBEE_UPSTREAM_LANDING: ${COMBEE_UPSTREAM_LANDING:-landing:80}
+      COMBEE_UPSTREAM_DOCS: ${COMBEE_UPSTREAM_DOCS:-docs:3000}
+      COMBEE_UPSTREAM_API: ${COMBEE_UPSTREAM_API:-api-server:8080}
+      COMBEE_UPSTREAM_WEB: ${COMBEE_UPSTREAM_WEB:-web:3000}
+    configs:
+      - source: caddyfile
+        target: /etc/caddy/Caddyfile
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      default:
+        aliases:
+          - caddy
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+        parallelism: 1
+        delay: 10s
+        monitor: 10s
+        failure_action: rollback
+      restart_policy:
+        condition: any
+        delay: 5s
+
+  # ---- Landing(无状态,可多副本)----
+  landing:
+    image: ccr.ccs.tencentyun.com/combee/landing:latest
+    networks:
+      default:
+        aliases:
+          - landing
+    deploy:
+      replicas: 2
+      update_config:
+        order: start-first
+        parallelism: 1
+        delay: 5s
+        monitor: 10s
+        failure_action: rollback
+      restart_policy:
+        condition: any
+
+  # ---- Docs 文档站(无状态)----
+  docs:
+    image: ccr.ccs.tencentyun.com/combee/docs:latest
+    networks:
+      default:
+        aliases:
+          - docs
+    deploy:
+      replicas: 2
+      update_config:
+        order: start-first
+        parallelism: 1
+        delay: 5s
+        monitor: 10s
+        failure_action: rollback
+      restart_policy:
+        condition: any
+
+  # ---- Cloud Console 主前端(无状态)----
+  web:
+    image: ccr.ccs.tencentyun.com/combee/console:latest
+    environment:
+      COMBEE_API_URL: ${COMBEE_API_URL:-http://api-server:8080}
+      COMBEE_API_KEY: ${COMBEE_API_KEY:-}
+      COMBEE_BFF_API_KEY: ${COMBEE_BFF_API_KEY:-}
+      COMBEE_BFF_CELL: ${COMBEE_BFF_CELL:-}
+      COMBEE_BFF_CELL_NAME: ${COMBEE_BFF_CELL_NAME:-}
+      COMBEE_BFF_DEBUG: ${COMBEE_BFF_DEBUG:-}
+      COMBEE_BFF_LOG_FILE: ${COMBEE_BFF_LOG_FILE:-}
+      COMBEE_CONSOLE_SIGNUP: ${COMBEE_CONSOLE_SIGNUP:-code}
+    networks:
+      default:
+        aliases:
+          - web
+    deploy:
+      replicas: 2
+      update_config:
+        order: start-first
+        parallelism: 1
+        delay: 5s
+        monitor: 10s
+        failure_action: rollback
+      restart_policy:
+        condition: any
+
+  # ---- PostgreSQL(有状态,stop-first;一般只在初始化/迁移时更新)----
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-combee}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-combee}
+      POSTGRES_DB: ${POSTGRES_DB:-combee}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    networks:
+      default:
+        aliases:
+          - postgres
+    deploy:
+      replicas: 1
+      update_config:
+        order: stop-first
+        parallelism: 1
+        failure_action: rollback
+      restart_policy:
+        condition: any
+
+  # ---- Data Node(有状态,stop-first 防同卷双写;数据持久在 /data)----
+  data-node:
+    image: ccr.ccs.tencentyun.com/combee/data-node:latest
+    command: ["/usr/local/bin/combee-data-node"]
+    environment:
+      COMBEE_DATA_NODE_ADDR: "0.0.0.0:${COMBEE_DATA_NODE_PORT:-9000}"
+      COMBEE_API_SERVER_URL: ${COMBEE_API_SERVER_URL:-http://api-server:8080}
+      COMBEE_NODE_ADVERTISE_URL: ${COMBEE_NODE_ADVERTISE_URL:-http://data-node:9000}
+      COMBEE_DATA_DIR: /data
+      COMBEE_MAX_ACTIVE_DBS: "100"
+      COMBEE_S3_ENDPOINT: ${COS_ENDPOINT:-https://cos.ap-guangzhou.myqcloud.com}
+      COMBEE_S3_ACCESS_KEY: ${COS_SECRET_ID:?COS_SECRET_ID required}
+      COMBEE_S3_SECRET_KEY: ${COS_SECRET_KEY:?COS_SECRET_KEY required}
+      COMBEE_S3_BUCKET: ${COS_BUCKET:?COS_BUCKET required}
+      COMBEE_S3_REGION: ${COS_REGION:-ap-guangzhou}
+      COMBEE_S3_VIRTUAL_HOSTED: ${COMBEE_S3_VIRTUAL_HOSTED:-true}
+      COMBEE_CONTROL_PLANE_TOKEN: ${COMBEE_CONTROL_PLANE_TOKEN:-}
+    volumes:
+      - data-node-data:/data
+    networks:
+      default:
+        aliases:
+          - data-node
+    deploy:
+      replicas: 1
+      update_config:
+        order: stop-first
+        parallelism: 1
+        delay: 5s
+        failure_action: rollback
+      restart_policy:
+        condition: any
+
+  # ---- API Server(2 副本)----
+  # 注意:NodeRegistry 在进程内存,data-node 只注册到被 DNS 命中的那个副本,
+  # 另一副本可能暂时路由不到节点(2s 心跳后重注册缓解);registry 落 PG 后可完全消除。
+  api-server:
+    image: ccr.ccs.tencentyun.com/combee/api-server:latest
+    command: ["/usr/local/bin/combee-api-server"]
+    environment:
+      COMBEE_BIND_ADDR: "0.0.0.0:8080"
+      COMBEE_METADATA: postgres
+      COMBEE_DATABASE_URL: postgres://${POSTGRES_USER:-combee}:${POSTGRES_PASSWORD:-combee}@postgres:5432/${POSTGRES_DB:-combee}
+      COMBEE_DATA_NODE_URL: http://data-node:${COMBEE_DATA_NODE_PORT:-9000}
+      COMBEE_DATA_DIR: /data
+      COMBEE_CONTROL_PLANE_TOKEN: ${COMBEE_CONTROL_PLANE_TOKEN:-}
+      COMBEE_ADMIN_TOKEN: ${COMBEE_ADMIN_TOKEN:-}
+      COMBEE_ADMIN_API_KEY: ${COMBEE_ADMIN_API_KEY:-}
+      COMBEE_API_KEYS: ${COMBEE_API_KEYS:-}
+      COMBEE_AUTH: ${COMBEE_AUTH:-key}
+    volumes:
+      - api-data:/data
+    networks:
+      default:
+        aliases:
+          - api-server
+    deploy:
+      replicas: 2
+      update_config:
+        order: start-first
+        parallelism: 1
+        delay: 5s
+        monitor: 10s
+        failure_action: rollback
+      restart_policy:
+        condition: any
+
+configs:
+  caddyfile:
+    file: ./Caddyfile
+
+volumes:
+  caddy-data:
+  caddy-config:
+  pg-data:
+  data-node-data:
+  api-data:
+
+networks:
+  default:
+    driver: overlay
+    # 服务别名已在各服务的 networks 下声明(web/api-server/data-node/docs/landing),
+    # 使 Caddyfile 与各服务间地址保持与 compose 版一致。
+    attachable: true

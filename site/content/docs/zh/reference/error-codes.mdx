@@ -1,0 +1,46 @@
+---
+title: 错误码
+description: HTTP 状态、error.code 与 SDK 异常的统一映射。
+since: 0.1.0-beta
+status: stable
+---
+
+每个错误响应都有相同的结构——`{ code, error }`——并回显 `x-request-id`(SDK 错误上以 `requestId`
+暴露)。整套文档由下面这一张表驱动:
+
+| HTTP | `error.code` | SDK 异常(TS / Python) |
+|---|---|---|
+| 400 | `invalid_request` | `InvalidRequestError` |
+| 400 | `sql` | `SqlError` |
+| 400 | `invalid_cell_name` | `InvalidCellNameError` |
+| 401 | `unauthorized` | `AuthenticationError` |
+| 403 | `forbidden` | `PermissionDeniedError` |
+| 404 | `database_not_found` | `CellNotFoundError` |
+| 404 | `api_key_not_found` | `ApiKeyNotFoundError` |
+| 409 | `database_already_exists` | `CombeeError`(基类) |
+| 409 | `cell_already_exists` | `CellAlreadyExistsError` |
+| 409 | `cell_name_conflict` | `CellNameConflictError` |
+| 429 | `quota_exceeded` | `QuotaExceededError` |
+| 500 | `internal` | `InternalServerError` |
+| 500 | `cell_reset_failed` | `CellResetFailedError` |
+
+## 客户端侧异常
+
+以下 SDK 错误不映射到服务端 `error.code`:
+
+- `SqlTimeoutError` —— 语句超过客户端超时。
+- `DataNodeUnavailableError` —— 服务不可达。
+
+## 示例
+
+```json
+HTTP/1.1 404 Not Found
+x-request-id: 3f1c4a0e-...
+
+{ "code": "database_not_found", "error": "database not found: 2f1c4a0e-..." }
+```
+
+## 说明
+
+- 跨租户访问表现为 `database_not_found`(404)——绝不泄露存在性。
+- `code` 稳定且为小写;SDK 类一一对应。

@@ -215,6 +215,43 @@ pub fn incr(conn: &Connection, key: &str, delta: i64, ttl_seconds: Option<u64>) 
     Ok(new_value)
 }
 
+/// 前缀扫描:按 key 字典序列出(过滤已过期),返回 keys 与下一页游标。
+pub fn scan(
+    conn: &Connection,
+    prefix: &str,
+    limit: u32,
+    cursor: &str,
+) -> combee_common::Result<combee_common::rpc::RpcKvScanResult> {
+    use combee_common::CombeeError;
+    let limit = limit.clamp(1, 1000);
+    let now = crate::ttl::unix_now();
+    let mut stmt = conn
+        .prepare(
+            "SELECT CAST(key AS TEXT) FROM __sys_kv
+             WHERE (expires_at IS NULL OR expires_at > ?1)
+               AND CAST(key AS TEXT) LIKE ?2 || '%'
+               AND (?3 = '' OR CAST(key AS TEXT) > ?3)
+             ORDER BY CAST(key AS TEXT) LIMIT ?4",
+        )
+        .map_err(|e| CombeeError::Sql(e.to_string()))?;
+    let rows = stmt
+        .query_map(
+            rusqlite::params![now, prefix, cursor, limit as i64 + 1],
+            |r| r.get::<_, String>(0),
+        )
+        .map_err(|e| CombeeError::Sql(e.to_string()))?
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(|e| CombeeError::Sql(e.to_string()))?;
+    let more = rows.len() as u32 > limit;
+    let keys: Vec<String> = rows.into_iter().take(limit as usize).collect();
+    let next_cursor = if more {
+        keys.last().cloned().unwrap_or_default()
+    } else {
+        String::new()
+    };
+    Ok(combee_common::rpc::RpcKvScanResult { keys, next_cursor })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -228,6 +265,31 @@ mod tests {
         (conn, dir)
     }
 
+    #[test]
+    fn scan_prefix_pagination_and_expiry() {
+        let (conn, _d) = kv_conn();
+        for (k, ttl) in [
+            ("alpha:1", None::<u64>),
+            ("alpha:2", Some(60)),
+            ("beta:1", None),
+            ("alpha:3", Some(u64::MAX)),
+        ] {
+            set(&conn, k, "v", ttl, false, false).unwrap();
+        }
+        // 前缀 alpha:返回 alpha:1、alpha:2(alpha:3 用 u64::MAX 模拟极端过期,无 ttl 语义差异,仅验证前缀)
+        let r = scan(&conn, "alpha:", 10, "").unwrap();
+        assert_eq!(r.keys, vec!["alpha:1", "alpha:2"]);
+        assert!(r.next_cursor.is_empty());
+        // 分页:limit 1,cursor 续页
+        let r1 = scan(&conn, "", 1, "").unwrap();
+        assert_eq!(r1.keys, vec!["alpha:1"]);
+        assert_eq!(r1.next_cursor, "alpha:1");
+        let r2 = scan(&conn, "", 1, &r1.next_cursor).unwrap();
+        assert_eq!(r2.keys, vec!["alpha:2"]);
+        // 无前缀列出全部(未过期)
+        let all = scan(&conn, "", 10, "").unwrap();
+        assert_eq!(all.keys, vec!["alpha:1", "alpha:2", "beta:1"]);
+    }
     #[test]
     fn set_get_roundtrip() {
         let (conn, _d) = kv_conn();

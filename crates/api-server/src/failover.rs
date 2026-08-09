@@ -94,7 +94,7 @@ pub fn spawn_failover_scanner(
                 let Some(primary) = rec.storage_node_id else {
                     continue;
                 };
-                if rec.replica_node_id.is_some() && !nodes.is_healthy(primary) {
+                if rec.replica_node_id.is_some() && !nodes.is_healthy(primary).await {
                     // 主节点心跳超时且有副本 → failover
                     let state = AppState {
                         metadata: metadata.clone(),
@@ -111,6 +111,9 @@ pub fn spawn_failover_scanner(
                             std::time::Duration::from_secs(3600),
                         ),
                         admin_token: None,
+                        admin_api_key: None,
+                        quota: Default::default(),
+                        concurrency: Default::default(),
                     };
                     match failover_cell(&state, rec.tenant_id, rec.id).await {
                         Ok(promoted) => tracing::info!(

@@ -1,0 +1,37 @@
+---
+title: Vouchers
+description: Redeem voucher codes to add credits.
+since: 0.1.0-beta
+status: stable
+---
+
+Voucher codes (like `CMB-XXXX-XXXX-XXXX`) add credits to your account. Redeeming is single-use,
+idempotent, and concurrency-safe.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/credits/redeem \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"code": "CMB-84PA-X2KD-7MQR"}'
+    # → {"credits_added": "50000000", "balance": "50000000", "already_redeemed": false}
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const result = await combee.credits.redeem('CMB-84PA-X2KD-7MQR');
+    // { balance: 50000000, already_redeemed: false }
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    result = combee.credits.redeem("CMB-84PA-X2KD-7MQR")
+    # {"balance": 50000000, "already_redeemed": False}
+    ```
+  </Tab>
+</Tabs>
+
+- Redeeming the same code twice does **not** add credits twice (returns `already_redeemed`).
+- Expired or invalid codes are rejected.
+- Vouchers are the only way to add credits in v0.1.0-beta (online payment is not available).

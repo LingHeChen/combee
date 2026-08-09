@@ -92,7 +92,7 @@ p99 ≈ 64µs、缓存命中率 100%、活跃 SQLite 连接数严格 ≤ 上限�
 - **单 replica + 自动 failover**:复制通道复用 WAL 归档;主节点心跳超时自动提升副本,generation fencing 防脑裂。
 - **多租户**:API key(仅存 sha256 哈希)绑定 tenant;隔离在 repository 层强制,跨租户一律 404。
 - **Usage Metering**:按 (tenant, cell, metric, 分钟桶) 统计 KV/SQL read/write、requests、bytes in/out、storage bytes;内存聚合 + 周期 flush(不进入热路径),`GET /v1/usage/summary` / `/v1/usage/timeseries` / `/v1/cells/{id}/usage`。
-- **Public API 契约**:`GET /openapi.json` 机器契约 + [docs/API.md](docs/API.md) 冻结规范(request-id / 稳定错误 code / Idempotency-Key / 游标分页)。
+- **Public API 契约**:`GET /openapi.json` 机器契约 + [artifacts/engineering/API.md](artifacts/engineering/API.md) 冻结规范(request-id / 稳定错误 code / Idempotency-Key / 游标分页)。
 - **Credits + Pricing**:整数 microcredits 账本(append-only,余额可从账本重建)、admin grant、voucher 兑换(哈希存库、单次/幂等/并发安全)、pricing 版本热更新(5s 生效,无效配置拒绝);settlement 周期把 usage → credits(记录 pricing_version,soft limit 告警不切断)。
 - **Control plane**:`/internal/*` 与 data-node `/rpc/*` 由 `COMBEE_CONTROL_PLANE_TOKEN` 保护,租户 key 永不进入内部接口。
 
@@ -104,16 +104,18 @@ p99 ≈ 64µs、缓存命中率 100%、活跃 SQLite 连接数严格 ≤ 上限�
 - **failover 依赖对象存储**:副本通过 S3 拉取归档;未配置 S3 时无复制/failover。
 - **V0 明确不做**:RESP / PG wire / Blob / 多副本(>1 replica)/ 复杂 scheduler —— 见 [V0 范围冻结](#v0-范围冻结v01-alpha)。
 
-## 文档
+## 工程文档
+
+> 内部工程文档位于 `artifacts/engineering/`;用户文档站(docs.combee.dev,Fumadocs)另行构建,规范见 `artifacts/docs-requirements.md` + `artifacts/FACTS.md`。
 
 | 文档 | 内容 |
 |---|---|
-| [docs/COMBEE_DESIGN.md](docs/COMBEE_DESIGN.md) | 完整设计(§1–§22:架构、存储、一致性、性能目标) |
-| [docs/PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md) | 项目总结(架构/功能/测试/性能/可靠性实测) |
-| [docs/RELEASE_READINESS.md](docs/RELEASE_READINESS.md) | Public Alpha 审计:Release Gate + 缺陷清单(BLOCKER=0 / HIGH=0) |
-| [docs/TESTING.md](docs/TESTING.md) | 全部测试的目的与预期结果 |
-| [docs/COMBEE_RELEASE_READINESS_TEST_PLAN.md](docs/COMBEE_RELEASE_READINESS_TEST_PLAN.md) | Release Gate 测试计划 |
-| [docs/API.md](docs/API.md) | **Public API 冻结契约**(分层 / 错误模型 / request-id / Idempotency / Pagination) |
+| [artifacts/engineering/COMBEE_DESIGN.md](artifacts/engineering/COMBEE_DESIGN.md) | 完整设计(§1–§22:架构、存储、一致性、性能目标) |
+| [artifacts/engineering/PROJECT_SUMMARY.md](artifacts/engineering/PROJECT_SUMMARY.md) | 项目总结(架构/功能/测试/性能/可靠性实测) |
+| [artifacts/engineering/RELEASE_READINESS.md](artifacts/engineering/RELEASE_READINESS.md) | Public Alpha 审计:Release Gate + 缺陷清单(BLOCKER=0 / HIGH=0) |
+| [artifacts/engineering/TESTING.md](artifacts/engineering/TESTING.md) | 全部测试的目的与预期结果 |
+| [artifacts/engineering/COMBEE_RELEASE_READINESS_TEST_PLAN.md](artifacts/engineering/COMBEE_RELEASE_READINESS_TEST_PLAN.md) | Release Gate 测试计划 |
+| [artifacts/engineering/API.md](artifacts/engineering/API.md) | **Public API 冻结契约**(分层 / 错误模型 / request-id / Idempotency / Pagination) |
 | [combee-js](https://github.com/LingHeChen/combee-js) / [combee-python](https://github.com/LingHeChen/combee-python) | **官方 SDK(独立仓库)**:`@combee/sdk`(TS)与 `combee`(Python),contract tests 跑真实 server |
 | [CHANGELOG.md](CHANGELOG.md) / [SECURITY.md](SECURITY.md) / [CONTRIBUTING.md](CONTRIBUTING.md) | 变更记录 / 安全 / 贡献 |
 
@@ -227,6 +229,16 @@ curl -X POST 127.0.0.1:8080/v1/databases/<id>/failover         # 手动提升副
 | `COMBEE_NODE_ADVERTISE_URL` | `http://<DATA_NODE_ADDR>` | agent 对外 RPC 地址(容器内用服务名) |
 | `COMBEE_S3_ENDPOINT` / `COMBEE_S3_ACCESS_KEY` / `COMBEE_S3_SECRET_KEY` / `COMBEE_S3_BUCKET` | 空 | 对象存储(备份/恢复/复制);未配置时测试可用本地 fs |
 | `COMBEE_WAL_BACKUP_INTERVAL_SECS` | `0`(关) | WAL 增量自动归档周期 |
+| `COMBEE_MAX_REQUEST_BODY_BYTES` | `5MB` | 请求体上限(axum body limit) |
+| `COMBEE_MAX_KV_KEY_BYTES` | `1024` | KV key 大小上限 |
+| `COMBEE_MAX_KV_VALUE_BYTES` | `256KB` | KV value 大小上限 |
+| `COMBEE_MAX_SQL_ROWS` | `10000` | 单条查询最大返回行数(超出截断+truncated) |
+| `COMBEE_MAX_SQL_RESULT_BYTES` | `5MB` | 查询结果字节上限(超出截断) |
+| `COMBEE_MAX_CELLS_PER_TENANT` | `1000` | 每租户 Cell 数上限 |
+| `COMBEE_MAX_PER_TENANT_CONCURRENCY` | `0`(不限) | 每租户并发请求上限(429) |
+| `COMBEE_MAX_PER_CELL_CONCURRENCY` | `0`(不限) | 每 Cell 并发请求上限(429) |
+| `COMBEE_STORAGE_SOFT_BYTES` | `0`(不限) | 存储软上限(超限告警) |
+| `COMBEE_STORAGE_HARD_BYTES` | `0`(不限) | 存储硬上限(KV 写入超限拒绝) |
 | `COMBEE_REPLICA_INTERVAL_SECS` | `0`(关) | 副本拉取归档周期 |
 | `COMBEE_FAILOVER_INTERVAL_SECS` | `0`(关) | 自动 failover 扫描周期 |
 
@@ -257,7 +269,7 @@ cargo run --release -p combee-benchmark -- --e2e --url http://127.0.0.1:8080
 cargo test --workspace
 ```
 
-全部测试(单元 + 集成)的**目的**与**预期结果**逐条说明见 [`docs/TESTING.md`](docs/TESTING.md)。
+全部测试(单元 + 集成)的**目的**与**预期结果**逐条说明见 [`artifacts/engineering/TESTING.md`](artifacts/engineering/TESTING.md)。
 
 ## V0 范围冻结(v0.1-alpha)
 

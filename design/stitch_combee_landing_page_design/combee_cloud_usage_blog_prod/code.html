@@ -1,0 +1,477 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Combee Cloud - Cell Detail: Usage</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Tailwind -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-secondary-fixed-variant": "#3d4756",
+                        "surface-container-highest": "#333535",
+                        "on-surface": "#e2e2e2",
+                        "inverse-on-surface": "#2f3130",
+                        "primary-container": "#0a0a0a",
+                        "on-primary": "#313030",
+                        "primary-fixed-dim": "#c9c6c5",
+                        "tertiary-fixed": "#ffddb8",
+                        "surface-container-low": "#1a1c1c",
+                        "surface-bright": "#383939",
+                        "on-tertiary-fixed-variant": "#653e00",
+                        "tertiary": "#ffb95f",
+                        "background": "#121414",
+                        "surface-dim": "#121414",
+                        "inverse-primary": "#5f5e5e",
+                        "on-primary-fixed-variant": "#474646",
+                        "error": "#ffb4ab",
+                        "primary": "#c9c6c5",
+                        "on-background": "#e2e2e2",
+                        "on-tertiary-container": "#aa6c00",
+                        "on-error": "#690005",
+                        "on-primary-fixed": "#1c1b1b",
+                        "on-surface-variant": "#c4c7c7",
+                        "error-container": "#93000a",
+                        "surface-container-lowest": "#0c0f0e",
+                        "outline-variant": "#444748",
+                        "secondary-container": "#404a59",
+                        "surface-variant": "#333535",
+                        "surface": "#121414",
+                        "surface-tint": "#c9c6c5",
+                        "tertiary-container": "#130800",
+                        "on-error-container": "#ffdad6",
+                        "surface-container": "#1e2020",
+                        "inverse-surface": "#e2e2e2",
+                        "on-secondary-fixed": "#121c2a",
+                        "secondary-fixed": "#d9e3f6",
+                        "on-tertiary": "#472a00",
+                        "secondary": "#bdc7d9",
+                        "on-primary-container": "#7b7979",
+                        "outline": "#8e9192",
+                        "primary-fixed": "#e5e2e1",
+                        "tertiary-fixed-dim": "#ffb95f",
+                        "secondary-fixed-dim": "#bdc7d9",
+                        "on-tertiary-fixed": "#2a1700",
+                        "surface-container-high": "#282a2a",
+                        "on-secondary-container": "#afb9cb",
+                        "on-secondary": "#27313f"
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.125rem",
+                        lg: "0.25rem",
+                        xl: "0.5rem",
+                        full: "0.75rem"
+                    },
+                    spacing: {
+                        "margin-desktop": "32px",
+                        "container-max": "1280px",
+                        "unit": "4px",
+                        "gutter": "16px",
+                        "margin-mobile": "16px"
+                    },
+                    fontFamily: {
+                        "body-lg": ["Geist"],
+                        "display-lg": ["Geist"],
+                        "body-sm": ["Geist"],
+                        "headline-md": ["Geist"],
+                        "headline-lg": ["Geist"],
+                        "mono-code": ["JetBrains Mono"],
+                        "headline-lg-mobile": ["Geist"],
+                        "mono-label": ["JetBrains Mono"]
+                    },
+                    fontSize: {
+                        "body-lg": ["16px", { lineHeight: "24px", letterSpacing: "0em", fontWeight: "400" }],
+                        "display-lg": ["48px", { lineHeight: "56px", letterSpacing: "-0.04em", fontWeight: "700" }],
+                        "body-sm": ["14px", { lineHeight: "20px", letterSpacing: "0em", fontWeight: "400" }],
+                        "headline-md": ["20px", { lineHeight: "28px", letterSpacing: "-0.01em", fontWeight: "500" }],
+                        "headline-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "600" }],
+                        "mono-code": ["14px", { lineHeight: "22px", letterSpacing: "0em", fontWeight: "400" }],
+                        "headline-lg-mobile": ["24px", { lineHeight: "32px", letterSpacing: "-0.02em", fontWeight: "600" }],
+                        "mono-label": ["13px", { lineHeight: "16px", letterSpacing: "0.02em", fontWeight: "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .icon-fill {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Subtle glow for focus/active states */
+        .glow-active {
+            box-shadow: 0 0 20px rgba(255, 185, 95, 0.1);
+        }
+        
+        /* Minimal scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0A0A0A; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151; 
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4B5563; 
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-sm antialiased flex h-screen overflow-hidden">
+<!-- SideNavBar -->
+<nav class="bg-surface-container-low dark:bg-surface-container-low flex flex-col h-full py-6 px-4 gap-2 docked left-0 h-screen w-64 border-r border-outline-variant shrink-0 z-20">
+<!-- Brand -->
+<div class="flex items-center gap-3 px-3 mb-6">
+<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCZo_M9KH5eZVrCGbqztqtM0lKeAEIjsmGgr8IKdJ75BZ3jo82FYH5tZX8hdEbi5RSSBcKPDlOOFj6jJhbMD-BP05wCsDEdgWVkV9Xj7GpY50o1ktRaK8JbKX9b9flJSgyGJuBzzygvXHpPeiIO24FfhGezFvRPlJOeb59HnPbHY8SZfsHo7IhqluDIdkn_hm4U09RESlzlW5odFiow7hFjuOuYG-rHVyzSrgVk7_jQQJ-3s72WyO_pqC6MVyowQ8atPNk" alt="Combee Cloud Logo" class="h-8 w-8 object-cover shrink-0">
+<div>
+<h1 class="text-headline-md font-headline-md font-bold text-on-surface dark:text-on-surface leading-tight">Combee Cloud</h1>
+<p class="font-mono-label text-mono-label text-on-surface-variant">v2.4.0-stable</p>
+</div>
+</div>
+<!-- Main Tabs -->
+<div class="flex flex-col gap-1 flex-grow font-mono-label text-mono-label">
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+                Overview
+            </a>
+<!-- Active Tab: Cells -->
+<a class="flex items-center gap-3 px-3 py-2 rounded bg-tertiary-container text-tertiary font-bold border-r-2 border-tertiary scale-[0.99] transition-transform glow-active" href="#">
+<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuAvshZ8Fz_pYgnPdD81aCY04nJJrnL-DT_BoqKG9JAJC2b3yBL_sTE8Y2kfPGMNCDGvZJ66z_C-YfDkpnFn-G7XKkFxjqndYH-1BXpyE5rNUljyb79iYcV4q9jrechYfX9RuyjQx8gHR2oJuWThydJ_siRg_czs0Ej_Xnl8Dkx_ZWZDWA6bDIom1KNM4arYQxjwSlvo24ijGQz4Aei4DmHtpI7jSw_6aUil4-_GLwa_QFsijtOAvdaeAKsDgxdHli6crzE" alt="" class="h-5 w-5 object-cover shrink-0">
+                Cells
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="key">key</span>
+                API Keys
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="bar_chart">bar_chart</span>
+                Usage
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="account_balance_wallet">account_balance_wallet</span>
+                Credits
+            </a>
+</div>
+<!-- CTA -->
+<div class="mt-4 mb-6">
+<button class="w-full bg-tertiary text-primary-container font-mono-label text-mono-label font-bold py-2 px-4 rounded hover:bg-tertiary-fixed transition-colors">
+                Create Cell
+            </button>
+</div>
+<!-- Footer Tabs -->
+<div class="flex flex-col gap-1 font-mono-label text-mono-label mt-auto border-t border-outline-variant pt-4">
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span>
+                Docs
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="contact_support">contact_support</span>
+                Support
+            </a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-grow flex flex-col min-w-0 bg-background relative overflow-y-auto">
+<!-- TopNavBar -->
+<header class="bg-surface-dim/80 dark:bg-surface-dim/80 backdrop-blur-md flex justify-between items-center h-16 px-gutter w-full ml-auto docked top-0 border-b border-outline-variant sticky z-10">
+<div class="flex items-center gap-8 h-full">
+<!-- Search -->
+<div class="relative hidden md:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
+<input class="bg-primary-container border border-outline-variant rounded pl-9 pr-3 py-1.5 text-body-sm font-mono-code text-on-surface focus:border-tertiary focus:ring-1 focus:ring-tertiary/30 outline-none w-64 placeholder-on-surface-variant transition-all" placeholder="Search resources..." type="text">
+</div>
+<!-- Nav Links -->
+<nav class="flex h-full gap-6 font-body-sm text-body-sm">
+<a class="flex items-center text-on-surface-variant hover:text-on-surface pb-2 pt-2 border-b-2 border-transparent hover:text-tertiary transition-all duration-200 mt-2" href="#">Projects</a>
+<a class="flex items-center text-on-surface-variant hover:text-on-surface pb-2 pt-2 border-b-2 border-transparent hover:text-tertiary transition-all duration-200 mt-2" href="#">Regions</a>
+<a class="flex items-center text-on-surface-variant hover:text-on-surface pb-2 pt-2 border-b-2 border-transparent hover:text-tertiary transition-all duration-200 mt-2" href="#">Network</a>
+</nav>
+</div>
+<!-- Trailing Actions -->
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:text-tertiary transition-colors focus:ring-1 focus:ring-tertiary/30 outline-none rounded p-1">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-tertiary transition-colors focus:ring-1 focus:ring-tertiary/30 outline-none rounded p-1">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<div class="w-8 h-8 rounded bg-surface-container-high border border-outline-variant overflow-hidden flex items-center justify-center cursor-pointer ml-2">
+<img class="w-full h-full object-cover" data-alt="A futuristic minimalist avatar placeholder featuring abstract geometric shapes in muted amber and slate tones, designed for a professional developer dashboard." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBHxHcbj7p4knSxh3xd2fyZM22zE7-DL52YJzLTnxHccqL5JAST-JBcJoz-kbIKCwwe-ws3WgVW6DtegfN2ajYrk65cQjoXZyMWKQaxb7JuUnjqW7bHg-J0_YOSPqPVRNNjziuI4oOMu8K1iipo8g_p6xtR-yVVxBT7w-IkZ-kwYEJUr_Gvcs9nrieJi5fMyixRHKdgZ1FY8aGgw6717002GORaI-3t8PiOUG8qK2jHkoIyxgcjLne0nQ">
+</div>
+</div>
+</header>
+<!-- Cell Context Header -->
+<div class="px-margin-desktop py-6 border-b border-outline-variant bg-surface">
+<div class="max-w-container-max mx-auto">
+<div class="flex items-end justify-between mb-6">
+<div>
+<div class="flex items-center gap-3 mb-2">
+<span class="flex items-center justify-center w-6 h-6 rounded bg-tertiary/10 text-tertiary border border-tertiary/20">
+<span class="material-symbols-outlined text-sm" data-icon="database">database</span>
+</span>
+<h2 class="font-headline-lg text-headline-lg text-on-surface m-0">prod-eu-central-01</h2>
+<span class="px-2 py-0.5 rounded text-[11px] font-mono-label bg-surface-container-highest border border-outline-variant text-on-surface-variant flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary animate-pulse"></span>
+                                Live
+                            </span>
+</div>
+<p class="font-mono-code text-mono-code text-on-surface-variant">ID: cell_9x8f7d6c5b • Region: eu-central</p>
+</div>
+<!-- Time Range Control -->
+<div class="flex bg-primary-container p-1 rounded border border-outline-variant font-mono-label text-mono-label">
+<button class="px-3 py-1 rounded text-on-surface-variant hover:text-on-surface transition-colors">24H</button>
+<button class="px-3 py-1 rounded bg-surface-container-high text-on-surface shadow-sm glow-active border border-outline-variant">7D</button>
+<button class="px-3 py-1 rounded text-on-surface-variant hover:text-on-surface transition-colors">30D</button>
+</div>
+</div>
+<!-- Internal Nav -->
+<nav class="flex gap-8 font-body-sm text-body-sm border-b border-outline-variant -mb-px">
+<a class="py-3 text-on-surface-variant hover:text-on-surface border-b-2 border-transparent transition-colors" href="#">Overview</a>
+<a class="py-3 text-tertiary border-b-2 border-tertiary font-medium" href="#">Usage</a>
+<a class="py-3 text-on-surface-variant hover:text-on-surface border-b-2 border-transparent transition-colors" href="#">Logs</a>
+<a class="py-3 text-on-surface-variant hover:text-on-surface border-b-2 border-transparent transition-colors" href="#">Settings</a>
+</nav>
+</div>
+</div>
+<!-- Usage Dashboard Content -->
+<div class="p-margin-desktop max-w-container-max mx-auto w-full flex flex-col gap-6">
+<!-- Summary Bento Grid -->
+<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+<!-- Credits Consumed (Highlighted) -->
+<div class="col-span-2 md:col-span-1 lg:col-span-2 bg-surface-container-low border border-outline-variant rounded p-4 relative overflow-hidden group hover:border-tertiary/50 transition-colors">
+<div class="absolute -right-10 -top-10 w-32 h-32 bg-tertiary/5 rounded-full blur-2xl group-hover:bg-tertiary/10 transition-all"></div>
+<div class="flex items-center gap-2 text-on-surface-variant mb-2">
+<span class="material-symbols-outlined text-sm text-tertiary" data-icon="toll">toll</span>
+<h3 class="font-mono-label text-mono-label uppercase tracking-wider">Credits Consumed</h3>
+</div>
+<div class="font-mono-code text-display-lg text-on-surface mt-1">12,405</div>
+<div class="font-mono-code text-[11px] text-error mt-2 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="trending_up">trending_up</span>
+                        +14.2% vs last 7d
+                    </div>
+</div>
+<!-- Requests -->
+<div class="bg-surface-container-low border border-outline-variant rounded p-4 flex flex-col justify-between hover:bg-surface-container-highest transition-colors">
+<h3 class="font-mono-label text-mono-label text-on-surface-variant uppercase tracking-wider">Requests</h3>
+<div class="mt-4">
+<div class="font-mono-code text-headline-lg text-on-surface">4.2M</div>
+<div class="h-1 w-full bg-primary-container mt-3 rounded overflow-hidden flex">
+<div class="h-full bg-secondary w-3/4"></div>
+<div class="h-full bg-error w-1/4"></div>
+</div>
+<div class="flex justify-between font-mono-code text-[10px] text-on-surface-variant mt-1">
+<span class="">Success 99.8%</span>
+<span class="">Err 0.2%</span>
+</div>
+</div>
+</div>
+<!-- SQL R/W -->
+<div class="bg-surface-container-low border border-outline-variant rounded p-4 flex flex-col justify-between hover:bg-surface-container-highest transition-colors">
+<h3 class="font-mono-label text-mono-label text-on-surface-variant uppercase tracking-wider">SQL R/W</h3>
+<div class="mt-4">
+<div class="font-mono-code text-headline-lg text-on-surface">845<span class="text-headline-md text-on-surface-variant">k</span></div>
+<div class="flex items-center gap-4 mt-2 font-mono-code text-[11px] text-on-surface-variant">
+<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-secondary"></span> R: 710k</span>
+<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-tertiary"></span> W: 135k</span>
+</div>
+</div>
+</div>
+<!-- Storage -->
+<div class="bg-surface-container-low border border-outline-variant rounded p-4 flex flex-col justify-between hover:bg-surface-container-highest transition-colors">
+<h3 class="font-mono-label text-mono-label text-on-surface-variant uppercase tracking-wider">Storage</h3>
+<div class="mt-4">
+<div class="font-mono-code text-headline-lg text-on-surface">14.2<span class="text-headline-md text-on-surface-variant">GB</span></div>
+<div class="font-mono-code text-[11px] text-on-surface-variant mt-2">Avg. over 7d</div>
+</div>
+</div>
+<!-- Bandwidth -->
+<div class="bg-surface-container-low border border-outline-variant rounded p-4 flex flex-col justify-between hover:bg-surface-container-highest transition-colors">
+<h3 class="font-mono-label text-mono-label text-on-surface-variant uppercase tracking-wider">Egress (BW)</h3>
+<div class="mt-4">
+<div class="font-mono-code text-headline-lg text-on-surface">412<span class="text-headline-md text-on-surface-variant">GB</span></div>
+<div class="font-mono-code text-[11px] text-secondary mt-2 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="trending_down">trending_down</span>
+                            -2.4% vs last 7d
+                        </div>
+</div>
+</div>
+</div>
+<!-- Charts Section -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+<!-- Ops Chart -->
+<div class="bg-surface-container-low border border-outline-variant rounded p-5 flex flex-col min-h-[320px]">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline-md text-headline-md text-on-surface">Operations Overview</h3>
+<div class="flex gap-3 font-mono-label text-[11px]">
+<span class="flex items-center gap-1 text-on-surface-variant"><span class="w-2 h-2 rounded-sm bg-secondary"></span> Reads</span>
+<span class="flex items-center gap-1 text-on-surface-variant"><span class="w-2 h-2 rounded-sm bg-tertiary"></span> Writes</span>
+</div>
+</div>
+<!-- Faux Chart Canvas -->
+<div class="flex-grow relative border-b border-l border-outline-variant/50 ml-6 mb-4">
+<!-- Y-axis labels -->
+<div class="absolute -left-8 h-full flex flex-col justify-between font-mono-code text-[10px] text-on-surface-variant py-2">
+<span class="">150k</span>
+<span class="">100k</span>
+<span class="">50k</span>
+<span class="">0</span>
+</div>
+<!-- Grid lines -->
+<div class="absolute inset-0 flex flex-col justify-between pointer-events-none">
+<div class="border-t border-outline-variant/20 w-full"></div>
+<div class="border-t border-outline-variant/20 w-full"></div>
+<div class="border-t border-outline-variant/20 w-full"></div>
+<div class="border-t border-outline-variant/20 w-full"></div>
+</div>
+<!-- Data visualization (CSS shapes mapping to a line graph) -->
+<div class="absolute bottom-0 left-0 w-full h-full flex items-end justify-between px-2 pt-8 pointer-events-none">
+<!-- Faux columns/points -->
+<div class="w-[8%] h-[40%] bg-gradient-to-t from-secondary/10 to-secondary/40 border-t border-secondary rounded-t-sm"></div>
+<div class="w-[8%] h-[60%] bg-gradient-to-t from-secondary/10 to-secondary/40 border-t border-secondary rounded-t-sm relative">
+<div class="absolute -bottom-0 left-0 w-full h-[20%] bg-gradient-to-t from-tertiary/20 to-tertiary/60 border-t border-tertiary rounded-t-sm z-10"></div>
+</div>
+<div class="w-[8%] h-[85%] bg-gradient-to-t from-secondary/10 to-secondary/40 border-t border-secondary rounded-t-sm glow-active"></div>
+<div class="w-[8%] h-[45%] bg-gradient-to-t from-secondary/10 to-secondary/40 border-t border-secondary rounded-t-sm"></div>
+<div class="w-[8%] h-[70%] bg-gradient-to-t from-secondary/10 to-secondary/40 border-t border-secondary rounded-t-sm relative">
+<div class="absolute -bottom-0 left-0 w-full h-[35%] bg-gradient-to-t from-tertiary/20 to-tertiary/60 border-t border-tertiary rounded-t-sm z-10"></div>
+</div>
+<div class="w-[8%] h-[95%] bg-gradient-to-t from-secondary/10 to-secondary/40 border-t border-secondary rounded-t-sm relative">
+<div class="absolute -bottom-0 left-0 w-full h-[15%] bg-gradient-to-t from-tertiary/20 to-tertiary/60 border-t border-tertiary rounded-t-sm z-10"></div>
+</div>
+<div class="w-[8%] h-[50%] bg-gradient-to-t from-secondary/10 to-secondary/40 border-t border-secondary rounded-t-sm"></div>
+</div>
+</div>
+<!-- X-axis labels -->
+<div class="flex justify-between ml-6 font-mono-code text-[10px] text-on-surface-variant">
+<span class="">Mon</span>
+<span class="">Tue</span>
+<span class="">Wed</span>
+<span class="">Thu</span>
+<span class="">Fri</span>
+<span class="">Sat</span>
+<span class="">Sun</span>
+</div>
+</div>
+<!-- Credits Chart -->
+<div class="bg-surface-container-low border border-outline-variant rounded p-5 flex flex-col min-h-[320px]">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline-md text-headline-md text-on-surface">Credits Burn</h3>
+<div class="font-mono-code text-body-sm text-tertiary flex items-center gap-2">
+                            Avg: 1.7k / day
+                        </div>
+</div>
+<!-- Faux Chart Canvas for Line Graph -->
+<div class="flex-grow relative border-b border-l border-outline-variant/50 ml-6 mb-4">
+<!-- Y-axis labels -->
+<div class="absolute -left-8 h-full flex flex-col justify-between font-mono-code text-[10px] text-on-surface-variant py-2">
+<span class="">3k</span>
+<span class="">2k</span>
+<span class="">1k</span>
+<span class="">0</span>
+</div>
+<!-- Grid lines -->
+<div class="absolute inset-0 flex flex-col justify-between pointer-events-none">
+<div class="border-t border-outline-variant/10 w-full border-dashed"></div>
+<div class="border-t border-outline-variant/10 w-full border-dashed"></div>
+<div class="border-t border-outline-variant/10 w-full border-dashed"></div>
+</div>
+<!-- CSS SVG Line Path -->
+<div class="absolute inset-0 overflow-hidden pointer-events-none">
+<svg class="w-full h-full stroke-tertiary fill-none" preserveAspectRatio="none" style="stroke-width: 2px;" viewBox="0 0 100 100">
+<path class="drop-shadow-[0_0_8px_rgba(255,185,95,0.4)]" d="M0,80 L15,75 L30,60 L45,65 L60,40 L75,30 L90,45 L100,20"></path>
+<path class="fill-tertiary/10 stroke-none" d="M0,80 L15,75 L30,60 L45,65 L60,40 L75,30 L90,45 L100,20 L100,100 L0,100 Z"></path>
+</svg>
+</div>
+</div>
+<!-- X-axis labels -->
+<div class="flex justify-between ml-6 font-mono-code text-[10px] text-on-surface-variant">
+<span class="">Mon</span>
+<span class="">Tue</span>
+<span class="">Wed</span>
+<span class="">Thu</span>
+<span class="">Fri</span>
+<span class="">Sat</span>
+<span class="">Sun</span>
+</div>
+</div>
+</div>
+<!-- Detail Data Table (High Density) -->
+<div class="bg-surface-container-low border border-outline-variant rounded mt-2 overflow-hidden">
+<div class="px-5 py-4 border-b border-outline-variant flex justify-between items-center bg-surface-container-highest/50">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Usage by Service</h3>
+<button class="font-mono-label text-mono-label text-secondary hover:text-on-surface flex items-center gap-1 transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="download">download</span> CSV
+                    </button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left font-mono-code text-body-sm whitespace-nowrap">
+<thead class="text-on-surface-variant text-[11px] uppercase tracking-wider border-b border-outline-variant">
+<tr>
+<th class="px-5 py-3 font-medium">Service</th>
+<th class="px-5 py-3 font-medium text-right">Ops / Size</th>
+<th class="px-5 py-3 font-medium text-right">Multiplier</th>
+<th class="px-5 py-3 font-medium text-right text-tertiary">Credits Total</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/50 text-on-surface">
+<tr class="hover:bg-surface-container-highest transition-colors">
+<td class="px-5 py-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-on-surface-variant" data-icon="data_object">data_object</span>
+                                    KV Reads
+                                </td>
+<td class="px-5 py-3 text-right">3,142,005</td>
+<td class="px-5 py-3 text-right text-on-surface-variant">0.001</td>
+<td class="px-5 py-3 text-right text-tertiary">3,142</td>
+</tr>
+<tr class="hover:bg-surface-container-highest transition-colors">
+<td class="px-5 py-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-on-surface-variant" data-icon="table">table</span>
+                                    SQL Writes
+                                </td>
+<td class="px-5 py-3 text-right">135,441</td>
+<td class="px-5 py-3 text-right text-on-surface-variant">0.025</td>
+<td class="px-5 py-3 text-right text-tertiary">3,386</td>
+</tr>
+<tr class="hover:bg-surface-container-highest transition-colors">
+<td class="px-5 py-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-on-surface-variant" data-icon="folder">folder</span>
+                                    Storage Base
+                                </td>
+<td class="px-5 py-3 text-right">14.2 GB</td>
+<td class="px-5 py-3 text-right text-on-surface-variant">250.0</td>
+<td class="px-5 py-3 text-right text-tertiary">3,550</td>
+</tr>
+<tr class="hover:bg-surface-container-highest transition-colors">
+<td class="px-5 py-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-on-surface-variant" data-icon="router">router</span>
+                                    Egress
+                                </td>
+<td class="px-5 py-3 text-right">412.5 GB</td>
+<td class="px-5 py-3 text-right text-on-surface-variant">5.64</td>
+<td class="px-5 py-3 text-right text-tertiary">2,327</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="h-12 w-full"></div> <!-- Bottom spacer -->
+</div>
+</main>
+
+
+</body></html>

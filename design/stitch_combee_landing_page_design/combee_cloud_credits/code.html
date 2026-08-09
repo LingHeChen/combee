@@ -1,0 +1,372 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Combee Cloud - Credits</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed-variant": "#3d4756",
+                        "surface-container-highest": "#333535",
+                        "on-surface": "#e2e2e2",
+                        "inverse-on-surface": "#2f3130",
+                        "primary-container": "#0a0a0a",
+                        "on-primary": "#313030",
+                        "primary-fixed-dim": "#c9c6c5",
+                        "tertiary-fixed": "#ffddb8",
+                        "surface-container-low": "#1a1c1c",
+                        "surface-bright": "#383939",
+                        "on-tertiary-fixed-variant": "#653e00",
+                        "tertiary": "#ffb95f",
+                        "background": "#121414",
+                        "surface-dim": "#121414",
+                        "inverse-primary": "#5f5e5e",
+                        "on-primary-fixed-variant": "#474646",
+                        "error": "#ffb4ab",
+                        "primary": "#c9c6c5",
+                        "on-background": "#e2e2e2",
+                        "on-tertiary-container": "#aa6c00",
+                        "on-error": "#690005",
+                        "on-primary-fixed": "#1c1b1b",
+                        "on-surface-variant": "#c4c7c7",
+                        "error-container": "#93000a",
+                        "surface-container-lowest": "#0c0f0e",
+                        "outline-variant": "#444748",
+                        "secondary-container": "#404a59",
+                        "surface-variant": "#333535",
+                        "surface": "#121414",
+                        "surface-tint": "#c9c6c5",
+                        "tertiary-container": "#130800",
+                        "on-error-container": "#ffdad6",
+                        "surface-container": "#1e2020",
+                        "inverse-surface": "#e2e2e2",
+                        "on-secondary-fixed": "#121c2a",
+                        "secondary-fixed": "#d9e3f6",
+                        "on-tertiary": "#472a00",
+                        "secondary": "#bdc7d9",
+                        "on-primary-container": "#7b7979",
+                        "outline": "#8e9192",
+                        "primary-fixed": "#e5e2e1",
+                        "tertiary-fixed-dim": "#ffb95f",
+                        "secondary-fixed-dim": "#bdc7d9",
+                        "on-tertiary-fixed": "#2a1700",
+                        "surface-container-high": "#282a2a",
+                        "on-secondary-container": "#afb9cb",
+                        "on-secondary": "#27313f"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "margin-desktop": "32px",
+                        "container-max": "1280px",
+                        "unit": "4px",
+                        "gutter": "16px",
+                        "margin-mobile": "16px"
+                    },
+                    "fontFamily": {
+                        "body-lg": ["Geist"],
+                        "display-lg": ["Geist"],
+                        "body-sm": ["Geist"],
+                        "headline-md": ["Geist"],
+                        "headline-lg": ["Geist"],
+                        "mono-code": ["JetBrains Mono"],
+                        "headline-lg-mobile": ["Geist"],
+                        "mono-label": ["JetBrains Mono"]
+                    },
+                    "fontSize": {
+                        "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "400" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.04em", "fontWeight": "700" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "500" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "mono-code": ["14px", { "lineHeight": "22px", "letterSpacing": "0em", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "mono-label": ["13px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+        /* Base Styles mapped from Theme */
+        body {
+            background-color: #0A0A0A; /* Using primary-container conceptually as base 0 */
+            color: #e2e2e2;
+            margin: 0;
+            overflow-x: hidden;
+        }
+        
+        .card-surface {
+            background-color: #111111;
+            border: 1px solid #1F2937;
+        }
+
+        .focus-glow:focus-within {
+            box-shadow: 0 0 20px 0 rgba(245, 158, 11, 0.1);
+        }
+
+        /* Material Icons setup */
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        /* Subtle grid background for the tech feel */
+        .tech-bg {
+            background-image: 
+                linear-gradient(to right, #1F2937 1px, transparent 1px),
+                linear-gradient(to bottom, #1F2937 1px, transparent 1px);
+            background-size: 40px 40px;
+            background-position: center center;
+            opacity: 0.1;
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="flex min-h-screen">
+<div class="tech-bg"></div>
+<!-- SideNavBar (Shared Component JSON) -->
+<nav class="hidden md:flex flex-col h-screen w-64 bg-surface-container-low dark:bg-surface-container-low border-r border-outline-variant py-6 px-4 gap-2 flex-shrink-0 sticky top-0">
+<!-- Brand / Header -->
+<div class="mb-8 px-2 flex items-center gap-3">
+<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuAQWfnyn1ObSoD-mG05ArkuPSLVImRBnNQ0E1XfzKPzMSHm6Su6wBYd-6N4wErfDVEixC73QrrQBDw3nMjKUeKd4_Ieg8ol7VHXQebEgeK185Ee3Gi4-OxgTnXhXf4qhjo3doBnuVE_YFDE2KRKOe4cV6Tc8vMLVAnROBaOY8lxSe0MENiFwG6Gv8YsrO0Sj9-KWMoJKvIIf_zikQgXX1IszCK8aP5wkqzHu2DTAIEUtkzGcxh1sUAm3Cd-JPSV9c-ifOk" alt="Combee Cloud Logo" class="h-8 w-8 object-contain">
+<div>
+<div class="text-headline-md font-headline-md font-bold text-on-surface dark:text-on-surface">Combee Cloud</div>
+<div class="font-mono-label text-mono-label text-on-surface-variant">v2.4.0-stable</div>
+</div>
+</div>
+<!-- CTA -->
+<button class="mb-6 w-full py-2 px-4 bg-tertiary text-primary-container font-headline-md text-headline-md rounded hover:bg-tertiary-fixed transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[20px]" data-icon="add">add</span>
+            Create Cell
+        </button>
+<!-- Navigation Links -->
+<div class="flex-1 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="dashboard">dashboard</span>
+<span class="font-mono-label text-mono-label">Overview</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="hive">hive</span>
+<span class="font-mono-label text-mono-label">Cells</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="key">key</span>
+<span class="font-mono-label text-mono-label">API Keys</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="bar_chart">bar_chart</span>
+<span class="font-mono-label text-mono-label">Usage</span>
+</a>
+<!-- Active State -->
+<a class="flex items-center gap-3 px-3 py-2 rounded bg-tertiary-container text-tertiary font-bold border-r-2 border-tertiary scale-[0.99] transition-transform" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="account_balance_wallet">account_balance_wallet</span>
+<span class="font-mono-label text-mono-label">Credits</span>
+</a>
+</div>
+<!-- Footer Links -->
+<div class="mt-auto flex flex-col gap-1 border-t border-outline-variant pt-4">
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="menu_book">menu_book</span>
+<span class="font-mono-label text-mono-label">Docs</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="contact_support">contact_support</span>
+<span class="font-mono-label text-mono-label">Support</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 flex flex-col min-h-screen">
+<!-- TopNavBar (Shared Component JSON - Mobile View context handling) -->
+<header class="md:hidden flex justify-between items-center h-16 px-gutter w-full bg-surface-dim/80 dark:bg-surface-dim/80 backdrop-blur-md border-b border-outline-variant sticky top-0 z-50">
+<div class="font-mono-code text-mono-code uppercase tracking-widest text-on-surface"><div class="flex items-center gap-2"><img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDnaoRCjZH6LqRjh0_r9tBX5j8nCXaHdma07paAtj8x9f2nYJ-nqrzu2SHImz36F5uBrOl9SnODs4J2FkVGo5EB5WzJUt-b4_41pWfA-ussOL64_plyBD-KllgDLRPB4yq_o-OkYwmLUnpiVY7AHJMZo6CmUUvSgU5_xflZ98n5bkSqw85rGew1l3lLKB-YfljEpZg1ml-ZAaAed8cMXr8Q_qte8Od5Ol4gyHa3kIqmJjZQHBpWNiifpq97gPDSPWwTNKw" alt="" class="h-6 w-6 object-contain"><span class="">Combee Cloud</span></div></div>
+<div class="flex gap-4">
+<button class="text-on-surface-variant hover:text-tertiary transition-all duration-200">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-tertiary transition-all duration-200">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<div class="w-8 h-8 rounded bg-surface-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A macro shot of a geometric, glowing digital avatar on a dark screen. The avatar is composed of sharp, angular lines in deep amber and slate grey, representing a user profile in a high-tech developer environment. The lighting is low and moody, emphasizing the bright UI elements." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBL4NuwhbOA8_ZoRK7HFJlDcLe78dv6e3rD27gvlHkSqcUFvFgbeP7_hhQB3ouFtNgBHP2-Mvig7STAe-7iXggj8pdyQ9sdtBXUNNI4ZGqI-4kX2LksT1deRwjcsnWGkzv8k14mVuAREMsg2Lobd_LHojcmP1Pd243GmrSSnC9d-sNJR6ukBPs06FMpAqdA4AWNBcBd6Se8gY2nueojZJluKp8JKjPSe-g5vIR7tE6EI-CWlHy6njWgAg">
+</div>
+</div>
+</header>
+<!-- Canvas -->
+<main class="flex-1 p-margin-mobile md:p-margin-desktop max-w-container-max mx-auto w-full flex flex-col gap-8">
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div>
+<h1 class="font-display-lg text-display-lg text-on-surface hidden md:block">Credits</h1>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface md:hidden">Credits</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant mt-2 max-w-2xl">
+                        Manage your platform balance, view transaction history, and redeem vouchers.
+                    </p>
+</div>
+<div class="flex gap-4">
+<button class="px-6 py-2 border border-[#1F2937] text-[#FAFAF9] font-mono-label text-mono-label rounded hover:bg-surface-container-highest transition-colors focus:ring-1 focus:ring-tertiary/30 outline-none">
+                        Buy Credits
+                    </button>
+<button class="px-6 py-2 bg-[#F59E0B] text-[#0A0A0A] font-mono-label text-mono-label rounded hover:bg-opacity-90 transition-colors focus:ring-1 focus:ring-tertiary/30 outline-none">
+                        Redeem Code
+                    </button>
+</div>
+</div>
+<!-- Bento Grid: Top Section -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-gutter">
+<!-- Primary Balance Card -->
+<div class="card-surface rounded-lg p-6 md:col-span-8 flex flex-col justify-between relative overflow-hidden group focus-glow" tabindex="0">
+<!-- Subtle Glow Effect on Hover/Focus inside card -->
+<div class="absolute inset-0 bg-tertiary opacity-0 group-hover:opacity-5 transition-opacity duration-300 pointer-events-none blur-3xl"></div>
+<div class="flex justify-between items-start mb-8 relative z-10">
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface-variant flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px]" data-icon="account_balance_wallet">account_balance_wallet</span>
+                                Available Credits
+                            </h2>
+</div>
+<div class="font-mono-code text-mono-code text-on-surface-variant opacity-50 border border-outline-variant px-2 py-1 rounded text-[12px]">
+                            ID: BAL-8992
+                        </div>
+</div>
+<div class="relative z-10 flex items-baseline gap-2">
+<span class="text-[64px] font-bold font-mono-code leading-none text-tertiary tracking-tight">12,840.52</span>
+<span class="font-headline-md text-headline-md text-tertiary-fixed-dim/70">CRD</span>
+</div>
+<!-- decorative hex graphic -->
+<div class="absolute right-[-10%] bottom-[-20%] opacity-10 pointer-events-none">
+<svg fill="none" height="200" viewBox="0 0 100 100" width="200" xmlns="http://www.w3.org/2000/svg">
+<path d="M50 0L93.3013 25V75L50 100L6.69873 75V25L50 0Z" stroke="#ffb95f" stroke-width="2"></path>
+<path d="M50 10L84.641 30V70L50 90L15.359 70V30L50 10Z" stroke="#ffb95f" stroke-width="1"></path>
+</svg>
+</div>
+</div>
+<!-- Secondary Info: Consumed & Estimated -->
+<div class="flex flex-col gap-gutter md:col-span-4">
+<!-- Consumed -->
+<div class="card-surface rounded-lg p-6 flex-1 flex flex-col justify-center focus-glow" tabindex="0">
+<div class="font-mono-label text-mono-label text-on-surface-variant mb-2 uppercase tracking-wider">Consumed (MTD)</div>
+<div class="font-headline-lg text-headline-lg text-on-surface">3,245.00</div>
+<div class="mt-2 flex items-center gap-2">
+<span class="material-symbols-outlined text-error text-[16px]" data-icon="trending_up">trending_up</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">12% vs last month</span>
+</div>
+</div>
+<!-- Estimated Remaining -->
+<div class="card-surface rounded-lg p-6 flex-1 flex flex-col justify-center focus-glow" tabindex="0">
+<div class="font-mono-label text-mono-label text-on-surface-variant mb-2 uppercase tracking-wider">Est. Remaining Usage</div>
+<div class="font-headline-lg text-headline-lg text-on-surface">~48 Days</div>
+<div class="mt-4 h-1 w-full bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-primary w-2/3"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Transaction History Table -->
+<div class="card-surface rounded-lg flex flex-col mt-4">
+<div class="p-6 border-b border-[#1F2937] flex justify-between items-center">
+<h3 class="font-headline-md text-headline-md text-on-surface">Transaction History</h3>
+<button class="text-on-surface-variant hover:text-tertiary transition-colors">
+<span class="material-symbols-outlined" data-icon="filter_list">filter_list</span>
+</button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-[#1F2937] bg-surface-container-low/50">
+<th class="p-4 font-mono-label text-mono-label text-on-surface-variant uppercase tracking-wider font-medium w-32">Date</th>
+<th class="p-4 font-mono-label text-mono-label text-on-surface-variant uppercase tracking-wider font-medium">Type</th>
+<th class="p-4 font-mono-label text-mono-label text-on-surface-variant uppercase tracking-wider font-medium">Description</th>
+<th class="p-4 font-mono-label text-mono-label text-on-surface-variant uppercase tracking-wider font-medium text-right">Amount</th>
+<th class="p-4 font-mono-label text-mono-label text-on-surface-variant uppercase tracking-wider font-medium text-right">Balance</th>
+</tr>
+</thead>
+<tbody class="font-mono-code text-mono-code text-on-surface divide-y divide-[#1F2937]">
+<tr class="hover:bg-surface-container-highest/50 transition-colors group">
+<td class="p-4 text-on-surface-variant">2023-10-24</td>
+<td class="p-4">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[12px] bg-[#1F2937]/50 text-on-surface border border-[#1F2937]">
+<div class="w-2 h-2 rounded-sm bg-outline transform rotate-45"></div>
+                                        Usage
+                                    </span>
+</td>
+<td class="p-4 text-on-surface-variant">Daily Compute - US East (N. Virginia)</td>
+<td class="p-4 text-right text-error font-medium">-45.20</td>
+<td class="p-4 text-right">12,840.52</td>
+</tr>
+<tr class="hover:bg-surface-container-highest/50 transition-colors group">
+<td class="p-4 text-on-surface-variant">2023-10-23</td>
+<td class="p-4">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[12px] bg-[#1F2937]/50 text-on-surface border border-[#1F2937]">
+<div class="w-2 h-2 rounded-sm bg-outline transform rotate-45"></div>
+                                        Usage
+                                    </span>
+</td>
+<td class="p-4 text-on-surface-variant">Daily Compute - US East (N. Virginia)</td>
+<td class="p-4 text-right text-error font-medium">-42.80</td>
+<td class="p-4 text-right">12,885.72</td>
+</tr>
+<tr class="hover:bg-surface-container-highest/50 transition-colors group">
+<td class="p-4 text-on-surface-variant">2023-10-22</td>
+<td class="p-4">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[12px] bg-[#1F2937]/50 text-on-surface border border-[#1F2937]">
+<div class="w-2 h-2 rounded-sm bg-tertiary transform rotate-45"></div>
+                                        Voucher
+                                    </span>
+</td>
+<td class="p-4 text-on-surface-variant">Startup Program Tier 1 Grant</td>
+<td class="p-4 text-right text-tertiary font-medium">+10,000.00</td>
+<td class="p-4 text-right">12,928.52</td>
+</tr>
+<tr class="hover:bg-surface-container-highest/50 transition-colors group">
+<td class="p-4 text-on-surface-variant">2023-10-21</td>
+<td class="p-4">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[12px] bg-[#1F2937]/50 text-on-surface border border-[#1F2937]">
+<div class="w-2 h-2 rounded-sm bg-primary transform rotate-45"></div>
+                                        Grant
+                                    </span>
+</td>
+<td class="p-4 text-on-surface-variant">Monthly Recurring Subscription</td>
+<td class="p-4 text-right text-primary font-medium">+3,000.00</td>
+<td class="p-4 text-right">2,928.52</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="p-4 border-t border-[#1F2937] flex justify-center">
+<button class="font-mono-label text-mono-label text-on-surface-variant hover:text-tertiary transition-colors flex items-center gap-2">
+                        View Older Transactions
+                        <span class="material-symbols-outlined text-[16px]" data-icon="arrow_downward">arrow_downward</span>
+</button>
+</div>
+</div>
+</main>
+</div>
+
+
+</body></html>

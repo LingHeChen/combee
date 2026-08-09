@@ -29,6 +29,7 @@ pub fn test_app(max_active: usize) -> (Router, Arc<LocalDataNodeClient>, tempfil
         kv_cache_capacity: 100_000,
         kv_durability: KvDurability::Normal,
         sql_timeout: Some(std::time::Duration::from_secs(5)),
+        quota: Default::default(),
     }));
     let client = Arc::new(LocalDataNodeClient::new(node));
     let provider: Arc<dyn DataNodeProvider> = Arc::new(LocalProvider::new(client.clone()));
@@ -49,6 +50,8 @@ pub fn test_app(max_active: usize) -> (Router, Arc<LocalDataNodeClient>, tempfil
         usage: usage_meter,
         pricing: pricing_meter,
         admin_token: None,
+        quota: Default::default(),
+        concurrency: Default::default(),
     };
     (build_app(state), client, dir)
 }
@@ -60,7 +63,8 @@ pub async fn test_app_with_keys(keys: &[&str]) -> (Router, tempfile::TempDir) {
     // Key 模式下需先在元数据中预置 key 哈希(明文仅存在于调用方)
     for k in keys {
         metadata
-            .create_api_key(DEFAULT_TENANT, combee_common::api_key::hash(k))
+            .create_api_key(DEFAULT_TENANT, combee_common::api_key::hash(k), "default")
+
             .await
             .unwrap();
     }
@@ -72,6 +76,7 @@ pub async fn test_app_with_keys(keys: &[&str]) -> (Router, tempfile::TempDir) {
         kv_cache_capacity: 100_000,
         kv_durability: KvDurability::Normal,
         sql_timeout: Some(std::time::Duration::from_secs(5)),
+        quota: Default::default(),
     }));
     let client = Arc::new(LocalDataNodeClient::new(node));
     let provider: Arc<dyn DataNodeProvider> = Arc::new(LocalProvider::new(client));
@@ -92,6 +97,8 @@ pub async fn test_app_with_keys(keys: &[&str]) -> (Router, tempfile::TempDir) {
         usage: usage_meter,
         pricing: pricing_meter,
         admin_token: None,
+        quota: Default::default(),
+        concurrency: Default::default(),
     };
     (build_app(state), dir)
 }

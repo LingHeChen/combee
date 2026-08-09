@@ -1,0 +1,369 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Combee Cloud - Cell Detail (Replication)</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary-fixed-variant": "#3d4756",
+                      "surface-container-highest": "#333535",
+                      "on-surface": "#e2e2e2",
+                      "inverse-on-surface": "#2f3130",
+                      "primary-container": "#0a0a0a",
+                      "on-primary": "#313030",
+                      "primary-fixed-dim": "#c9c6c5",
+                      "tertiary-fixed": "#ffddb8",
+                      "surface-container-low": "#1a1c1c",
+                      "surface-bright": "#383939",
+                      "on-tertiary-fixed-variant": "#653e00",
+                      "tertiary": "#ffb95f",
+                      "background": "#121414",
+                      "surface-dim": "#121414",
+                      "inverse-primary": "#5f5e5e",
+                      "on-primary-fixed-variant": "#474646",
+                      "error": "#ffb4ab",
+                      "primary": "#c9c6c5",
+                      "on-background": "#e2e2e2",
+                      "on-tertiary-container": "#aa6c00",
+                      "on-error": "#690005",
+                      "on-primary-fixed": "#1c1b1b",
+                      "on-surface-variant": "#c4c7c7",
+                      "error-container": "#93000a",
+                      "surface-container-lowest": "#0c0f0e",
+                      "outline-variant": "#444748",
+                      "secondary-container": "#404a59",
+                      "surface-variant": "#333535",
+                      "surface": "#121414",
+                      "surface-tint": "#c9c6c5",
+                      "tertiary-container": "#130800",
+                      "on-error-container": "#ffdad6",
+                      "surface-container": "#1e2020",
+                      "inverse-surface": "#e2e2e2",
+                      "on-secondary-fixed": "#121c2a",
+                      "secondary-fixed": "#d9e3f6",
+                      "on-tertiary": "#472a00",
+                      "secondary": "#bdc7d9",
+                      "on-primary-container": "#7b7979",
+                      "outline": "#8e9192",
+                      "primary-fixed": "#e5e2e1",
+                      "tertiary-fixed-dim": "#ffb95f",
+                      "secondary-fixed-dim": "#bdc7d9",
+                      "on-tertiary-fixed": "#2a1700",
+                      "surface-container-high": "#282a2a",
+                      "on-secondary-container": "#afb9cb",
+                      "on-secondary": "#27313f"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "margin-desktop": "32px",
+                      "container-max": "1280px",
+                      "unit": "4px",
+                      "gutter": "16px",
+                      "margin-mobile": "16px"
+              },
+              "fontFamily": {
+                      "body-lg": [
+                              "Geist"
+                      ],
+                      "display-lg": [
+                              "Geist"
+                      ],
+                      "body-sm": [
+                              "Geist"
+                      ],
+                      "headline-md": [
+                              "Geist"
+                      ],
+                      "headline-lg": [
+                              "Geist"
+                      ],
+                      "mono-code": [
+                              "JetBrains Mono"
+                      ],
+                      "headline-lg-mobile": [
+                              "Geist"
+                      ],
+                      "mono-label": [
+                              "JetBrains Mono"
+                      ]
+              },
+              "fontSize": {
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "letterSpacing": "0em",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "display-lg": [
+                              "48px",
+                              {
+                                      "lineHeight": "56px",
+                                      "letterSpacing": "-0.04em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-sm": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "letterSpacing": "0em",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-md": [
+                              "20px",
+                              {
+                                      "lineHeight": "28px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "mono-code": [
+                              "14px",
+                              {
+                                      "lineHeight": "22px",
+                                      "letterSpacing": "0em",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "mono-label": [
+                              "13px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.02em",
+                                      "fontWeight": "500"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col md:flex-row antialiased">
+<!-- SideNavBar (Hidden on Mobile) -->
+<nav class="hidden md:flex flex-col h-screen w-64 bg-surface-container-low dark:bg-surface-container-low border-r border-outline-variant py-6 px-4 gap-2 docked left-0 flex-shrink-0 sticky top-0">
+<div class="mb-8 px-2 flex items-center gap-3">
+<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCPLMX_rJn2G2Vz7QwLZ2K1uTW4XiQePFiTCgK5Dtl6yNYCKcyyleinfMN7hBikatO7-VePsi6HiZ8xCbJNBLDeB5va_omVm0dshSofaQjCVqe-4anAi1J80lqsRqTz9njTDZluJ_igY3wB0i8Hv6gQKBSjnHic2ha-TckAs_393psIH5sSuqeiMb7i9BVL82lI7QQJjnWBuluiL6ftMNebh8jHjOR5xqUBDo9H2Y4tDAsTrYKEmdmEXA3ChvtVlRuiTl0" alt="Combee Cloud Logo" class="w-8 h-8 object-cover">
+<div>
+<h1 class="text-headline-md font-headline-md font-bold text-on-surface dark:text-on-surface">Combee Cloud</h1>
+<p class="font-mono-label text-mono-label text-on-surface-variant">v2.4.0-stable</p>
+</div>
+</div>
+<button class="w-full bg-[#F59E0B] hover:bg-tertiary-fixed text-[#0A0A0A] font-body-sm text-body-sm font-medium py-2 px-4 rounded transition-colors mb-6 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">add</span>
+            Create Cell
+        </button>
+<div class="flex-1 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 font-mono-label text-mono-label" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+                Overview
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded bg-tertiary-container text-tertiary font-bold border-r-2 border-tertiary scale-[0.99] transition-transform font-mono-label text-mono-label" href="#">
+<span class="material-symbols-outlined" data-icon="hive">hive</span>
+                Cells
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 font-mono-label text-mono-label" href="#">
+<span class="material-symbols-outlined" data-icon="key">key</span>
+                API Keys
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 font-mono-label text-mono-label" href="#">
+<span class="material-symbols-outlined" data-icon="bar_chart">bar_chart</span>
+                Usage
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 font-mono-label text-mono-label" href="#">
+<span class="material-symbols-outlined" data-icon="account_balance_wallet">account_balance_wallet</span>
+                Credits
+            </a>
+</div>
+<div class="mt-auto border-t border-outline-variant pt-4 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 font-mono-label text-mono-label" href="#">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span>
+                Docs
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-highest transition-colors duration-150 font-mono-label text-mono-label" href="#">
+<span class="material-symbols-outlined" data-icon="contact_support">contact_support</span>
+                Support
+            </a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 flex flex-col min-w-0">
+<!-- TopNavBar (Web & Mobile) -->
+<header class="flex justify-between items-center h-16 px-gutter w-full ml-auto bg-surface-dim/80 dark:bg-surface-dim/80 backdrop-blur-md docked top-0 border-b border-outline-variant sticky z-10 flex-shrink-0">
+<div class="flex items-center gap-4">
+<!-- Mobile Menu Toggle -->
+<button class="md:hidden text-on-surface-variant hover:text-tertiary transition-colors">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDt57BM_Nh-P6GdEaQRk-1C01BZfmICUHVnEIdRE3QTxEIEkowokZHbRe2E8YkjyRh9qssfuzYZ4vTcQ7HDfErRT5YrPItj85uI_g9AuSGqzqnwsId_Kffw5308LwsH7Kyd92DseIfS-FLJjzdmzcBbFT5iWoT0jWTxvzpowCX9c9H52Q7WpeWqiN4i9utNKkN-VrF6mCpWUqp_AR65buVEvWtg27YH8F2uwt1AdVo8v1XrVQB3rfIAsT1H2Q73qnuTbzY" alt="Combee Cloud Logo" class="w-8 h-8 object-cover md:hidden">
+</div>
+<nav class="hidden md:flex gap-6 items-center">
+<a class="text-on-surface-variant hover:text-on-surface pb-2 hover:text-tertiary transition-all duration-200 font-body-sm text-body-sm" href="#">Projects</a>
+<a class="text-tertiary border-b-2 border-tertiary pb-2 hover:text-tertiary transition-all duration-200 font-body-sm text-body-sm" href="#">Regions</a>
+<a class="text-on-surface-variant hover:text-on-surface pb-2 hover:text-tertiary transition-all duration-200 font-body-sm text-body-sm" href="#">Network</a>
+</nav>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:text-tertiary transition-colors">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-tertiary transition-colors">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<div class="w-8 h-8 rounded bg-surface-container-high border border-outline-variant overflow-hidden">
+<img alt="User profile avatar" class="w-full h-full object-cover" data-alt="A small, stylized avatar image representing a generic user profile. The image should be abstract, perhaps a geometric shape or a simple, minimalist icon in shades of grey and amber on a dark background, fitting a professional developer tool aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA8iJSmdwIB-N4sF8WN1NNRMRlM07XozaZtqANlk0jBSo1Fk3KHux5pPDJcxZZ4E_OOZE1eTYNbWtSKEr2zeiJ6p-1PJWJC6w_1Kqc43boT-FCr8AHiDC504hwbr1S2N2oU8IRllfr0_S5onyAvVlBxBoATTsE581lnRw-ht5HOWexbhxUV574JCM3I6XrY_u9KXczEDsGPUIqCLNttYuoKp0iH_h_7h3Z4IMEOSJMBTCPen0ojVfMArw">
+</div>
+</div>
+</header>
+<!-- Canvas -->
+<main class="flex-1 p-margin-mobile md:p-margin-desktop overflow-y-auto">
+<div class="max-w-container-max mx-auto space-y-8">
+<!-- Page Header -->
+<div>
+<div class="flex items-center gap-2 text-on-surface-variant font-mono-code text-mono-code mb-2">
+<span class="">Cells</span>
+<span class="material-symbols-outlined text-sm">chevron_right</span>
+<span class="text-on-surface">production-db-alpha</span>
+</div>
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-on-surface">Cell Details</h2>
+</div>
+<!-- Tabs -->
+<div class="flex border-b border-outline-variant gap-6">
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface pb-2" href="#">Overview</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface pb-2" href="#">Metrics</a>
+<a class="font-body-sm text-body-sm text-tertiary border-b-2 border-tertiary pb-2" href="#">Replication</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface pb-2" href="#">Settings</a>
+</div>
+<!-- Replication Content -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+<!-- Left Column: Status & Metrics -->
+<div class="md:col-span-8 space-y-6">
+<!-- Main Status Card -->
+<div class="bg-surface-container-low border border-[#1F2937] rounded-lg p-6 relative overflow-hidden group">
+<!-- Subtle Glow on hover -->
+<div class="absolute inset-0 bg-tertiary opacity-0 group-hover:opacity-5 transition-opacity duration-300 blur-xl"></div>
+<div class="flex justify-between items-start mb-6 relative z-10">
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-1">Primary to Secondary Sync</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Continuous logical replication active.</p>
+</div>
+<div class="bg-[#1F2937]/50 border border-[#1F2937] px-3 py-1 rounded font-mono-label text-mono-label text-on-surface">
+                                    REP-09A4
+                                </div>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 relative z-10">
+<div class="bg-background border border-[#374151] rounded p-4 flex flex-col gap-2">
+<span class="font-mono-label text-mono-label text-on-surface-variant uppercase tracking-wider">Status</span>
+<div class="flex items-center gap-2">
+<svg class="text-tertiary animate-pulse" fill="currentColor" height="8" viewBox="0 0 8 8" width="8" xmlns="http://www.w3.org/2000/svg">
+<polygon points="4,0 7.464,2 7.464,6 4,8 0.536,6 0.536,2"></polygon>
+</svg>
+<span class="font-body-lg text-body-lg text-on-surface font-medium">Healthy</span>
+</div>
+</div>
+<div class="bg-background border border-[#374151] rounded p-4 flex flex-col gap-2">
+<span class="font-mono-label text-mono-label text-on-surface-variant uppercase tracking-wider">Replica</span>
+<span class="font-body-lg text-body-lg text-on-surface font-medium">Enabled</span>
+</div>
+<div class="bg-background border border-[#374151] rounded p-4 flex flex-col gap-2">
+<span class="font-mono-label text-mono-label text-on-surface-variant uppercase tracking-wider">Region</span>
+<span class="font-body-sm text-body-sm text-on-surface font-medium truncate">US-East-1 (Secondary)</span>
+</div>
+</div>
+</div>
+<!-- Metrics Bento Box -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+<div class="bg-surface-container-low border border-[#1F2937] rounded-lg p-6 flex flex-col justify-between">
+<div class="flex items-center gap-2 mb-4 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">schedule</span>
+<span class="font-mono-label text-mono-label uppercase">Replication Lag</span>
+</div>
+<div class="flex items-baseline gap-1">
+<span class="font-display-lg text-display-lg text-on-surface">120</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">ms</span>
+</div>
+</div>
+<div class="bg-surface-container-low border border-[#1F2937] rounded-lg p-6 flex flex-col justify-between">
+<div class="flex items-center gap-2 mb-4 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">sync</span>
+<span class="font-mono-label text-mono-label uppercase">Last Sync</span>
+</div>
+<div class="flex items-baseline gap-1">
+<span class="font-display-lg text-display-lg text-on-surface">3</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">s ago</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Controls & Advanced -->
+<div class="md:col-span-4 space-y-6">
+<!-- Quick Actions -->
+<div class="bg-surface-container-low border border-[#1F2937] rounded-lg p-6">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-4">Controls</h3>
+<div class="flex flex-col gap-3">
+<button class="w-full bg-transparent border border-[#1F2937] text-[#FAFAF9] hover:bg-surface-container-highest font-body-sm text-body-sm py-2 px-4 rounded transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="power_settings_new">power_settings_new</span>
+                                    Disable Replica
+                                </button>
+<button class="w-full bg-[#1F2937] border border-[#374151] text-[#FAFAF9] opacity-50 cursor-not-allowed font-body-sm text-body-sm py-2 px-4 rounded flex items-center justify-center gap-2" disabled="">
+<span class="material-symbols-outlined text-sm" data-icon="play_arrow">play_arrow</span>
+                                    Enable Replica
+                                </button>
+</div>
+</div>
+<!-- Advanced Operations -->
+<div class="bg-surface-container-low border border-[#1F2937] rounded-lg overflow-hidden" id="advanced-ops">
+<button class="w-full p-4 flex justify-between items-center bg-surface-container-low hover:bg-surface-container-highest transition-colors border-b border-[#1F2937]" onclick="document.getElementById('advanced-content').classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180')">
+<span class="font-headline-md text-headline-md text-on-surface">Advanced Operations</span>
+<span class="material-symbols-outlined text-on-surface-variant chevron transition-transform duration-200">expand_more</span>
+</button>
+<div class="hidden p-6 space-y-4 bg-background" id="advanced-content">
+<p class="font-body-sm text-body-sm text-on-surface-variant">Manual failover will promote the secondary replica to primary. This action may cause brief downtime.</p>
+<div class="bg-error-container/10 border border-error/20 p-4 rounded-lg">
+<label class="block font-mono-label text-mono-label text-on-surface mb-2">Type cell name to confirm:</label>
+<input class="w-full bg-[#0A0A0A] border border-[#374151] rounded px-3 py-2 font-mono-code text-mono-code text-on-surface focus:border-tertiary focus:ring-1 focus:ring-tertiary outline-none transition-colors" placeholder="production-db-alpha" type="text">
+</div>
+<button class="w-full bg-error text-on-error font-body-sm text-body-sm font-medium py-2 px-4 rounded transition-colors hover:bg-error/90 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">warning</span>
+                                    Initiate Failover
+                                </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+
+
+</body></html>

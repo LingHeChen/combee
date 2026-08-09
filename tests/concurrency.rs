@@ -5,7 +5,7 @@
 //! - 同一 Cell 的并发 SET 必须 last-writer-wins(值不撕裂、不报错);
 //! - 不同 Cell 的并发 SQL 写入互不干扰。
 //!
-//! 每个测试的目的与预期结果见 `docs/TESTING.md`。
+//! 每个测试的目的与预期结果见 `artifacts/engineering/TESTING.md`。
 
 mod common;
 

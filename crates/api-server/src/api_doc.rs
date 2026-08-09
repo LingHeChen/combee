@@ -2,7 +2,7 @@
 //! SDK / Console / Docs / contract tests 的共同机器契约。
 //!
 //! 只暴露 **Public API**(Data Plane + User Control Plane);
-//! `/internal/*`、`/rpc/*`、`/admin/*` 不进 OpenAPI(见 docs/API.md 分层)。
+//! `/internal/*`、`/rpc/*`、`/admin/*` 不进 OpenAPI(见 artifacts/engineering/API.md 分层)。
 
 use utoipa::OpenApi;
 

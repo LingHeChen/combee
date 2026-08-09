@@ -1,0 +1,475 @@
+---
+title: Python API
+description: Full API reference for the combee package — every method with signatures and examples.
+since: 0.1.0-beta
+status: stable
+---
+
+The official Python SDK is published on PyPI as **`combee`**. It ships both sync and async APIs
+(`a`-prefixed). Every method below maps to a REST endpoint documented in [REST API](./rest-api)
+(with curl examples).
+
+## Install
+
+```bash
+pip install combee
+```
+
+## Client
+
+```python
+import os
+from combee import Combee, AsyncCombee
+
+combee = Combee(
+    base_url="https://api.combee.cloud",
+    api_key=os.environ["COMBEE_API_KEY"],
+    timeout_ms=30_000,  # optional, default 30000
+)
+
+# Async twin:
+# async_combee = AsyncCombee(base_url=..., api_key=...)
+```
+
+`Combee` can be used as a context manager (auto-closes the HTTP client); `AsyncCombee` supports
+`async with`. Amounts and balances are decimal strings — never floats.
+
+### `combee.cell(cell_id) -> Cell`
+
+Binds a Cell by id locally — no request is sent until the first method call.
+
+```python
+cell = combee.cell("2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b")
+cell.sql.query("SELECT 1")
+```
+
+## Cells — `combee.cells`
+
+### `create(name=None, region=None) -> Cell`
+
+Creates a new Cell. **Strict**: if `name` is already used in the account it raises
+`CellAlreadyExistsError` (409). Use [`ensure`](#ensurename---cell) for an idempotent get-or-create.
+REST: [`POST /v1/databases`](./rest-api#create-a-cell). Async: `acreate`.
+
+```python
+cell = combee.cells.create(name="my-app")
+print(cell.id, cell.name)
+```
+
+Errors: `CellAlreadyExistsError` (409), `InvalidCellNameError` (400).
+
+### `ensure(name) -> Cell`
+
+Idempotent get-or-create by name: creates the Cell if it does not exist, otherwise reuses it.
+Recommended at application startup. REST: [`PUT /v1/databases/by-name/{name}`](./rest-api#ensure-a-cell).
+Async: `aensure`.
+
+```python
+cell = combee.cells.ensure("my-app")
+```
+
+### `get_by_name(name) -> Cell`
+
+Looks up a Cell by name; raises `CellNotFoundError` (404) when it does not exist.
+REST: [`GET /v1/databases/by-name/{name}`](./rest-api#get-a-cell-by-name). Async: `aget_by_name`.
+
+```python
+cell = combee.cells.get_by_name("my-app")
+```
+
+### `get(cell_id) -> Cell`
+
+Returns a Cell handle and verifies it exists (via the list endpoint). Async: `aget`.
+
+```python
+cell = combee.cells.get("2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b")
+```
+
+### `list(limit=100, cursor=None) -> dict`
+
+Lists the account's Cells. Returns `{"items": [...], "next_cursor": None}`.
+REST: [`GET /v1/databases`](./rest-api#list-cells). Async: `alist`.
+
+```python
+for c in combee.cells.list()["items"]:
+    print(c["id"], c["state"])
+```
+
+### `delete(cell_id) -> None`
+
+Deletes a Cell permanently. REST: [`DELETE /v1/databases/{id}`](./rest-api#delete-a-cell).
+Async: `adelete`.
+
+```python
+combee.cells.delete(cell.id)
+```
+
+## Cell — `cell`
+
+### `info() -> dict`
+
+Fetches the Cell's metadata (`id`, `tenant_id`, `state`, `created_at`, `storage_node_id`).
+Async: `ainfo`.
+
+```python
+info = cell.info()
+```
+
+### `delete() -> None`
+
+Deletes this Cell. Async: `adelete`.
+
+```python
+cell.delete()
+```
+
+### `rename(name) -> dict`
+
+Renames the Cell; the `id` is preserved. Raises `CellNameConflictError` (409) when the name is taken,
+`InvalidCellNameError` (400) for invalid names. REST: [`PATCH /v1/databases/{id}`](./rest-api#rename-a-cell).
+Async: `arename`.
+
+```python
+updated = cell.rename("blog-prod-v2")
+print(updated["name"])
+```
+
+### `reset() -> dict`
+
+Wipes all SQL and KV data; the `id` and `name` are preserved. Destructive — no undo.
+REST: [`POST /v1/databases/{id}/reset`](./rest-api#reset-a-cell). Async: `areset`.
+
+```python
+cell.reset()
+```
+
+## SQL — `cell.sql`
+
+### `query(sql, params=None) -> dict`
+
+Runs a read-only statement (`SELECT`, `WITH`, `PRAGMA`, `EXPLAIN`) and maps each row to a dict.
+REST: [`POST /v1/databases/{id}/sql`](./rest-api#execute-a-statement). Async: `aquery`.
+
+```python
+result = cell.sql.query("SELECT id, title FROM posts WHERE id = ?", [1])
+# {"columns": ["id", "title"], "rows": [{"id": 1, "title": "Hello"}]}
+```
+
+### `execute(sql, params=None) -> dict`
+
+Runs a write statement or DDL. Returns `{"rows_affected": ..., "last_insert_rowid": ...}`.
+REST: [`POST /v1/databases/{id}/sql`](./rest-api#execute-a-statement). Async: `aexecute`.
+
+```python
+cell.sql.execute("CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT)")
+result = cell.sql.execute("INSERT INTO posts (title) VALUES (?)", ["Hello"])
+print(result["rows_affected"])  # 1
+```
+
+### `transaction(statements) -> list`
+
+Runs a list of statements atomically. REST: [`POST /v1/databases/{id}/transaction`](./rest-api#run-a-transaction).
+Async: `atransaction`.
+
+```python
+results = cell.sql.transaction([
+    {"sql": "UPDATE accounts SET balance = balance - 100 WHERE id = ?", "params": [1]},
+    {"sql": "UPDATE accounts SET balance = balance + 100 WHERE id = ?", "params": [2]},
+])
+```
+
+## KV — `cell.kv`
+
+All keys are URL-encoded automatically by the SDK. Async methods: only `aget` / `aset` / `adelete` /
+`aincr` exist in v0.1.0-beta.
+
+### `get(key) -> Optional[str]`
+
+REST: [`GET /v1/databases/{id}/kv/{key}`](./rest-api#get-a-value). Async: `aget`.
+
+```python
+value = cell.kv.get("greeting")  # "hello", or None when missing
+```
+
+### `get_json(key) -> Any`
+
+`get` + `json.loads`.
+
+```python
+config = cell.kv.get_json("config")
+```
+
+### `set(key, value, ttl=None, condition=None) -> bool`
+
+REST: [`PUT /v1/databases/{id}/kv/{key}`](./rest-api#set-a-value). Returns whether the write happened
+(`False` when an `nx` / `xx` condition is not met). Async: `aset`.
+
+| Argument | Description |
+|---|---|
+| `ttl` | TTL in seconds; omitted = persistent |
+| `condition` | `"nx"` or `"xx"` — conditional write (see [NX / XX](../kv/nx-xx)) |
+
+```python
+written = cell.kv.set("greeting", "hello", ttl=60)
+acquired = cell.kv.set("lock:deploy", "running", ttl=30, condition="nx")
+```
+
+### `set_json(key, value, ttl=None, condition=None) -> bool`
+
+`json.dumps` + `set`.
+
+```python
+cell.kv.set_json("config", {"theme": "dark"})
+```
+
+### `delete(key) -> bool`
+
+REST: [`DELETE /v1/databases/{id}/kv/{key}`](./rest-api#delete-a-value). Returns whether the key existed.
+Async: `adelete`.
+
+```python
+deleted = cell.kv.delete("greeting")
+```
+
+### `exists(key) -> bool`
+
+REST: [`POST /v1/databases/{id}/kv/ops/exists`](./rest-api#check-existence).
+
+```python
+exists = cell.kv.exists("greeting")
+```
+
+### `mget(keys) -> list`
+
+REST: [`POST /v1/databases/{id}/kv/ops/mget`](./rest-api#get-many-values).
+
+```python
+values = cell.kv.mget(["a", "b", "missing"])  # ['1', '2', None]
+```
+
+### `mset(entries) -> None`
+
+Atomic multi-write. REST: [`POST /v1/databases/{id}/kv/ops/mset`](./rest-api#set-many-values).
+
+```python
+cell.kv.mset({"a": "1", "b": "2"})
+```
+
+### `ttl(key) -> dict`
+
+REST: [`POST /v1/databases/{id}/kv/ops/ttl`](./rest-api#time-to-live).
+
+```python
+ttl = cell.kv.ttl("greeting")
+# {"state": "expires", "seconds": 299} | {"state": "persistent"} | {"state": "missing"}
+```
+
+### `expire(key, seconds) -> bool`
+
+REST: [`POST /v1/databases/{id}/kv/ops/expire`](./rest-api#set-or-remove-expiry).
+
+```python
+cell.kv.expire("greeting", 60)  # reset to 60s
+```
+
+### `persist(key) -> bool`
+
+Removes the TTL (keeps the key forever).
+
+```python
+cell.kv.persist("greeting")
+```
+
+### `incr(key, delta=1) -> int`
+
+REST: [`POST /v1/databases/{id}/kv/ops/incr`](./rest-api#increment--decrement). Async: `aincr`.
+
+```python
+value = cell.kv.incr("pageviews", 5)  # 6
+```
+
+### `decr(key, delta=1) -> int`
+
+`incr(key, -delta)`.
+
+```python
+value = cell.kv.decr("pageviews", 2)  # 4
+```
+
+## Backups — `cell.backups`
+
+Sync only in v0.1.0-beta.
+
+### `create() -> dict`
+
+Full snapshot backup. REST: [`POST /v1/databases/{id}/backup`](./rest-api#create-a-snapshot-backup).
+
+```python
+backup = cell.backups.create()
+```
+
+### `create_incremental() -> dict`
+
+WAL incremental backup. REST: [`POST /v1/databases/{id}/backup/incr`](./rest-api#create-an-incremental-backup).
+
+```python
+incr = cell.backups.create_incremental()
+```
+
+### `restore(version=None) -> None`
+
+Restores from a specific backup object key; omit to restore the latest.
+REST: [`POST /v1/databases/{id}/restore`](./rest-api#restore-a-cell).
+
+```python
+cell.backups.restore("snapshots/2f1c4a0e-.../backup-20260801T000000Z")
+```
+
+### `restore_latest() -> None`
+
+Restores the latest backup.
+
+```python
+cell.backups.restore_latest()
+```
+
+## Replication — `cell.replication`
+
+Sync only in v0.1.0-beta.
+
+### `get() -> dict`
+
+REST: [`GET /v1/databases/{id}/replication`](./rest-api#get-replication-status).
+
+```python
+status = cell.replication.get()
+# {"enabled": True, "replica_node": "node-b"}
+```
+
+### `enable(replica_node) -> None`
+
+REST: [`POST /v1/databases/{id}/replication`](./rest-api#enable-replication).
+
+```python
+cell.replication.enable("node-b")
+```
+
+### `disable() -> None`
+
+REST: [`DELETE /v1/databases/{id}/replication`](./rest-api#disable-replication).
+
+```python
+cell.replication.disable()
+```
+
+## API Keys — `combee.api_keys`
+
+### `create(name=None) -> dict`
+
+REST: [`POST /v1/api-keys`](./rest-api#create-an-api-key). The plaintext `key` is returned once.
+Async: `acreate`.
+
+```python
+key = combee.api_keys.create(name="ci")
+print(key["key"])  # 只显示一次——请立即保存
+```
+
+### `list() -> list`
+
+REST: [`GET /v1/api-keys`](./rest-api#list-api-keys). Async: `alist`.
+
+```python
+keys = combee.api_keys.list()
+```
+
+### `revoke(key_id) -> None`
+
+REST: [`DELETE /v1/api-keys/{id}`](./rest-api#revoke-an-api-key). Async: `arevoke`.
+
+```python
+combee.api_keys.revoke(key["id"])
+```
+
+## Usage — `combee.usage`
+
+### `summary(opts=None) -> dict`
+
+REST: [`GET /v1/usage/summary`](./rest-api#usage-summary). Async: `asummary`.
+
+```python
+summary = combee.usage.summary({"from": "2026-08-01T00:00:00Z"})
+```
+
+### `cell(cell_id, opts=None) -> dict`
+
+REST: [`GET /v1/cells/{id}/usage`](./rest-api#cell-usage). Async: `acell`.
+
+```python
+cell_usage = combee.usage.cell(cell.id)
+```
+
+### `timeseries(metric, interval="minute", opts=None) -> list`
+
+REST: [`GET /v1/usage/timeseries`](./rest-api#usage-timeseries). Async: `atimeseries`.
+
+| Argument | Description |
+|---|---|
+| `metric` | `kv_read` \| `kv_write` \| `sql_read` \| `sql_write` \| `requests` \| `bytes_in` \| `bytes_out` \| `storage_bytes` |
+| `interval` | `"minute"` (default) \| `"hour"` \| `"day"` |
+| `opts` | Optional `{"from": ..., "to": ...}` RFC3339; default last 24h |
+
+```python
+series = combee.usage.timeseries("kv_read", interval="hour")
+```
+
+## Credits — `combee.credits`
+
+### `balance() -> dict`
+
+REST: [`GET /v1/credits/balance`](./rest-api#balance). Async: `abalance`.
+
+```python
+balance = combee.credits.balance()
+# {"available": "50000000", "reserved": "0", "currency": "CREDIT", "updated_at": 1755000000}
+```
+
+### `transactions(limit=100, cursor=None) -> dict`
+
+REST: [`GET /v1/credits/transactions`](./rest-api#transactions). Async: `atransactions`.
+
+```python
+page = combee.credits.transactions()
+# {"items": [...], "next_cursor": ...}
+```
+
+### `redeem(code) -> dict`
+
+REST: [`POST /v1/credits/redeem`](./rest-api#redeem-a-voucher). Async: `aredeem`.
+
+```python
+result = combee.credits.redeem("CMB-84PA-X2KD-7MQR")
+# {"credits_added": "50000000", "balance": "100000000", "already_redeemed": False}
+```
+
+## Pricing — `combee.pricing`
+
+### `get() -> dict`
+
+REST: [`GET /v1/pricing`](./rest-api#pricing). Async: `aget`.
+
+```python
+pricing = combee.pricing.get()
+# {"version": 1, "effective_at": 1755000000, "units": {...}}
+```
+
+## Errors
+
+All errors inherit `CombeeError` and carry a `requestId`. See [Error Codes](./error-codes) for the full
+mapping (`SqlError`, `CellNotFoundError`, `CellAlreadyExistsError`, `CellNameConflictError`,
+`RateLimitError`, `InsufficientCreditsError`, ...). The Cell errors (`CellAlreadyExistsError`,
+`InvalidCellNameError`, `CellNameConflictError`, `CellResetFailedError`) are exported from the
+`combee.errors` module in v0.1.0-beta:
+
+```python
+from combee.errors import CellAlreadyExistsError
+```

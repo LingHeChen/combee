@@ -10,6 +10,18 @@ pub enum CombeeError {
     #[error("database already exists: {0}")]
     DatabaseAlreadyExists(DatabaseId),
 
+    #[error("cell name already exists: {0}")]
+    CellAlreadyExists(String),
+
+    #[error("invalid cell name: {0}")]
+    InvalidCellName(String),
+
+    #[error("cell name conflict: {0}")]
+    CellNameConflict(String),
+
+    #[error("cell reset failed: {0}")]
+    CellResetFailed(String),
+
     #[error("api key not found or already revoked")]
     ApiKeyNotFound,
 
@@ -38,6 +50,10 @@ impl CombeeError {
         match self {
             CombeeError::DatabaseNotFound(_) => "database_not_found",
             CombeeError::DatabaseAlreadyExists(_) => "database_already_exists",
+            CombeeError::CellAlreadyExists(_) => "cell_already_exists",
+            CombeeError::InvalidCellName(_) => "invalid_cell_name",
+            CombeeError::CellNameConflict(_) => "cell_name_conflict",
+            CombeeError::CellResetFailed(_) => "cell_reset_failed",
             CombeeError::Unauthorized => "unauthorized",
             CombeeError::ApiKeyNotFound => "api_key_not_found",
             CombeeError::InvalidRequest(_) => "invalid_request",

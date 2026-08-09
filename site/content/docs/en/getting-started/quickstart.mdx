@@ -1,0 +1,162 @@
+---
+title: Quickstart
+description: Create a Cell and run your first SQL query and KV operation in minutes.
+since: 0.1.0-beta
+status: stable
+---
+
+<Callout type="info" title="Prerequisites">
+  You need a Combee account and an API key (`cmb_sk_...`).
+  See [Authentication](./authentication) to get one.
+</Callout>
+
+## 1. Install the SDK
+
+<Tabs items={['TypeScript', 'Python']}>
+  <Tab value="TypeScript">
+    ```bash
+    npm install @combee/sdk
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```bash
+    pip install combee
+    ```
+  </Tab>
+</Tabs>
+
+## 2. Create a client
+
+<Tabs items={['TypeScript', 'Python']}>
+  <Tab value="TypeScript">
+    ```ts
+    import { Combee } from '@combee/sdk';
+
+    const combee = new Combee({
+      baseUrl: 'https://api.combee.cloud',
+      apiKey: process.env.COMBEE_API_KEY!, // cmb_sk_...
+    });
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    from combee import Combee
+
+    combee = Combee(
+        base_url="https://api.combee.cloud",
+        api_key="cmb_sk_...",
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## 3. Create a Cell
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -H "Idempotency-Key: cell:blog-prod" \
+      -d '{}'
+    # → {"id": "2f1c4a0e-..."} 保存 id,之后用它打开 Cell
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const cell = await combee.cells.create({ name: 'blog-prod' });
+    // `cell.id` is a UUID — save it if you need to open the Cell later.
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell = combee.cells.create(name="blog-prod")
+    # cell 可立即使用;后续可通过 cell_id 重新打开:combee.cell(cell_id)
+    ```
+  </Tab>
+</Tabs>
+
+## 4. Run SQL
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-.../sql \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"sql": "CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT NOT NULL)"}'
+
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-.../sql \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"sql": "INSERT INTO posts (title) VALUES (?)", "params": ["Hello"]}'
+
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-.../sql \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"sql": "SELECT * FROM posts WHERE id = ?", "params": [1]}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.sql.execute(
+      `CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT NOT NULL)`,
+    );
+    await cell.sql.execute(`INSERT INTO posts (title) VALUES (?)`, ['Hello']);
+
+    const { rows } = await cell.sql.query(`SELECT * FROM posts WHERE id = ?`, [1]);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.sql.execute(
+        "CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT NOT NULL)"
+    )
+    cell.sql.execute("INSERT INTO posts (title) VALUES (?)", ["Hello"])
+
+    result = cell.sql.query("SELECT * FROM posts WHERE id = ?", [1])
+    ```
+  </Tab>
+</Tabs>
+
+## 5. Use KV
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X PUT https://api.combee.cloud/v1/databases/2f1c4a0e-.../kv/session:user:1 \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"value": "{\"name\": \"Ada\"}", "ttl_seconds": 300}'
+
+    curl https://api.combee.cloud/v1/databases/2f1c4a0e-.../kv/session:user:1 \
+      -H "x-api-key: $COMBEE_API_KEY"
+
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-.../kv/ops/incr \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"key": "pageviews"}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    await cell.kv.set('session:user:1', JSON.stringify({ name: 'Ada' }), { ttl: 300 });
+    const session = await cell.kv.get('session:user:1'); // string | null
+    const views = await cell.kv.incr('pageviews'); // 1, 2, 3 ...
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    cell.kv.set("session:user:1", '{"name": "Ada"}', ttl=300)
+    session = cell.kv.get("session:user:1")
+    views = cell.kv.incr("pageviews")  # 1, 2, 3 ...
+    ```
+  </Tab>
+</Tabs>
+
+## What's next
+
+- [Authentication](./authentication) — API key security.
+- [Cells](../core-concepts/cells) — what a Cell is under the hood.
+- [KV TTL](../kv/ttl) — expiring keys automatically.

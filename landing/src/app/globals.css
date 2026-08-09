@@ -1,0 +1,161 @@
+@import "tailwindcss";
+
+/* ==== Combee Landing 设计系统(High-Density Engineering Core / DESIGN.md)==== */
+:root {
+  /* 颜色:Material 3 dark(与设计稿 code.html 完全一致) */
+  --surface: #121414;
+  --surface-dim: #121414;
+  --surface-bright: #383939;
+  --surface-lowest: #0c0f0e;
+  --surface-low: #1a1c1c;
+  --surface-container: #1e2020;
+  --surface-high: #282a2a;
+  --surface-highest: #333535;
+  --on-surface: #e2e2e2;
+  --on-surface-variant: #c4c7c7;
+  --outline: #8e9192;
+  --outline-variant: #444748;
+  --primary: #c9c6c5;
+  --on-primary: #313030;
+  --secondary: #bdc7d9;
+  --tertiary: #ffb95f; /* Warm Amber:能量信号 */
+  --on-tertiary: #472a00;
+  --tertiary-container: #130800;
+  --error: #ffb4ab;
+
+  /* 品牌(DESIGN.md §Colors):深炭黑 / 暖琥珀 / Soft Cream / Slate */
+  --brand-black: #0a0a0a;
+  --brand-amber: #f59e0b;
+  --brand-cream: #fafaf9;
+  --brand-slate: #1f2937;
+  --brand-slate-2: #374151;
+
+  /* 字体 */
+  --font-geist: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* 圆角:4px 标准 / 8px 大容器 */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--brand-black);
+  color: var(--brand-cream);
+  font-family: var(--font-geist);
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: 0em;
+}
+
+/* 标题紧凑字距:engineering feel */
+h1, h2, h3 {
+  letter-spacing: -0.02em;
+}
+
+/* 中文标签:缩小字距 + 关闭 uppercase(中文无大小写概念) */
+html[lang="zh-CN"] .mono-label { letter-spacing: 0.05em; text-transform: none; }
+
+/* 数据点/标签:等宽 + 大写 */
+.mono-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--on-surface-variant);
+}
+
+.mono-data {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 卡片:Level1 surface + 1px slate 边框 */
+.card {
+  background: #111111;
+  border: 1px solid var(--brand-slate);
+  border-radius: var(--radius-md);
+}
+
+/* active glow:琥珀 10% 20px blur */
+.glow-active:focus-within, .glow-active:hover {
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.10);
+  border-color: rgba(245, 158, 11, 0.45);
+}
+
+/* 玻璃导航 */
+.glass-nav {
+  background: rgba(10, 10, 10, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(31, 41, 55, 0.6);
+}
+
+/* 主按钮:琥珀实心 + 黑字 */
+.btn-primary {
+  background: var(--brand-amber);
+  color: var(--brand-black);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  transition: filter 0.15s ease;
+}
+.btn-primary:hover { filter: brightness(1.08); }
+
+.btn-secondary {
+  background: transparent;
+  border: 1px solid var(--brand-slate);
+  color: var(--brand-cream);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.btn-secondary:hover { border-color: var(--brand-slate-2); background: rgba(31, 41, 55, 0.4); }
+
+/* 状态六边形指示灯 */
+.hex-dot {
+  width: 8px;
+  height: 8px;
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+}
+.hex-dot.live { background: var(--brand-amber); animation: hex-pulse 2s ease-in-out infinite; }
+.hex-dot.idle { background: #4b5563; }
+@keyframes hex-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/* 代码块:Amber/Slate/Cream 受限高亮调色板 */
+.code-block {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.6;
+  background: #0c0f0e;
+  border: 1px solid var(--brand-slate);
+  border-radius: var(--radius-md);
+}
+.code-block .token.keyword, .code-block .token.operator { color: #f59e0b; }
+.code-block .token.string, .code-block .token.function { color: #fafaf9; }
+.code-block .token.comment { color: #6b7280; font-style: italic; }
+.code-block .token.number, .code-block .token.punctuation { color: #bdc7d9; }
+.code-block .token.class-name, .code-block .token.builtin { color: #fbbf24; }
+
+/* 网格背景(hero) */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(31, 41, 55, 0.35) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(31, 41, 55, 0.35) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%);
+}
+
+/* 截图容器:边框 + 顶部三点 */
+.screen-frame {
+  border: 1px solid var(--brand-slate);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: #0c0f0e;
+  box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.8);
+}

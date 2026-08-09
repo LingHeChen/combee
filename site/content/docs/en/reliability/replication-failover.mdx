@@ -1,0 +1,49 @@
+---
+title: Replication / Failover
+description: A single replica and automatic promotion.
+since: 0.1.0-beta
+status: stable
+---
+
+Each Cell can have **one replica**. The replica continuously pulls the primary's archived changes;
+if the primary misses heartbeats, the replica is promoted automatically and routing switches over.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    # 查询状态
+    curl https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/replication \
+      -H "x-api-key: $COMBEE_API_KEY"
+
+    # 启用(指定副本节点)
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/replication \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"replica_node": "node-b"}'
+
+    # 禁用
+    curl -X DELETE https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/replication \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const status = await cell.replication.get();
+    await cell.replication.enable('node-b'); // replica node id
+    await cell.replication.disable();
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    status = cell.replication.get()
+    cell.replication.enable("node-b")
+    cell.replication.disable()
+    ```
+  </Tab>
+</Tabs>
+
+- Promotion is guarded by **generation fencing**: a stale primary that missed the failover is
+  rejected on writes, preventing split-brain.
+- Multi-replica (>1) is **not** available in v0.1.0-beta.
+- Replication requires object storage (the replica pulls from it); without S3 configured there is no
+  replication or failover.

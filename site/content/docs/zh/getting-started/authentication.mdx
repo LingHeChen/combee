@@ -1,0 +1,66 @@
+---
+title: 认证
+description: 使用 x-api-key 请求头认证 Combee。
+since: 0.1.0-beta
+status: stable
+---
+
+Combee 用 **API key** 认证每一个公开请求,key 放在 `x-api-key` 请求头中。
+
+## API key
+
+- key 形如 `cmb_sk_...`。
+- 在[平台 → API Keys](../platform/api-keys)创建与吊销。
+- 一个 key 绑定一个账号,只能访问该账号下的 Cell。
+
+## 使用 key
+
+SDK 会自动附带 key:
+
+<Tabs items={['TypeScript', 'Python']}>
+  <Tab value="TypeScript">
+    ```ts
+    const combee = new Combee({
+      baseUrl: 'https://api.combee.cloud',
+      apiKey: process.env.COMBEE_API_KEY!,
+    });
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    import os
+
+    combee = Combee(
+        base_url="https://api.combee.cloud",
+        api_key=os.environ["COMBEE_API_KEY"],
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## 安全须知
+
+- **不要把 key 提交进代码仓库**;用环境变量或密钥管理服务。
+- Combee 只保存 key 的哈希——明文仅在创建时展示一次。
+- key 泄露时立即[吊销](../platform/api-keys),下次请求即生效。
+- 访问其他账号的 Cell 会被拒绝:跨租户请求表现为 **not found(404)**,不泄露存在性。
+
+## REST
+
+直接调用 REST API 时,每个请求都要带请求头:
+
+<Tabs items={['curl', 'HTTP']}>
+  <Tab value="curl">
+    ```bash
+    curl https://api.combee.cloud/v1/databases \
+      -H "x-api-key: $COMBEE_API_KEY"
+    ```
+  </Tab>
+  <Tab value="HTTP">
+    ```http
+    GET /v1/databases HTTP/1.1
+    Host: api.combee.cloud
+    x-api-key: cmb_sk_...
+    ```
+  </Tab>
+</Tabs>

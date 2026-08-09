@@ -1,0 +1,33 @@
+---
+title: Cells
+description: A Cell is a logical data space with SQL and KV.
+since: 0.1.0-beta
+status: stable
+---
+
+A **Cell** is the core unit of data in Combee — a logical data space for one app, providing:
+
+- **SQL** — a relational database with standard tables, indexes, and transactions.
+- **KV** — a Redis-style key-value store sharing the same lifecycle.
+
+## What a Cell is not
+
+- It is **not** a database server. You never see a hostname, port, or connection pool.
+- It is **not** a container. Creating a Cell has near-zero cost; resources are used only while the Cell is active.
+
+## Lifecycle in one glance
+
+| Step | Result |
+|---|---|
+| `create` | A new empty Cell with a tenant-unique `name` (strict — a used name fails) |
+| `ensure` | Get-or-create by name — idempotent, recommended at startup |
+| use | Run SQL / KV against it, per app |
+| rename / reset | Change the name / wipe the data, keeping the id |
+| delete | Data is removed |
+
+See [Lifecycle](./lifecycle) and [Limits](./limits) for details.
+
+## In the REST API
+
+Cells are exposed under the `/v1/databases/...` path prefix for compatibility, but the public concept is
+always **Cell** — the SDK never exposes "database" terminology to you.

@@ -1,0 +1,38 @@
+---
+title: Query
+description: Run read-only SQL SELECT statements and map results.
+since: 0.1.0-beta
+status: stable
+---
+
+Use `query` for read operations (`SELECT`, `WITH`, `PRAGMA`, `EXPLAIN`). It returns
+`{ columns, rows }`, where each row is mapped to an object by the SDK.
+
+<Tabs items={['curl', 'TypeScript', 'Python']}>
+  <Tab value="curl">
+    ```bash
+    curl -X POST https://api.combee.cloud/v1/databases/2f1c4a0e-8d3b-4b2a-9f7e-1c2d3e4f5a6b/sql \
+      -H "x-api-key: $COMBEE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"sql": "SELECT id, title FROM posts WHERE id = ?", "params": [1]}'
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```ts
+    const { columns, rows } = await cell.sql.query<{ id: number; title: string }>(
+      `SELECT id, title FROM posts WHERE id = ?`,
+      [1],
+    );
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    result = cell.sql.query("SELECT id, title FROM posts WHERE id = ?", [1])
+    # result = {"columns": [...], "rows": [...]}
+    ```
+  </Tab>
+</Tabs>
+
+- **Parameters**: positional `?` placeholders — always use them instead of string interpolation.
+- **Read-only**: statements that write (`INSERT`/`UPDATE`/`DELETE`/DDL) are rejected by this endpoint;
+  use [Execute](./execute) instead.

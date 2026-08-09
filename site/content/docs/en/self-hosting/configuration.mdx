@@ -1,0 +1,27 @@
+---
+title: Configuration
+description: Environment variables for the API Server and Data Node.
+since: 0.1.0-beta
+status: stable
+---
+
+Both binaries are configured with environment variables. Common ones:
+
+| Variable | Default | Description |
+|---|---|---|
+| `COMBEE_BIND_ADDR` | `127.0.0.1:8080` | API Server listen address |
+| `COMBEE_DATA_DIR` | `./data` | Local data directory |
+| `COMBEE_METADATA` | `in-memory` | `in-memory` or `postgres` |
+| `COMBEE_DATABASE_URL` | — | PostgreSQL connection string (when `COMBEE_METADATA=postgres`) |
+| `COMBEE_DATA_NODE_URL` | — | Data Node base URL used by the API Server |
+| `COMBEE_CONTROL_PLANE_TOKEN` | — | Internal control-plane auth |
+| `COMBEE_ADMIN_TOKEN` | — | Operator/admin auth (401 when unset) |
+| `COMBEE_MAX_ACTIVE_DBS` | `100` | Active database pool cap |
+| `COMBEE_SQL_TIMEOUT_SECS` | `30` | SQL statement timeout |
+| `COMBEE_KV_DURABILITY` | `normal` | `fast` / `normal` / `strict` |
+| `COMBEE_S3_*` | — | Object storage (see [Object Storage](./object-storage)) |
+| `COMBEE_USAGE_FLUSH_INTERVAL_SECS` | `5` | Usage batch flush interval |
+
+<Callout type="warn" title="Production">
+  Use `COMBEE_METADATA=postgres` in production — the in-memory store loses the Cell directory on restart.
+</Callout>

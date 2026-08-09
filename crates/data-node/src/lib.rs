@@ -47,6 +47,8 @@ pub struct DataNode {
     store: Option<Arc<dyn ObjectStore>>,
     /// per-cell generation(fencing):failover 时经 fence_cell 递增;写校验。
     generations: std::sync::Mutex<std::collections::HashMap<DatabaseId, i64>>,
+    /// 资源配额。
+    quota: combee_common::config::QuotaConfig,
     _maintenance: tokio::task::JoinHandle<()>,
 }
 
@@ -54,6 +56,7 @@ impl DataNode {
     pub fn new(config: DataNodeConfig) -> Self {
         let cache = Arc::new(KvCache::new(config.kv_cache_capacity.max(1) as u64));
         let sql_timeout = config.sql_timeout;
+        let quota = config.quota.clone();
         let manager = Arc::new(ActiveDbManager::new(config));
         let maintenance = manager.spawn_maintenance();
         Self {
@@ -62,6 +65,7 @@ impl DataNode {
             sql_timeout,
             store: None,
             generations: std::sync::Mutex::new(std::collections::HashMap::new()),
+            quota,
             _maintenance: maintenance,
         }
     }
@@ -314,9 +318,11 @@ impl DataNode {
         generation: i64,
     ) -> Result<SqlResult> {
         self.check_generation(db, generation)?;
+        let quota = self.quota.clone();
         self.timeout_sql(
-            self.manager
-                .with_conn(db, move |conn| sql::execute_sql(conn, &req)),
+            self.manager.with_conn(db, move |conn| {
+                sql::execute_sql_quota(conn, &req, Some(&quota))
+            }),
             db,
         )
         .await
@@ -330,9 +336,11 @@ impl DataNode {
         generation: i64,
     ) -> Result<Vec<SqlResult>> {
         self.check_generation(db, generation)?;
+        let quota = self.quota.clone();
         self.timeout_sql(
-            self.manager
-                .with_conn(db, move |conn| sql::execute_transaction(conn, &req)),
+            self.manager.with_conn(db, move |conn| {
+                sql::execute_transaction(conn, &req, Some(&quota))
+            }),
             db,
         )
         .await
@@ -343,6 +351,21 @@ impl DataNode {
     /// GET key;过期视为不存在(lazy expiration)。
     /// **无锁快路径**:缓存命中直接返回(纯内存,不经过 per-db 锁与
     /// `spawn_blocking`,热点 Cell 的读可并行);未命中才进锁读 SQLite 并填充。
+    /// 按 key 前缀扫描(key 字典序),返回 keys 与下一页游标(最后一个 key)。
+    pub async fn kv_scan(
+        &self,
+        db: DatabaseId,
+        prefix: String,
+        limit: u32,
+        cursor: String,
+    ) -> Result<combee_common::rpc::RpcKvScanResult> {
+        self.manager
+            .with_conn(db, move |conn| {
+                crate::kv::scan(conn, &prefix, limit, &cursor)
+            })
+            .await
+    }
+
     pub async fn kv_get(&self, db: DatabaseId, key: String) -> Result<Option<KvEntry>> {
         let now = ttl::unix_now();
         if let Some(entry) = self.cache.get(db, &key, now) {
@@ -380,6 +403,38 @@ impl DataNode {
         generation: i64,
     ) -> Result<bool> {
         self.check_generation(db, generation)?;
+        // 配额:key/value 大小、存储硬上限
+        let quota = &self.quota;
+        if quota.max_kv_key_bytes > 0 && key.len() > quota.max_kv_key_bytes {
+            return Err(CombeeError::QuotaExceeded(format!(
+                "kv key too large: {} bytes (max {})",
+                key.len(),
+                quota.max_kv_key_bytes
+            )));
+        }
+        if quota.max_kv_value_bytes > 0 && value.len() > quota.max_kv_value_bytes {
+            return Err(CombeeError::QuotaExceeded(format!(
+                "kv value too large: {} bytes (max {})",
+                value.len(),
+                quota.max_kv_value_bytes
+            )));
+        }
+        if quota.storage_hard_bytes > 0 {
+            let current = self.storage_bytes(db).await?;
+            let projected = current.saturating_add(value.len() as u64);
+            if projected > quota.storage_hard_bytes {
+                return Err(CombeeError::QuotaExceeded(format!(
+                    "storage hard limit exceeded: {projected} bytes (max {})",
+                    quota.storage_hard_bytes
+                )));
+            }
+        }
+        if quota.storage_soft_bytes > 0 {
+            let current = self.storage_bytes(db).await?;
+            if current > quota.storage_soft_bytes {
+                tracing::warn!(%db, "storage soft limit exceeded: {current} bytes");
+            }
+        }
         let cache = self.cache.clone();
         self.manager
             .with_conn(db, move |conn| {
@@ -541,6 +596,30 @@ impl DataNode {
 
     /// 删除数据库:回收连接、移除磁盘文件,并清空该 db 的缓存条目。
     /// 目录记录由 API Server 在 Metadata 中删除。
+    /// 重置 Cell 数据:删除 SQLite 文件与相关缓存(元数据记录由 API server 保留并递增 generation)。
+    pub async fn reset_database(&self, db: DatabaseId) -> Result<()> {
+        let data_dir = self.manager.data_dir();
+        let db_path = storage::db_path(&data_dir, db);
+        self.manager.close_database(db).await?;
+        self.cache.clear_database(db);
+        // 主库 + WAL + 共享内存 + 临时文件一并清除
+        for suffix in ["", "-wal", "-shm", "-journal"] {
+            let p = db_path.with_file_name(format!(
+                "{}{}",
+                db_path
+                    .file_name()
+                    .map(|s| s.to_string_lossy().to_string())
+                    .unwrap_or_default(),
+                suffix
+            ));
+            if p.exists() {
+                std::fs::remove_file(&p)
+                    .map_err(|e| CombeeError::Internal(format!("reset remove file failed: {e}")))?;
+            }
+        }
+        Ok(())
+    }
+
     pub async fn delete_database(&self, db: DatabaseId) -> Result<()> {
         self.manager.delete_database(db).await?;
         self.cache.clear_database(db);

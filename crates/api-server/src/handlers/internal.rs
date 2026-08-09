@@ -15,7 +15,7 @@ pub async fn register(
     State(state): State<AppState>,
     Json(req): Json<NodeRegisterRequest>,
 ) -> Json<NodeRegisterResponse> {
-    let id = state.nodes.register_with_id(req.id, req.addr, req.capacity);
+    let id = state.nodes.register_with_id(req.id, req.addr, req.capacity).await;
     Json(NodeRegisterResponse { id })
 }
 
@@ -24,7 +24,7 @@ pub async fn heartbeat(
     State(state): State<AppState>,
     Json(req): Json<NodeHeartbeatRequest>,
 ) -> Result<StatusCode, StatusCode> {
-    if state.nodes.heartbeat(req.id, req.active_conns) {
+    if state.nodes.heartbeat(req.id, req.active_conns).await {
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err(StatusCode::NOT_FOUND)
@@ -36,7 +36,7 @@ pub async fn unregister(
     State(state): State<AppState>,
     Json(req): Json<NodeUnregisterRequest>,
 ) -> Result<StatusCode, StatusCode> {
-    if state.nodes.unregister(req.id) {
+    if state.nodes.unregister(req.id).await {
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err(StatusCode::NOT_FOUND)
@@ -45,7 +45,7 @@ pub async fn unregister(
 
 /// GET /internal/nodes —— 节点状态(metrics)。
 pub async fn list(State(state): State<AppState>) -> Json<Vec<NodeInfo>> {
-    Json(state.nodes.list())
+    Json(state.nodes.list().await)
 }
 
 /// GET /internal/nodes/{node}/replicas —— 该节点作为副本负责的全部 Cell id。

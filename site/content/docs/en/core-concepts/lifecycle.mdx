@@ -1,0 +1,21 @@
+---
+title: Lifecycle
+description: How Cells are created, activated, and deleted.
+since: 0.1.0-beta
+status: stable
+---
+
+A Cell moves through a simple lifecycle:
+
+| State | Description |
+|---|---|
+| **Created** | Metadata is registered; no data exists yet. |
+| **Active** | The Cell has received traffic and holds an open database / cache. |
+| **Idle** | Not requested for a while; resources are released. Data stays durable. |
+| **Deleted** | The Cell and its data are removed (with backups kept, if any exist). |
+
+Key behaviors:
+
+- Creating a Cell is cheap. `create` is **strict** (a used name fails with 409); use `ensure` for idempotent get-or-create.
+- An idle Cell costs nothing — the next request re-activates it.
+- Deleting a Cell is destructive; take a [backup](../reliability/backups) first if needed.

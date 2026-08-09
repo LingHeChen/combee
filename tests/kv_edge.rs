@@ -2,7 +2,7 @@
 //!
 //! 覆盖:空 key 拒绝、不存在的 db 全 404、unicode 与大 value 往返、
 //! 端点保留名作为普通 key、INCR 带 TTL。
-//! 每个测试的目的与预期结果见 `docs/TESTING.md`。
+//! 每个测试的目的与预期结果见 `artifacts/engineering/TESTING.md`。
 
 mod common;
 

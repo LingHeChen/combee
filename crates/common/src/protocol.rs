@@ -25,6 +25,9 @@ pub struct SqlResult {
     pub rows: Vec<Vec<serde_json::Value>>,
     /// 受影响行数(INSERT / UPDATE / DELETE 等)。
     pub rows_affected: u64,
+    /// 查询结果因配额(行数/字节)被截断。
+    #[serde(default)]
+    pub truncated: bool,
 }
 
 /// 事务请求:多条语句在同一个 SQLite 事务中原子执行。
@@ -124,6 +127,7 @@ mod tests {
             columns: vec!["a".into(), "b".into()],
             rows: vec![vec![json!(1), json!(null)]],
             rows_affected: 0,
+            truncated: false,
         };
         let json = serde_json::to_value(&result).unwrap();
         assert_eq!(json["columns"], json!(["a", "b"]));

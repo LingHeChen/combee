@@ -1,0 +1,46 @@
+---
+title: Error Codes
+description: The unified mapping of HTTP status, error.code, and SDK exceptions.
+since: 0.1.0-beta
+status: stable
+---
+
+Every error response has the same shape — `{ code, error }` — and echoes the `x-request-id` header
+(exposed as `requestId` on SDK errors). One table drives the whole documentation:
+
+| HTTP | `error.code` | SDK exception (TS / Python) |
+|---|---|---|
+| 400 | `invalid_request` | `InvalidRequestError` |
+| 400 | `sql` | `SqlError` |
+| 400 | `invalid_cell_name` | `InvalidCellNameError` |
+| 401 | `unauthorized` | `AuthenticationError` |
+| 403 | `forbidden` | `PermissionDeniedError` |
+| 404 | `database_not_found` | `CellNotFoundError` |
+| 404 | `api_key_not_found` | `ApiKeyNotFoundError` |
+| 409 | `database_already_exists` | `CombeeError` (base class) |
+| 409 | `cell_already_exists` | `CellAlreadyExistsError` |
+| 409 | `cell_name_conflict` | `CellNameConflictError` |
+| 429 | `quota_exceeded` | `QuotaExceededError` |
+| 500 | `internal` | `InternalServerError` |
+| 500 | `cell_reset_failed` | `CellResetFailedError` |
+
+## Client-side exceptions
+
+These SDK errors are not tied to a server `error.code`:
+
+- `SqlTimeoutError` — a statement exceeded the client timeout.
+- `DataNodeUnavailableError` — the service is unreachable.
+
+## Example
+
+```json
+HTTP/1.1 404 Not Found
+x-request-id: 3f1c4a0e-...
+
+{ "code": "database_not_found", "error": "database not found: 2f1c4a0e-..." }
+```
+
+## Notes
+
+- Cross-tenant access behaves as `database_not_found` (404) — existence is never leaked.
+- The `code` values are stable and lowercase; SDK classes map one-to-one.
