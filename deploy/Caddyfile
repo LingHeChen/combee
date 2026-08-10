@@ -36,5 +36,9 @@
 # Cloud Console(云端后台,主前端)
 {$COMBEE_CONSOLE_DOMAIN} {
 	encode gzip
-	reverse_proxy {$COMBEE_UPSTREAM_WEB}
+	# 禁止上游(next)自行压缩:由 Caddy 统一 gzip,避免双重压缩损坏 HTTP/2 响应帧
+	# (next 动态页若已 Content-Encoding: gzip,Caddy 再压一遍会导致 h2 framing error)
+	reverse_proxy {$COMBEE_UPSTREAM_WEB} {
+		header_up -Accept-Encoding
+	}
 }
