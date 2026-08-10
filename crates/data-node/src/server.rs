@@ -7,8 +7,8 @@
 use std::sync::Arc;
 
 use axum::extract::State;
-use axum::routing::{get, post};
 use axum::response::IntoResponse;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use combee_common::protocol::{KvEntry, SqlResult};
 use combee_common::rpc::{
@@ -53,6 +53,12 @@ pub(crate) async fn rpc_auth(
 ) -> axum::response::Response {
     use axum::response::IntoResponse;
     if req.headers().contains_key("x-api-key") {
+        tracing::warn!(
+            service = "combee-data-node",
+            event = "rpc.unauthorized",
+            path = %req.uri(),
+            reason = "tenant api key on internal rpc",
+        );
         return (axum::http::StatusCode::UNAUTHORIZED, "unauthorized").into_response();
     }
     if let Some(expected) = &token {
@@ -70,6 +76,13 @@ pub(crate) async fn rpc_auth(
             .map(|t| t == expected)
             .unwrap_or(false);
         if !bearer_ok && !header_ok {
+            tracing::warn!(
+                service = "combee-data-node",
+                event = "rpc.unauthorized",
+                path = %req.uri(),
+                reason = "control token mismatch",
+                provided = req.headers().get("x-control-token").and_then(|v| v.to_str().ok()).map(|s| s.chars().take(8).collect::<String>()),
+            );
             return (axum::http::StatusCode::UNAUTHORIZED, "unauthorized").into_response();
         }
     }
