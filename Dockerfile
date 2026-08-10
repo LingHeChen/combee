@@ -4,6 +4,8 @@
 #   docker buildx build --platform linux/amd64 --target data-node -t combee/data-node .
 FROM rust:1.97-bookworm AS builder
 WORKDIR /build
+# 依赖下载走 rsproxy 镜像(crates.io 直连在部分网络下 TLS 不稳)
+COPY .cargo-config /usr/local/cargo/config.toml
 COPY Cargo.toml Cargo.lock ./
 # workspace 根 package(combee)的 lib 入口,缺了 cargo 无法解析根 manifest
 COPY src ./src
