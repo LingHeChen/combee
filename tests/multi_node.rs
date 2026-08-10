@@ -71,6 +71,7 @@ async fn create_database_round_robin_placement() {
         registry.clone(),
         metadata.clone(),
         None,
+        None,
     ));
     let app = build_app(AppState {
         metadata: metadata.clone(),
@@ -129,6 +130,7 @@ async fn routing_isolates_data_per_node() {
     let provider = Arc::new(RoutingProvider::new(
         registry.clone(),
         metadata.clone(),
+        None,
         None,
     ));
 
@@ -207,6 +209,7 @@ async fn agent_registers_heartbeats_and_unregisters() {
         registry.clone(),
         metadata.clone(),
         Some(remote),
+        None,
     ));
     let usage_meter = combee_api_server::usage::UsageMeter::new(
         metadata.clone(),

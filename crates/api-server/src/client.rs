@@ -566,6 +566,8 @@ pub struct RoutingProvider {
     metadata: Arc<dyn MetadataStore>,
     /// 按节点缓存的远程客户端(节点重启换端口时需重建 registry 或重启 API Server)。
     clients: std::sync::Mutex<HashMap<NodeId, Arc<dyn DataNodeClient>>>,
+    /// 控制面 token:创建远程 client 时带上,data-node 的 rpc_auth 校验用。
+    control_token: Option<String>,
     local: Option<Arc<dyn DataNodeClient>>,
     /// Cell → 主节点的路由缓存(TTL),避免热路径每次查 PostgreSQL。
     /// Arc:供 RPC 失败回调共享,以在失败时失效缓存。
@@ -580,11 +582,13 @@ impl RoutingProvider {
         registry: Arc<NodeRegistry>,
         metadata: Arc<dyn MetadataStore>,
         local: Option<Arc<dyn DataNodeClient>>,
+        control_token: Option<String>,
     ) -> Self {
         Self {
             registry,
             metadata,
             clients: std::sync::Mutex::new(HashMap::new()),
+            control_token,
             local,
             route_cache: Arc::new(std::sync::Mutex::new(HashMap::new())),
         }
@@ -610,8 +614,11 @@ impl RoutingProvider {
             tracing::debug!("rpc failure -> invalidate route cache for cell {db}");
             rc.lock().unwrap().remove(&db);
         });
-        let client: Arc<dyn DataNodeClient> =
-            Arc::new(RemoteDataNodeClient::with_hooks(addr, None, Some(on_error)));
+        let client: Arc<dyn DataNodeClient> = Arc::new(RemoteDataNodeClient::with_hooks(
+            addr,
+            self.control_token.clone(),
+            Some(on_error),
+        ));
         self.clients.lock().unwrap().insert(node_id, client.clone());
         client
     }
@@ -681,7 +688,11 @@ impl DataNodeProvider for RoutingProvider {
         if let Some(c) = clients.get(&node) {
             return Ok(c.clone());
         }
-        let client: Arc<dyn DataNodeClient> = Arc::new(RemoteDataNodeClient::new(addr));
+        let client: Arc<dyn DataNodeClient> = Arc::new(RemoteDataNodeClient::with_hooks(
+            addr,
+            self.control_token.clone(),
+            None,
+        ));
         clients.insert(node, client.clone());
         Ok(client)
     }

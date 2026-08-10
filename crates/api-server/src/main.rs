@@ -96,6 +96,7 @@ async fn main() {
             registry.clone(),
             metadata.clone(),
             None,
+            config.control_plane_token.clone(),
         ))
     } else if config.data_node_url.is_empty() {
         let node = Arc::new(DataNode::new(DataNodeConfig::from_common(&config)));
@@ -113,6 +114,7 @@ async fn main() {
             registry.clone(),
             metadata.clone(),
             Some(remote),
+            config.control_plane_token.clone(),
         ))
     };
 

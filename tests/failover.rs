@@ -113,6 +113,7 @@ async fn failover_promotes_replica_and_fences_old_primary() {
         registry.clone(),
         metadata.clone(),
         None,
+        None,
     ));
 
     let db = DatabaseId::new();
