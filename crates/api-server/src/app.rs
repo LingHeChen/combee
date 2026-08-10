@@ -8,12 +8,18 @@ use tower_http::trace::TraceLayer;
 
 use crate::AppState;
 use crate::auth;
-use crate::handlers::{
+use crate::handlers::{health, 
     admin, backup, credits, database, failover, internal, keys, kv, replication, sql, usage,
     waitlist,
 };
 
 pub fn build_app(state: AppState) -> Router {
+    // 探活/就绪:不挂租户认证(供外部探针、Swarm healthcheck、告警使用)。
+    let health_routes = Router::new()
+        .route("/health", get(|| async { axum::Json(serde_json::json!({"status": "ok"})) }))
+        .route("/ready", get(health::ready))
+        .with_state(state.clone());
+
     // public 路由:走租户 key 认证(auth_middleware)
     let public = Router::new()
         .route(
@@ -145,6 +151,7 @@ pub fn build_app(state: AppState) -> Router {
         ))
         .merge(admin_routes)
         .merge(internal)
+        .merge(health_routes)
         .with_state(state)
         .layer(middleware::from_fn(auth::request_id))
         .layer(TraceLayer::new_for_http())

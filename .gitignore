@@ -41,3 +41,4 @@
 
 # pnpm 本地缓存(误提交过大对象,移除跟踪)
 /.pnpm-store/
+deploy/alert/config.env

@@ -42,6 +42,22 @@ pub async fn request_logging(State(state): State<AppState>, req: Request, next: 
     let latency_ms = started.elapsed().as_secs_f64() * 1000.0;
     let status_code = response.status().as_u16();
 
+    if latency_ms >= 500.0 && status_code < 500 {
+        // 慢请求:WARN,供告警查询 request.slow;不打断上面的错误分类逻辑。
+        warn!(
+            service = "combee-api",
+            event = "request.slow",
+            %request_id,
+            tenant_id = %tenant.0,
+            cell_id = %cell.map(|c| c.0.to_string()).unwrap_or_default(),
+            %operation,
+            %method,
+            status = status_code,
+            latency_ms = format!("{latency_ms:.2}"),
+            "request.slow"
+        );
+    }
+
     if status_code >= 500 {
         tracing::error!(
             service = "combee-api",

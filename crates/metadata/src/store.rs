@@ -207,6 +207,9 @@ pub trait MetadataStore: Send + Sync {
     /// 撤销 API key。不存在报 NotFound。
     async fn revoke_api_key(&self, tenant: TenantId, key_id: Uuid) -> Result<()>;
 
+    /// 探活(metadata 依赖可达)。用于 /ready 健康检查。
+    async fn ping(&self) -> Result<()>;
+
     // ---- Data Node 注册表(共享 authority;Postgres 模式下多 API 副本共享)----
     /// 注册或更新节点(幂等;address/capacity/last_heartbeat 更新)。
     async fn upsert_data_node(
@@ -628,6 +631,10 @@ impl MetadataStore for InMemoryStore {
             self.create_tenant(tenant).await?;
             self.create_api_key(tenant, hash, "bootstrap").await?;
         }
+        Ok(())
+    }
+
+    async fn ping(&self) -> Result<()> {
         Ok(())
     }
 

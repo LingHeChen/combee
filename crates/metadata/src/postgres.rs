@@ -500,6 +500,14 @@ impl MetadataStore for PostgresStore {
         })
     }
 
+    async fn ping(&self) -> Result<()> {
+        sqlx::query("SELECT 1")
+            .fetch_one(&self.pool)
+            .await
+            .map_err(PostgresStore::internal)?;
+        Ok(())
+    }
+
     async fn upsert_data_node(&self, id: NodeId, addr: String, capacity: usize) -> Result<()> {
         let now = DatabaseRecord::now_unix() as i64;
         sqlx::query(

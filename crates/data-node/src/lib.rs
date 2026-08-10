@@ -53,6 +53,25 @@ pub struct DataNode {
 }
 
 impl DataNode {
+    /// 就绪检查:数据目录可写(runtime 正常;node identity 由 agent 加载)。
+    pub async fn ready(&self) -> bool {
+        let dir = std::path::PathBuf::from(self.manager.data_dir());
+        if !dir.is_dir() {
+            return false;
+        }
+        let probe = dir.join(".ready-probe");
+        match std::fs::File::create(&probe) {
+            Ok(f) => {
+                drop(f);
+                let _ = std::fs::remove_file(&probe);
+                true
+            }
+            Err(_) => false,
+        }
+    }
+}
+
+impl DataNode {
     pub fn new(config: DataNodeConfig) -> Self {
         let cache = Arc::new(KvCache::new(config.kv_cache_capacity.max(1) as u64));
         let sql_timeout = config.sql_timeout;

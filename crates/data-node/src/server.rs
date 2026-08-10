@@ -7,7 +7,8 @@
 use std::sync::Arc;
 
 use axum::extract::State;
-use axum::routing::post;
+use axum::routing::{get, post};
+use axum::response::IntoResponse;
 use axum::{Json, Router};
 use combee_common::protocol::{KvEntry, SqlResult};
 use combee_common::rpc::{
@@ -77,7 +78,7 @@ pub(crate) async fn rpc_auth(
 
 /// 构建内部 RPC 路由(供 bin 与测试复用)。`control_token` 为空表示 dev 放行。
 pub fn router(node: Arc<DataNode>, control_token: Option<String>) -> Router {
-    Router::new()
+    let rpc = Router::new()
         .route("/rpc/execute_sql", post(rpc_execute_sql))
         .route("/rpc/execute_transaction", post(rpc_execute_transaction))
         .route("/rpc/kv_get", post(rpc_kv_get))
@@ -103,7 +104,25 @@ pub fn router(node: Arc<DataNode>, control_token: Option<String>) -> Router {
             control_token.clone(),
             rpc_auth,
         ))
-        .with_state(node)
+        .with_state(node.clone());
+
+    // 探活/就绪:不经过 control-token 认证(供外部探针/Swarm healthcheck)。
+    Router::new()
+        .route("/health", get(|| async { axum::Json(serde_json::json!({"status": "ok"})) }))
+        .route("/ready", get(move || {
+            let n = node.clone();
+            async move {
+                if n.ready().await {
+                    axum::Json(serde_json::json!({"status": "ok"})).into_response()
+                } else {
+                    (
+                        axum::http::StatusCode::SERVICE_UNAVAILABLE,
+                        axum::Json(serde_json::json!({"status": "not_ready", "reason": "storage_not_writable"})),
+                    ).into_response()
+                }
+            }
+        }))
+        .merge(rpc)
 }
 
 /// 启动内部 RPC 服务(阻塞)。

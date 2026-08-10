@@ -31,6 +31,9 @@ fn init_tracing() {
 
 #[tokio::main]
 async fn main() {
+    // 容器 HEALTHCHECK:`combee-api-server --healthcheck`(探活 127.0.0.1:8080/ready)
+    combee_common::healthcheck::run_if_healthcheck(8080, "/ready");
+
     init_tracing();
     let config = Config::from_env();
 
@@ -64,6 +67,13 @@ async fn main() {
     // - COMBEE_DATA_NODE_URL 非空:单远程节点(未注册时兜底该地址);
     // - 默认:进程内本地 Data Node。
     // 注册表:Postgres 模式用 PG 作为共享 authority(多 API 副本一致),否则内存模式。
+    tracing::info!(
+        event = "service.started",
+        service = "combee-api",
+        version = env!("CARGO_PKG_VERSION"),
+        "starting"
+    );
+
     let registry = match config.metadata_mode {
         MetadataMode::Postgres => {
             tracing::info!("node registry: shared (postgres-backed)");

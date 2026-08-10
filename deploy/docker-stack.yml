@@ -70,6 +70,12 @@ services:
       default:
         aliases:
           - landing
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
     deploy:
       replicas: 2
       update_config:
@@ -88,6 +94,12 @@ services:
       default:
         aliases:
           - docs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
     deploy:
       replicas: 2
       update_config:
@@ -115,6 +127,12 @@ services:
       default:
         aliases:
           - web
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
     deploy:
       replicas: 2
       update_config:
@@ -139,6 +157,11 @@ services:
       default:
         aliases:
           - postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-combee}"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
     deploy:
       replicas: 1
       update_config:
@@ -171,6 +194,12 @@ services:
       default:
         aliases:
           - data-node
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/combee-data-node", "--healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
     deploy:
       replicas: 1
       update_config:
@@ -204,6 +233,12 @@ services:
       default:
         aliases:
           - api-server
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/combee-api-server", "--healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
     deploy:
       replicas: 2
       update_config:

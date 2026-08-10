@@ -14,6 +14,8 @@ use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() {
+    // 容器 HEALTHCHECK:`combee-data-node --healthcheck`(探活 127.0.0.1:9000/ready)
+    combee_common::healthcheck::run_if_healthcheck(9000, "/ready");
     let fmt = tracing_subscriber::fmt().with_env_filter(
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,combee=debug")),
     );

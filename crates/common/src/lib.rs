@@ -4,6 +4,7 @@ pub mod api_key;
 pub mod config;
 pub mod credit;
 pub mod errors;
+pub mod healthcheck;
 pub mod ids;
 pub mod protocol;
 pub mod rpc;
