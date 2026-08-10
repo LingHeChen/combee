@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useT } from "@/lib/i18n-context";
 import { Loader2, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Image from "next/image";
@@ -54,9 +54,7 @@ export default function LoginPage() {
             <CardTitle className="font-mono-label text-on-surface flex items-center gap-2">
               <LogIn className="h-4 w-4 text-tertiary" /> {t.login.title}
             </CardTitle>
-            <CardDescription className="font-mono-code text-on-surface-variant text-xs">
-              {t.login.subtitle}
-            </CardDescription>
+
           </CardHeader>
           <CardContent>
             <form onSubmit={onSubmit} className="flex flex-col gap-5">
