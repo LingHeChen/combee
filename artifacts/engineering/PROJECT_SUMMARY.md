@@ -195,6 +195,25 @@
 
 ---
 
+## 7.5 稳定性工程进度(2026-08,按 COMBEE_STABILITY_ROADMAP.md)
+
+| 领域 | 状态 | 说明 |
+|---|---|---|
+| 优雅关闭 | ✅ | data-node SIGTERM → drain 在途 → unregister → WAL checkpoint;api-server 已有;`stop_grace_period 30s` |
+| SQL 超时 | ✅ | `COMBEE_SQL_TIMEOUT_SECS` 两侧生效(InterruptHandle 中止,默认 30s) |
+| 资源限制 | ✅ | per-tenant/per-cell 并发配额(429)、KV key/value/TTL 上限(`COMBEE_MAX_TTL_SECONDS` 默认 30 天)、MSET 校验 |
+| Cell 生命周期 | ✅ | `created → active`(create 后 ensure 落盘,失败回滚)、delete 先置 `deleting` |
+| 数据完整性 | ✅ | 备份 sha256 checksum;恢复后 `PRAGMA integrity_check`;打开即 `quick_check`,损坏 → 只读保护(写拒绝 + 告警) |
+| Cell 格式版本 | ✅ | `CELL_FORMAT_VERSION=1` manifest,超版本拒绝打开 |
+| Cell 迁移 | ✅ | `POST /admin/cells/{id}/migrate`:fence → 源备份 → 目标恢复 → 切路由 |
+| 故障注入 | ✅ | `scripts/fault/`:kill-9 / 网络隔离 / 磁盘满 |
+| 备份恢复验证 | ✅ | release 测试:节点炸毁恢复、删除 Cell 后恢复、恢复前后 sha256 对比 |
+| 配置管理 | ✅ | `deploy/CONFIG.md` env 单一来源清单 |
+| Benchmark | 🚧 | `crates/benchmark`(--mixed/--contention/--e2e/--capacity)+ 持续运行文档;数字须带环境条件 |
+| 多副本 / 容量调度 / SLO | ⬜ | 远期(roadmap §13/§15:不 rush) |
+
+---
+
 ## 8. 已知限制与下一步
 
 - 自动 failover 的 RTO 含心跳超时探测(10s)+ 扫描周期,秒级;多副本(>1)未做;

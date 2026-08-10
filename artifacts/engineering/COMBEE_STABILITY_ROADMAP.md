@@ -5,6 +5,28 @@
 
 ---
 
+# 0. 实施进度(2026-08)
+
+> 状态:✅ 已实施并验证 / 🚧 工具与文档就绪(持续实践项)/ ⬜ 远期未开始
+
+| 章节 | 内容 | 状态 | 落地 |
+|---|---|---|---|
+| §3.1 | 备份/恢复自动化验证 | ✅ | `tests/release/backup_restore.rs`:节点炸毁恢复、删除 Cell 后恢复、checksum 断言、恢复前后 sha256 对比 |
+| §4.1 | Cell Manifest / 只读保护 | ✅ | 打开即 `PRAGMA quick_check`;损坏 → 只读保护(写拒绝 + 告警,不静默修复);manifest 记录 format_version |
+| §5 | Cell 生命周期状态机 | ✅ | `created → active`(create 后 ensure 落盘)+ delete 先置 `deleting` |
+| §6 | 租户资源隔离 | ✅ | per-tenant/per-cell 并发配额、SQL 超时、KV key/value/TTL 上限、MSET 校验 |
+| §7 | 优雅关闭 | ✅ | SIGTERM → drain → unregister → WAL checkpoint;`stop_grace_period 30s` |
+| §8 | 稳定性测试/基准 | 🚧 | `crates/benchmark`(--mixed/--contention/--e2e/--capacity)+ 持续运行文档 |
+| §9 | 故障注入 | ✅ | `scripts/fault/{kill-node,network-isolate,disk-full}.sh` |
+| §10 | 配置管理 | ✅ | `deploy/CONFIG.md` 完整 env 单一来源清单 |
+| §11 | Cell 迁移 | ✅ | `POST /admin/cells/{id}/migrate`(fence → 备份 → 恢复 → 切路由)|
+| §12 | 版本兼容 | ✅ | `CELL_FORMAT_VERSION=1`,打开时校验,超版本拒绝 |
+| §13 | 多副本 / 调度 / SLO | ⬜ | 远期(§15:不 rush,先保证 backup+restore+migration 可靠)|
+
+> 对应提交:`019582c6`(Week 1)、`61961b30`(Week 2)、`d54f0df0`(版本兼容/恢复测试/配置)。
+
+---
+
 # 1. Reliability Philosophy
 
 For infrastructure products, the core value is not only functionality.
@@ -622,25 +644,25 @@ Restore RTO:
 
 # 14. Recommended Implementation Order
 
-## Stability Sprint Week 1
+## Stability Sprint Week 1(✅ 2026-08 已完成)
 
 ```
-[ ] Automated backup restore test
-[ ] Cell lifecycle state machine
-[ ] Graceful shutdown
-[ ] SQL timeout
-[ ] Resource limits
+[x] Automated backup restore test
+[x] Cell lifecycle state machine
+[x] Graceful shutdown
+[x] SQL timeout
+[x] Resource limits
 ```
 
 ---
 
-## Stability Sprint Week 2
+## Stability Sprint Week 2(✅ 2026-08 已完成)
 
 ```
-[ ] Cell checksum/manifest
-[ ] Migration tool
-[ ] Fault injection framework
-[ ] Benchmark suite
+[x] Cell checksum/manifest
+[x] Migration tool
+[x] Fault injection framework
+[x] Benchmark suite
 ```
 
 ---
