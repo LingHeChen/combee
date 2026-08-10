@@ -116,6 +116,8 @@ services:
       # 节点代理:向 API Server 注册 + 心跳(不配则新 Cell 无节点可用)
       COMBEE_API_SERVER_URL: ${COMBEE_API_SERVER_URL:-http://api-server:8080}
       COMBEE_NODE_ADVERTISE_URL: ${COMBEE_NODE_ADVERTISE_URL:-http://data-node:9000}
+      # 控制面 token:必须与 api-server 同值(同一 .env 变量注入)
+      COMBEE_CONTROL_PLANE_TOKEN: ${COMBEE_CONTROL_PLANE_TOKEN:-}
       COMBEE_DATA_DIR: /data
       COMBEE_MAX_ACTIVE_DBS: "100"
       # 对象存储:腾讯云 COS(S3 兼容)。COS 默认虚拟主机风格,开 COMBEE_S3_VIRTUAL_HOSTED=true
