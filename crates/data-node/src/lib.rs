@@ -192,6 +192,27 @@ impl DataNode {
             let _ = tokio::fs::remove_file(format!("{}-wal", dest.display())).await;
             tracing::info!(%db, key = %latest.location, "restored from full snapshot");
         }
+        // 恢复后完整性校验:SQLite PRAGMA integrity_check 必须返回 "ok",
+        // 否则数据可能损坏——报错而不是静默提供服务(roadmap 4.1)。
+        let check: Result<String> = self
+            .manager
+            .with_conn(db, |conn| {
+                conn.query_row("PRAGMA integrity_check", [], |r| r.get(0))
+                    .map_err(|e| CombeeError::Internal(format!("integrity check: {e}")))
+            })
+            .await;
+        match check {
+            Ok(res) if res.trim() == "ok" => {
+                tracing::info!(%db, "restored database integrity check passed");
+            }
+            Ok(res) => {
+                self.manager.close_database(db).await?;
+                return Err(CombeeError::Internal(format!(
+                    "restored database integrity check failed: {res}"
+                )));
+            }
+            Err(e) => return Err(e),
+        }
         self.cache.clear_database(db);
         Ok(())
     }
@@ -411,6 +432,21 @@ impl DataNode {
     /// SET key value [NX|XX]。返回是否真正写入。
     /// 写入 SQLite(权威)成功后更新缓存;NX/XX 未写入时不动缓存。
     #[allow(clippy::too_many_arguments)]
+    /// KV TTL 上限校验(0 = 不限)。
+    fn check_ttl(&self, ttl_seconds: Option<u64>) -> Result<()> {
+        let max = self.quota.max_ttl_seconds;
+        if max > 0 {
+            if let Some(ttl) = ttl_seconds {
+                if ttl > max {
+                    return Err(CombeeError::QuotaExceeded(format!(
+                        "ttl too large: {ttl}s (max {max}s)"
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub async fn kv_set(
         &self,
         db: DatabaseId,
@@ -422,6 +458,7 @@ impl DataNode {
         generation: i64,
     ) -> Result<bool> {
         self.check_generation(db, generation)?;
+        self.check_ttl(ttl_seconds)?;
         // 配额:key/value 大小、存储硬上限
         let quota = &self.quota;
         if quota.max_kv_key_bytes > 0 && key.len() > quota.max_kv_key_bytes {
@@ -539,6 +576,25 @@ impl DataNode {
     ) -> Result<()> {
         self.check_generation(db, generation)?;
         let cache = self.cache.clone();
+        // 配额:MSET 逐项校验 key/value/ttl(与 kv_set 一致,避免绕过)
+        let quota = &self.quota;
+        for it in &items {
+            if quota.max_kv_key_bytes > 0 && it.key.len() > quota.max_kv_key_bytes {
+                return Err(CombeeError::QuotaExceeded(format!(
+                    "kv key too large: {} bytes (max {})",
+                    it.key.len(),
+                    quota.max_kv_key_bytes
+                )));
+            }
+            if quota.max_kv_value_bytes > 0 && it.value.len() > quota.max_kv_value_bytes {
+                return Err(CombeeError::QuotaExceeded(format!(
+                    "kv value too large: {} bytes (max {})",
+                    it.value.len(),
+                    quota.max_kv_value_bytes
+                )));
+            }
+            self.check_ttl(it.ttl_seconds)?;
+        }
         self.manager
             .with_conn(db, move |conn| {
                 for it in &items {
@@ -579,6 +635,7 @@ impl DataNode {
         generation: i64,
     ) -> Result<bool> {
         self.check_generation(db, generation)?;
+        self.check_ttl(ttl_seconds)?;
         let cache = self.cache.clone();
         self.manager
             .with_conn(db, move |conn| {
@@ -601,6 +658,7 @@ impl DataNode {
         generation: i64,
     ) -> Result<i64> {
         self.check_generation(db, generation)?;
+        self.check_ttl(ttl_seconds)?;
         let cache = self.cache.clone();
         self.manager
             .with_conn(db, move |conn| {
@@ -612,6 +670,20 @@ impl DataNode {
     }
 
     // ---- 生命周期 ----
+
+    /// 确保 Cell 磁盘文件已初始化(显式触发 lazy create;幂等):
+    /// 供 API Server 在 create 后调用,使 Cell 立即进入 Active 状态。
+    /// 目录可写性/磁盘失败会在此暴露,而不是等到首次访问。
+    pub async fn ensure_database(&self, db: DatabaseId) -> Result<()> {
+        self.manager
+            .with_conn(db, |conn| {
+                let _ = conn
+                    .query_row("SELECT 1", [], |r| r.get::<_, i64>(0))
+                    .map_err(sql_err)?;
+                Ok(())
+            })
+            .await
+    }
 
     /// 删除数据库:回收连接、移除磁盘文件,并清空该 db 的缓存条目。
     /// 目录记录由 API Server 在 Metadata 中删除。

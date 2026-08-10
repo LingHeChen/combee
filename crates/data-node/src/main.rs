@@ -52,7 +52,7 @@ async fn main() {
                     ttl_gc_interval: cfg.ttl_gc_interval,
                     kv_cache_capacity: cfg.kv_cache_capacity,
                     kv_durability: cfg.kv_durability,
-                    sql_timeout: Some(std::time::Duration::from_secs(30)),
+                    sql_timeout: (cfg.sql_timeout_secs > 0).then(|| std::time::Duration::from_secs(cfg.sql_timeout_secs)),
                     quota: cfg.quota.clone(),
                 })
                 .with_object_store(store),
@@ -65,7 +65,7 @@ async fn main() {
             ttl_gc_interval: cfg.ttl_gc_interval,
             kv_cache_capacity: cfg.kv_cache_capacity,
             kv_durability: cfg.kv_durability,
-            sql_timeout: Some(std::time::Duration::from_secs(30)),
+            sql_timeout: (cfg.sql_timeout_secs > 0).then(|| std::time::Duration::from_secs(cfg.sql_timeout_secs)),
             quota: cfg.quota.clone(),
         })),
     };
@@ -137,10 +137,15 @@ async fn main() {
         let v = std::env::var("COMBEE_CONTROL_PLANE_TOKEN").unwrap_or_default();
         if v.is_empty() { None } else { Some(v) }
     };
-    let result = server::serve(node, addr, control_token).await;
-    // 退出前注销节点
+    let result = server::serve(node.clone(), addr, control_token).await;
+    // 优雅关闭收尾:先向 API Server 注销节点(心跳停止由 unregister 主动通知),
+    // 再对每个打开的 SQLite 连接做 WAL checkpoint(TRUNCATE)并关闭。
     if let Some(agent) = agent {
+        tracing::info!("unregistering node from API server");
         agent.unregister().await;
     }
+    tracing::info!("checkpointing active databases");
+    node.shutdown().await;
+    tracing::info!("data node shutdown complete");
     result.expect("data node server error");
 }

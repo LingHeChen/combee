@@ -69,6 +69,8 @@ pub trait DataNodeClient: Send + Sync {
     /// 副本追平:立即从对象存储拉取主节点最新归档。
     async fn replicate(&self, db: DatabaseId) -> Result<bool>;
 
+    /// 生命周期:确保 Cell 磁盘文件已初始化(create 后调用,使状态进入 active)。
+    async fn ensure_database(&self, db: DatabaseId) -> Result<()>;
     async fn delete_database(&self, db: DatabaseId) -> Result<()>;
     /// 备份 Cell 快照到对象存储(Data Node 侧执行)。
     async fn backup(&self, db: DatabaseId) -> Result<combee_common::rpc::BackupInfo>;
@@ -187,6 +189,10 @@ impl DataNodeClient for LocalDataNodeClient {
         self.node
             .kv_incr(db, req.key, req.delta, req.ttl_seconds, generation)
             .await
+    }
+
+    async fn ensure_database(&self, db: DatabaseId) -> Result<()> {
+        self.node.ensure_database(db).await
     }
 
     async fn delete_database(&self, db: DatabaseId) -> Result<()> {
@@ -434,6 +440,10 @@ impl DataNodeClient for RemoteDataNodeClient {
             },
         )
         .await
+    }
+
+    async fn ensure_database(&self, db: DatabaseId) -> Result<()> {
+        self.call("rpc/ensure_database", &RpcDb { db }).await
     }
 
     async fn delete_database(&self, db: DatabaseId) -> Result<()> {

@@ -170,7 +170,11 @@ async fn backup_restorable_after_full_destruction() {
         .unwrap();
 
     // snapshot + incremental(两种都要可恢复)
-    n.backup(db).await.unwrap();
+    let snap_info = n.backup(db).await.unwrap();
+    assert!(
+        snap_info.checksum.as_deref().is_some_and(|c| c.len() == 64),
+        "backup carries sha256 checksum"
+    );
     n.kv_set(
         db,
         "k:v".into(),
@@ -199,7 +203,7 @@ async fn backup_restorable_after_full_destruction() {
 
     // ---- Phase 3:仅从对象存储恢复 ----
     let n2 = node(dir.path(), os.path());
-    n2.restore(db, None).await.unwrap();
+    n2.restore(db, None).await.unwrap(); // restore 内部跑 PRAGMA integrity_check,失败即 panic
     let dump_after = logical_dump(&n2, db).await;
     // counter 恢复后应 ≥ 10(snapshot 后未再 incr,恢复点 = incremental 时刻,值为 10)
     assert!(

@@ -101,6 +101,24 @@ pub async fn create_database(
         .metadata
         .create_database(auth.tenant_id, id, storage_node, name)
         .await?;
+    // 生命周期:磁盘初始化(created → active)。失败时回滚目录记录并返回错误,
+    // 避免出现"目录存在但磁盘从未落盘"的悬空 Cell。
+    let ensure = match state.data_node.client_for(id).await {
+        Ok(client) => client.ensure_database(id).await,
+        Err(e) => Err(e),
+    };
+    if let Err(e) = ensure {
+        tracing::error!(%id, "ensure_database failed, rolling back cell record: {e}");
+        let _ = state.metadata.delete_database(auth.tenant_id, id).await;
+        return Err(ApiError(e));
+    }
+    if let Err(e) = state
+        .metadata
+        .set_database_state(auth.tenant_id, id, combee_metadata::DatabaseState::Active)
+        .await
+    {
+        tracing::warn!(%id, "failed to mark cell active: {e}");
+    }
     Ok((
         StatusCode::CREATED,
         Json(CreateDatabaseResponse {
@@ -141,6 +159,11 @@ pub async fn delete_database(
     Path(id): Path<DatabaseId>,
 ) -> Result<StatusCode, ApiError> {
     state.metadata.get_database(auth.tenant_id, id).await?;
+    // 生命周期:先置 deleting(半删除可见状态),再删磁盘文件,最后删目录记录。
+    state
+        .metadata
+        .set_database_state(auth.tenant_id, id, combee_metadata::DatabaseState::Deleting)
+        .await?;
     let client = state.data_node.client_for(id).await?;
     client.delete_database(id).await?;
     state.metadata.delete_database(auth.tenant_id, id).await?;
@@ -189,6 +212,26 @@ pub async fn ensure_database(
         .metadata
         .ensure_database_by_name(auth.tenant_id, &name, storage_node)
         .await?;
+    if created {
+        // 生命周期:新建 Cell 立即初始化磁盘并置 active(与 POST /v1/databases 一致)
+        let id = record.id;
+        let ensure = match state.data_node.client_for(id).await {
+            Ok(client) => client.ensure_database(id).await,
+            Err(e) => Err(e),
+        };
+        if let Err(e) = ensure {
+            tracing::error!(%id, "ensure_database failed, rolling back cell record: {e}");
+            let _ = state.metadata.delete_database(auth.tenant_id, id).await;
+            return Err(ApiError(e));
+        }
+        if let Err(e) = state
+            .metadata
+            .set_database_state(auth.tenant_id, id, combee_metadata::DatabaseState::Active)
+            .await
+        {
+            tracing::warn!(%id, "failed to mark cell active: {e}");
+        }
+    }
     let status = if created {
         StatusCode::CREATED
     } else {

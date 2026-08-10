@@ -52,6 +52,19 @@ pub fn build_s3_store(
     Ok(Arc::new(store))
 }
 
+/// 计算字节内容的 sha256(hex)。
+pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    let mut h = Sha256::new();
+    h.update(bytes);
+    let out = h.finalize();
+    let mut s = String::with_capacity(64);
+    for b in out {
+        s.push_str(&format!("{b:02x}"));
+    }
+    s
+}
+
 /// 生成一次快照的临时文件路径(系统临时目录,避免引号问题)。
 pub(crate) fn temp_snapshot_path(db: DatabaseId) -> std::path::PathBuf {
     let ts = ttl::unix_now();
@@ -83,6 +96,7 @@ pub async fn upload_snapshot(
         "backups/{db}/{ts_ms}-{}.sqlite",
         uuid::Uuid::new_v4()
     ));
+    let checksum = sha256_hex(&bytes);
     store
         .put(&key, PutPayload::from(bytes))
         .await
@@ -91,6 +105,7 @@ pub async fn upload_snapshot(
         key: key.to_string(),
         size_bytes: size,
         created_at: ttl::unix_now().max(0) as u64,
+        checksum: Some(checksum),
     })
 }
 
@@ -203,6 +218,10 @@ mod tests {
             let info = n.backup(db).await.unwrap();
             assert!(info.size_bytes > 0, "snapshot non-empty");
             assert!(info.key.contains(&db.to_string()));
+            assert!(
+                info.checksum.as_deref().is_some_and(|c| c.len() == 64),
+                "backup carries sha256 checksum"
+            );
             let os: Arc<dyn ObjectStore> =
                 Arc::new(LocalFileSystem::new_with_prefix(os_dir.path()).unwrap());
             let metas = list_snapshots(&os, db).await.unwrap();
@@ -339,6 +358,7 @@ pub async fn upload_incr(
         key: snap_key.to_string(),
         size_bytes: snap_bytes.len() as u64 + wal_size as u64,
         created_at: (rev / 1000) as u64,
+        checksum: Some(sha256_hex(&snap_bytes)),
     })
 }
 

@@ -63,6 +63,8 @@ pub struct BackupInfo {
     pub size_bytes: u64,
     /// 创建时间(unix 秒)。
     pub created_at: u64,
+    /// 快照内容 sha256(hex);旧版本备份可能缺失。
+    pub checksum: Option<String>,
 }
 
 /// 恢复请求:db + 可选快照版本(对象 key;缺省取最新)。

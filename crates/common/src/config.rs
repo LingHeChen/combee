@@ -132,6 +132,8 @@ pub struct QuotaConfig {
     pub storage_soft_bytes: u64,
     /// 存储硬上限字节(KV 写入超过则拒绝;0 = 不限)。
     pub storage_hard_bytes: u64,
+    /// KV TTL 上限秒数(超过拒绝;0 = 不限)。默认 30 天。
+    pub max_ttl_seconds: u64,
 }
 
 impl Default for QuotaConfig {
@@ -147,6 +149,7 @@ impl Default for QuotaConfig {
             max_per_cell_concurrency: 0,
             storage_soft_bytes: 0,
             storage_hard_bytes: 0,
+            max_ttl_seconds: 30 * 24 * 60 * 60,
         }
     }
 }
@@ -198,6 +201,7 @@ impl Config {
             max_per_cell_concurrency: env_parse("COMBEE_MAX_PER_CELL_CONCURRENCY", 0),
             storage_soft_bytes: env_parse("COMBEE_STORAGE_SOFT_BYTES", 0),
             storage_hard_bytes: env_parse("COMBEE_STORAGE_HARD_BYTES", 0),
+            max_ttl_seconds: env_parse("COMBEE_MAX_TTL_SECONDS", 30 * 24 * 60 * 60),
         };
         let kv_durability = env_str("COMBEE_KV_DURABILITY", "normal")
             .parse()

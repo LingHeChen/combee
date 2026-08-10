@@ -173,6 +173,7 @@ services:
 
   # ---- Data Node(有状态,stop-first 防同卷双写;数据持久在 /data)----
   data-node:
+    stop_grace_period: 30s
     image: ccr.ccs.tencentyun.com/combee/data-node:latest
     command: ["/usr/local/bin/combee-data-node"]
     environment:
@@ -214,6 +215,7 @@ services:
   # 注意:NodeRegistry 在进程内存,data-node 只注册到被 DNS 命中的那个副本,
   # 另一副本可能暂时路由不到节点(2s 心跳后重注册缓解);registry 落 PG 后可完全消除。
   api-server:
+    stop_grace_period: 30s
     image: ccr.ccs.tencentyun.com/combee/api-server:latest
     command: ["/usr/local/bin/combee-api-server"]
     environment:

@@ -90,6 +90,7 @@ pub fn router(node: Arc<DataNode>, control_token: Option<String>) -> Router {
         .route("/rpc/kv_ttl", post(rpc_kv_ttl))
         .route("/rpc/kv_expire", post(rpc_kv_expire))
         .route("/rpc/kv_incr", post(rpc_kv_incr))
+        .route("/rpc/ensure_database", post(rpc_ensure_database))
         .route("/rpc/delete_database", post(rpc_delete_database))
         .route("/rpc/fence_cell", post(rpc_fence_cell))
         .route("/rpc/replicate", post(rpc_replicate))
@@ -133,7 +134,37 @@ pub async fn serve(
 ) -> std::io::Result<()> {
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!("data node rpc listening on http://{addr}");
-    axum::serve(listener, router(node, control_token)).await
+    // 优雅关闭:收到 SIGTERM/Ctrl+C 后停止接新请求,drain 在途请求,
+    // serve 返回后由 main 执行 unregister + WAL checkpoint。
+    axum::serve(listener, router(node, control_token))
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+}
+
+/// SIGTERM / Ctrl+C → 停止接新请求,等待在途请求完成。
+pub async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install SIGTERM handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+    tracing::info!("shutdown signal received, draining requests");
 }
 
 // ---- handlers ----
@@ -261,6 +292,14 @@ async fn rpc_replicate(
     Json(rpc): Json<RpcDb>,
 ) -> Json<RpcResponse<bool>> {
     let r = node.replicate_from_primary(rpc.db).await;
+    Json(RpcResponse::from_result(r))
+}
+
+async fn rpc_ensure_database(
+    State(node): State<Arc<DataNode>>,
+    Json(rpc): Json<RpcDb>,
+) -> Json<RpcResponse<()>> {
+    let r = node.ensure_database(rpc.db).await;
     Json(RpcResponse::from_result(r))
 }
 

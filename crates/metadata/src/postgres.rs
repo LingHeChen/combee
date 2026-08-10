@@ -358,6 +358,22 @@ impl MetadataStore for PostgresStore {
         rows.iter().map(row_to_record).collect()
     }
 
+    async fn set_database_state(
+        &self,
+        tenant: TenantId,
+        id: DatabaseId,
+        state: DatabaseState,
+    ) -> Result<()> {
+        sqlx::query("UPDATE databases SET state = $1 WHERE id = $2 AND tenant_id = $3")
+            .bind(state.as_str())
+            .bind(id.0)
+            .bind(tenant.0)
+            .execute(&self.pool)
+            .await
+            .map_err(PostgresStore::internal)?;
+        Ok(())
+    }
+
     async fn delete_database(&self, tenant: TenantId, id: DatabaseId) -> Result<()> {
         let deleted = sqlx::query("DELETE FROM databases WHERE id = $1 AND tenant_id = $2")
             .bind(id.0)

@@ -160,6 +160,14 @@ pub trait MetadataStore: Send + Sync {
     /// 删除目录记录;不存在报 [`CombeeError::DatabaseNotFound`]。
     async fn delete_database(&self, tenant: TenantId, id: DatabaseId) -> Result<()>;
 
+    /// 更新 Cell 生命周期状态(created → active → deleting)。
+    async fn set_database_state(
+        &self,
+        tenant: TenantId,
+        id: DatabaseId,
+        state: DatabaseState,
+    ) -> Result<()>;
+
     /// 设置/清除副本节点(单 replica)。返回更新后的记录。
     async fn set_replica_node(
         &self,
@@ -531,6 +539,21 @@ impl MetadataStore for InMemoryStore {
         inner.name_index.retain(|_, v| *v != id);
         Ok(())
     }
+    async fn set_database_state(
+        &self,
+        tenant: TenantId,
+        id: DatabaseId,
+        state: DatabaseState,
+    ) -> Result<()> {
+        let mut inner = self.inner.lock().unwrap();
+        let rec = inner
+            .databases
+            .get_mut(&(tenant, id))
+            .ok_or(CombeeError::DatabaseNotFound(id))?;
+        rec.state = state;
+        Ok(())
+    }
+
 
     async fn set_replica_node(
         &self,

@@ -147,8 +147,8 @@ async fn main() {
         pricing: pricing_manager,
         admin_token: config.admin_token.clone(),
         admin_api_key: (!config.admin_api_key.is_empty()).then_some(config.admin_api_key.clone()),
-        quota: Default::default(),
-        concurrency: Default::default(),
+        quota: config.quota.clone(),
+        concurrency: std::sync::Arc::new(combee_api_server::quota::ConcurrencyCounters::default()),
     };
     let app = build_app(state);
 
