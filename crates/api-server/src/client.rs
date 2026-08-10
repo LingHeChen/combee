@@ -287,6 +287,19 @@ impl RemoteDataNodeClient {
         let mut req = self.http.post(format!("{}/{}", self.base, path)).json(body);
         if let Some(token) = &self.control_token {
             req = req.header("x-control-token", token);
+            tracing::debug!(
+                service = "combee-api",
+                event = "rpc.request",
+                rpc_path = %path,
+                token_prefix = token.chars().take(8).collect::<String>(),
+            );
+        } else {
+            tracing::warn!(
+                service = "combee-api",
+                event = "rpc.request.no_token",
+                rpc_path = %path,
+                reason = "control token not configured",
+            );
         }
         // request_id 贯穿:从 task-local 读取并随 RPC 透传
         if let Ok(rid) = crate::REQUEST_ID.try_with(|id| id.clone())

@@ -64,7 +64,11 @@ async fn make_app() -> (Router, TempDir, TenantId) {
     let metadata: Arc<dyn MetadataStore> = Arc::new(InMemoryStore::new());
     metadata.create_tenant(tenant_b).await.unwrap();
     metadata
-        .create_api_key(DEFAULT_TENANT, combee_common::api_key::hash(KEY_A), "default")
+        .create_api_key(
+            DEFAULT_TENANT,
+            combee_common::api_key::hash(KEY_A),
+            "default",
+        )
         .await
         .unwrap();
     metadata

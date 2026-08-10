@@ -101,17 +101,7 @@ pub async fn create_database(
         .metadata
         .create_database(auth.tenant_id, id, storage_node, name)
         .await?;
-    // 生命周期:磁盘初始化(created → active)。失败时回滚目录记录并返回错误,
-    // 避免出现"目录存在但磁盘从未落盘"的悬空 Cell。
-    let ensure = match state.data_node.client_for(id).await {
-        Ok(client) => client.ensure_database(id).await,
-        Err(e) => Err(e),
-    };
-    if let Err(e) = ensure {
-        tracing::error!(%id, "ensure_database failed, rolling back cell record: {e}");
-        let _ = state.metadata.delete_database(auth.tenant_id, id).await;
-        return Err(ApiError(e));
-    }
+    // lazy create:仅写目录记录,磁盘文件(主库+KV)在首次访问时才生成。
     if let Err(e) = state
         .metadata
         .set_database_state(auth.tenant_id, id, combee_metadata::DatabaseState::Active)

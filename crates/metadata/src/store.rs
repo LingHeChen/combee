@@ -229,12 +229,7 @@ pub trait MetadataStore: Send + Sync {
 
     // ---- Data Node 注册表(共享 authority;Postgres 模式下多 API 副本共享)----
     /// 注册或更新节点(幂等;address/capacity/last_heartbeat 更新)。
-    async fn upsert_data_node(
-        &self,
-        id: NodeId,
-        addr: String,
-        capacity: usize,
-    ) -> Result<()>;
+    async fn upsert_data_node(&self, id: NodeId, addr: String, capacity: usize) -> Result<()>;
 
     /// 上报心跳。未知节点返回 false。
     async fn heartbeat_data_node(&self, id: NodeId, active_conns: usize) -> Result<bool>;
@@ -563,7 +558,6 @@ impl MetadataStore for InMemoryStore {
         Ok(())
     }
 
-
     async fn set_replica_node(
         &self,
         tenant: TenantId,
@@ -622,7 +616,6 @@ impl MetadataStore for InMemoryStore {
         rec.generation += 1;
         Ok(rec.clone())
     }
-
 
     async fn list_all_databases(&self) -> Result<Vec<DatabaseRecord>> {
         let inner = self.inner.lock().unwrap();

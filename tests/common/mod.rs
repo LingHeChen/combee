@@ -65,7 +65,6 @@ pub async fn test_app_with_keys(keys: &[&str]) -> (Router, tempfile::TempDir) {
     for k in keys {
         metadata
             .create_api_key(DEFAULT_TENANT, combee_common::api_key::hash(k), "default")
-
             .await
             .unwrap();
     }

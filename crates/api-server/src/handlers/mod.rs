@@ -1,7 +1,7 @@
 pub mod backup;
-pub mod health;
 pub mod database;
 pub mod failover;
+pub mod health;
 pub mod internal;
 pub mod kv;
 pub mod replication;

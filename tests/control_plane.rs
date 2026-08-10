@@ -31,7 +31,11 @@ async fn make_app(control_token: Option<&str>) -> (Router, TempDir) {
     let metadata: Arc<dyn MetadataStore> = Arc::new(InMemoryStore::new());
     // 预置一个租户 key(key 模式下 public 接口可用)
     metadata
-        .create_api_key(DEFAULT_TENANT, combee_common::api_key::hash("cmb_sk_test"), "default")
+        .create_api_key(
+            DEFAULT_TENANT,
+            combee_common::api_key::hash("cmb_sk_test"),
+            "default",
+        )
         .await
         .unwrap();
 

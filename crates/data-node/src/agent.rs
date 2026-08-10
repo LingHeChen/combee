@@ -51,8 +51,7 @@ impl NodeAgent {
                 if let Some(t) = &control_token {
                     headers.insert(
                         "x-control-token",
-                        reqwest::header::HeaderValue::from_str(t)
-                            .expect("invalid control token"),
+                        reqwest::header::HeaderValue::from_str(t).expect("invalid control token"),
                     );
                 }
                 let mut builder = reqwest::Client::builder().timeout(Duration::from_secs(5));

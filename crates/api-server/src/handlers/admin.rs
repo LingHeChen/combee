@@ -146,10 +146,7 @@ pub async fn admin_migrate_cell(
             "to_node_id is already the storage node".into(),
         )));
     }
-    state
-        .data_node
-        .client_for_node(req.to_node_id)
-        .await?;
+    state.data_node.client_for_node(req.to_node_id).await?;
 
     // 1) 冻结写:fencing(generation +1)
     let frozen = state
@@ -274,7 +271,6 @@ pub async fn admin_list_pricing_versions(
     let versions = state.metadata.list_pricing_versions().await?;
     Ok(Json(versions))
 }
-
 
 /// POST /admin/tenants —— 为独立新租户创建一个专属 API key(注册/开通用)。
 /// 响应中的 key 明文仅返回一次。

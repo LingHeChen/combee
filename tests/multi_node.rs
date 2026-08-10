@@ -63,8 +63,8 @@ async fn create_database_round_robin_placement() {
     let (url_b, _) = spawn_data_node().await;
 
     let registry = Arc::new(NodeRegistry::new());
-    let node_a = registry.register(url_a, 10);
-    let node_b = registry.register(url_b, 10);
+    let node_a = registry.register(url_a, 10).await;
+    let node_b = registry.register(url_b, 10).await;
 
     let metadata: Arc<dyn MetadataStore> = Arc::new(InMemoryStore::new());
     let provider: Arc<dyn DataNodeProvider> = Arc::new(RoutingProvider::new(
@@ -123,8 +123,8 @@ async fn routing_isolates_data_per_node() {
     let (url_b, _) = spawn_data_node().await;
 
     let registry = Arc::new(NodeRegistry::new());
-    let node_a = registry.register(url_a, 10);
-    let node_b = registry.register(url_b, 10);
+    let node_a = registry.register(url_a, 10).await;
+    let node_b = registry.register(url_b, 10).await;
     let metadata: Arc<dyn MetadataStore> = Arc::new(InMemoryStore::new());
     let provider = Arc::new(RoutingProvider::new(
         registry.clone(),
@@ -237,8 +237,14 @@ async fn agent_registers_heartbeats_and_unregisters() {
     });
 
     // agent 注册(自愈循环:注册是异步的,轮询等待)
-    let (agent, _hb) =
-        NodeAgent::start(&format!("http://{addr}"), "http://node-a:9000", 10, None).await;
+    let (agent, _hb) = NodeAgent::start(
+        &format!("http://{addr}"),
+        "http://node-a:9000",
+        10,
+        None,
+        None,
+    )
+    .await;
     let mut node_id = None;
     for _ in 0..30 {
         if let Some(id) = agent.id() {
@@ -248,20 +254,24 @@ async fn agent_registers_heartbeats_and_unregisters() {
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
     let node_id = node_id.expect("agent registered within timeout");
-    assert_eq!(registry.list().len(), 1, "agent 注册后 registry 有一个节点");
-    assert!(registry.is_healthy(node_id));
     assert_eq!(
-        registry.addr(node_id).as_deref(),
+        registry.list().await.len(),
+        1,
+        "agent 注册后 registry 有一个节点"
+    );
+    assert!(registry.is_healthy(node_id).await);
+    assert_eq!(
+        registry.addr(node_id).await.as_deref(),
         Some("http://node-a:9000")
     );
 
     // 心跳任务在跑(300ms 后仍健康)
     tokio::time::sleep(Duration::from_millis(300)).await;
-    assert!(registry.is_healthy(node_id));
+    assert!(registry.is_healthy(node_id).await);
 
     // 注销
     agent.unregister().await;
-    assert_eq!(registry.list().len(), 0, "注销后 registry 为空");
+    assert_eq!(registry.list().await.len(), 0, "注销后 registry 为空");
 }
 
 // ---- helpers ----

@@ -41,6 +41,8 @@ pub async fn failover_cell(
 
     // 3. fence 新主
     let _ = replica_client.fence_cell(db, promoted.generation).await;
+    // 路由缓存失效:让后续写请求按新 storage_node_id(副本)路由,而不是旧主
+    state.data_node.invalidate_route(db);
 
     // 4. fence 旧主(尽力而为;旧主可能不可达)
     // 旧主可能不可达:fence 失败忽略(尽力而为)。

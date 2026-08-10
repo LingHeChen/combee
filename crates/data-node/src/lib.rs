@@ -126,6 +126,13 @@ impl DataNode {
             .copied()
             .unwrap_or(0);
         if generation != cur {
+            tracing::warn!(
+                service = "combee-data-node",
+                event = "kv.fenced",
+                cell_id = %db,
+                write_generation = generation,
+                current_generation = cur,
+            );
             return Err(CombeeError::Forbidden(format!(
                 "cell {db} fenced: write generation {generation} != current {cur}"
             )));

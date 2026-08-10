@@ -55,7 +55,10 @@ async fn main() {
         bootstrap_keys.push(config.admin_api_key.clone());
     }
     if !bootstrap_keys.is_empty() {
-        tracing::info!("bootstrapping {} preconfigured api keys", bootstrap_keys.len());
+        tracing::info!(
+            "bootstrapping {} preconfigured api keys",
+            bootstrap_keys.len()
+        );
         metadata
             .bootstrap_api_keys(&bootstrap_keys)
             .await

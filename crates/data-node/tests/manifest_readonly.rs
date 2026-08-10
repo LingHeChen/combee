@@ -5,9 +5,9 @@
 use std::io::{Seek, SeekFrom, Write};
 use std::sync::Arc;
 
+use combee_common::DatabaseId;
 use combee_common::config::KvDurability;
 use combee_data_node::{DataNode, DataNodeConfig};
-use combee_common::DatabaseId;
 use object_store::local::LocalFileSystem;
 use tempfile::TempDir;
 
@@ -59,10 +59,7 @@ async fn corrupted_cell_enters_readonly_and_blocks_writes() {
 
     // 破坏主库文件中部(覆盖页面内容 → quick_check 应失败)
     let path = combee_data_node::storage::db_path(dir.path(), db);
-    let mut f = std::fs::OpenOptions::new()
-        .write(true)
-        .open(&path)
-        .unwrap();
+    let mut f = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
     let len = f.metadata().unwrap().len();
     assert!(len > 4096, "cell file has pages");
     f.seek(SeekFrom::Start(len / 2)).unwrap();

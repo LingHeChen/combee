@@ -52,7 +52,8 @@ async fn main() {
                     ttl_gc_interval: cfg.ttl_gc_interval,
                     kv_cache_capacity: cfg.kv_cache_capacity,
                     kv_durability: cfg.kv_durability,
-                    sql_timeout: (cfg.sql_timeout_secs > 0).then(|| std::time::Duration::from_secs(cfg.sql_timeout_secs)),
+                    sql_timeout: (cfg.sql_timeout_secs > 0)
+                        .then(|| std::time::Duration::from_secs(cfg.sql_timeout_secs)),
                     quota: cfg.quota.clone(),
                 })
                 .with_object_store(store),
@@ -65,7 +66,8 @@ async fn main() {
             ttl_gc_interval: cfg.ttl_gc_interval,
             kv_cache_capacity: cfg.kv_cache_capacity,
             kv_durability: cfg.kv_durability,
-            sql_timeout: (cfg.sql_timeout_secs > 0).then(|| std::time::Duration::from_secs(cfg.sql_timeout_secs)),
+            sql_timeout: (cfg.sql_timeout_secs > 0)
+                .then(|| std::time::Duration::from_secs(cfg.sql_timeout_secs)),
             quota: cfg.quota.clone(),
         })),
     };

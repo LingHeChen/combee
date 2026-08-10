@@ -15,8 +15,9 @@ use sqlx::Row;
 use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
 use uuid::Uuid;
 
-use crate::store::{DataNodeRecord, 
-    ApiKeyRecord, DatabaseRecord, DatabaseState, MetadataStore, TenantRecord, WaitlistEntry,
+use crate::store::{
+    ApiKeyRecord, DataNodeRecord, DatabaseRecord, DatabaseState, MetadataStore, TenantRecord,
+    WaitlistEntry,
 };
 
 const SCHEMA: &str = "
@@ -272,7 +273,10 @@ impl MetadataStore for PostgresStore {
         }
         // 不存在 → 创建;唯一约束兜底并发(冲突时再查一次)
         let id = DatabaseId::new();
-        match self.create_database(tenant, id, storage_node, Some(name)).await {
+        match self
+            .create_database(tenant, id, storage_node, Some(name))
+            .await
+        {
             Ok(rec) => Ok((rec, true)),
             Err(CombeeError::DatabaseAlreadyExists(_)) => {
                 let rec = self.get_database_by_name(tenant, name).await?;

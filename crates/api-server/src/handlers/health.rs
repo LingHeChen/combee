@@ -8,12 +8,17 @@ use combee_common::CombeeError;
 
 use crate::AppState;
 
-pub async fn ready(State(state): State<AppState>) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+pub async fn ready(
+    State(state): State<AppState>,
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     if let Err(e) = state.metadata.ping().await {
         tracing::error!(event = "ready.failed", error = %e, "metadata postgres unreachable");
         return Err((
             axum::http::StatusCode::SERVICE_UNAVAILABLE,
-            axum::Json(serde_json::json!({"status": "not_ready", "reason": "postgres_unavailable"})),
+            axum::Json(
+                serde_json::json!({"status": "not_ready", "reason": "postgres_unavailable"}),
+            ),
         ));
     }
     // 多节点模式下要求至少一个健康 DataNode(单机/未注册节点模式跳过)

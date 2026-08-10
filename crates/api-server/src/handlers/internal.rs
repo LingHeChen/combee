@@ -15,7 +15,10 @@ pub async fn register(
     State(state): State<AppState>,
     Json(req): Json<NodeRegisterRequest>,
 ) -> Json<NodeRegisterResponse> {
-    let id = state.nodes.register_with_id(req.id, req.addr, req.capacity).await;
+    let id = state
+        .nodes
+        .register_with_id(req.id, req.addr, req.capacity)
+        .await;
     Json(NodeRegisterResponse { id })
 }
 

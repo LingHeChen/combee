@@ -8,15 +8,18 @@ use tower_http::trace::TraceLayer;
 
 use crate::AppState;
 use crate::auth;
-use crate::handlers::{health, 
-    admin, backup, credits, database, failover, internal, keys, kv, replication, sql, usage,
-    waitlist,
+use crate::handlers::{
+    admin, backup, credits, database, failover, health, internal, keys, kv, replication, sql,
+    usage, waitlist,
 };
 
 pub fn build_app(state: AppState) -> Router {
     // 探活/就绪:不挂租户认证(供外部探针、Swarm healthcheck、告警使用)。
     let health_routes = Router::new()
-        .route("/health", get(|| async { axum::Json(serde_json::json!({"status": "ok"})) }))
+        .route(
+            "/health",
+            get(|| async { axum::Json(serde_json::json!({"status": "ok"})) }),
+        )
         .route("/ready", get(health::ready))
         .with_state(state.clone());
 
@@ -106,10 +109,7 @@ pub fn build_app(state: AppState) -> Router {
         .route("/admin/tenants", post(admin::admin_create_tenant))
         .route("/admin/vouchers", get(admin::admin_list_vouchers))
         .route("/admin/waitlist", get(waitlist::admin_list))
-        .route(
-            "/admin/cells/{id}/migrate",
-            post(admin::admin_migrate_cell),
-        )
+        .route("/admin/cells/{id}/migrate", post(admin::admin_migrate_cell))
         .route(
             "/admin/pricing/versions",
             post(admin::admin_create_pricing_version),

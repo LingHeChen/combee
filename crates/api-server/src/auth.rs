@@ -89,6 +89,12 @@ pub async fn internal_auth(State(state): State<AppState>, req: Request, next: Ne
             .map(|t| t == expected)
             .unwrap_or(false);
         if !bearer_ok && !header_ok {
+            tracing::warn!(
+                service = "combee-api",
+                event = "internal.unauthorized",
+                path = %req.uri(),
+                provided = req.headers().get("x-control-token").and_then(|v| v.to_str().ok()).map(|s| s.chars().take(8).collect::<String>()),
+            );
             return (
                 StatusCode::UNAUTHORIZED,
                 Json(ErrorBody {
@@ -108,7 +114,8 @@ pub async fn admin_auth(State(state): State<AppState>, req: Request, next: Next)
     // 预配置的 admin API key(COMBEE_ADMIN_API_KEY)可以调用 admin 接口;
     // 其余租户 key 永远不能调用 admin 接口。
     if let Some(admin_key) = &state.admin_api_key {
-        if req.headers().get("x-api-key").and_then(|v| v.to_str().ok()) == Some(admin_key.as_str()) {
+        if req.headers().get("x-api-key").and_then(|v| v.to_str().ok()) == Some(admin_key.as_str())
+        {
             return next.run(req).await;
         }
     }

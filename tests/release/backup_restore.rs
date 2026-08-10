@@ -293,11 +293,7 @@ async fn delete_cell_then_restore_from_backup() {
     // ---- 数据一致 ----
     let v = n.kv_get(db, "k:a".into()).await.unwrap().map(|e| e.value);
     assert_eq!(v.as_deref(), Some("value-1"), "KV 恢复");
-    let ttl = n
-        .kv_ttl(db, "k:b".into())
-        .await
-        .unwrap()
-        .unwrap_or(0);
+    let ttl = n.kv_ttl(db, "k:b".into()).await.unwrap().unwrap_or(0);
     assert!(ttl > 0, "TTL 恢复(k:b 应仍有剩余秒数,实际 {ttl})");
     let r = n
         .execute_sql(
@@ -317,7 +313,11 @@ async fn delete_cell_then_restore_from_backup() {
 
     // 逻辑 dump 一致(恢复前 == 恢复后)
     let dump_after = logical_dump(&n, db).await;
-    assert_eq!(sha256(&dump_before), sha256(&dump_after), "恢复前后逻辑一致");
+    assert_eq!(
+        sha256(&dump_before),
+        sha256(&dump_after),
+        "恢复前后逻辑一致"
+    );
 
     // ---- 销毁 ----
     n.delete_database(db).await.unwrap();

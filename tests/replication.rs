@@ -136,7 +136,7 @@ async fn replication_api_sets_replica() {
     let dir = tempfile::tempdir().unwrap();
     let metadata: Arc<dyn MetadataStore> = Arc::new(InMemoryStore::new());
     let registry = Arc::new(NodeRegistry::new());
-    let replica_node = registry.register("http://replica:9000".into(), 10);
+    let replica_node = registry.register("http://replica:9000".into(), 10).await;
     let local = Arc::new(LocalDataNodeClient::new(Arc::new(DataNode::new(
         DataNodeConfig {
             data_dir: dir.path().to_path_buf(),
