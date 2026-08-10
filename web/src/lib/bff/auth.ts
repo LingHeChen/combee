@@ -23,15 +23,43 @@ export interface BffSession {
   created_at: number;
 }
 
+/** 探测 Cell 是否已有用户数据(console_users 表非空)。 */
+async function cellHasUsers(cellId: string): Promise<boolean> {
+  try {
+    const r = await combeeRequest<{ rows: unknown[][] }>(
+      `/v1/databases/${cellId}/sql`,
+      { method: "POST", body: { sql: "SELECT 1 FROM console_users LIMIT 1" }, apiKey: bffKey() },
+    );
+    return (r.rows ?? []).length > 0;
+  } catch {
+    return false; // 表不存在/查询失败 → 视为空
+  }
+}
+
 async function ensureSessionCell(): Promise<string> {
-  // ensure 语义:固定名会话 Cell,幂等复用(同名不再创建)
+  // ensure 语义:固定名会话 Cell,幂等复用(同名不再创建)。
+  // 兼容旧数据:新 cell 无用户时,扫描租户内其他 cell 找含 console_users 的
+  // 旧会话 cell 复用(ensure 改固定名前的随机 id cell),避免用户数据"丢失"。
   if (process.env.COMBEE_BFF_CELL) return process.env.COMBEE_BFF_CELL;
   const name = process.env.COMBEE_BFF_CELL_NAME ?? "combee-bff";
   const r = await combeeRequest<{ cell: { id: string } }>(
     `/v1/databases/by-name/${encodeURIComponent(name)}`,
     { method: "PUT", apiKey: bffKey() },
   );
-  return r.cell.id;
+  const fresh = r.cell.id;
+  if (await cellHasUsers(fresh)) return fresh;
+  try {
+    const cells = await combeeRequest<Array<{ id: string }>>("/v1/databases?limit=1000", {
+      apiKey: bffKey(),
+    });
+    for (const c of cells) {
+      if (c.id === fresh) continue;
+      if (await cellHasUsers(c.id)) return c.id; // 复用旧会话 cell(保留旧用户)
+    }
+  } catch {
+    /* 扫描失败不影响默认返回 */
+  }
+  return fresh;
 }
 
 /** BFF 服务账号 key:dev(auth=off)可空;生产必填(用于建表/建用户 key)。 */
