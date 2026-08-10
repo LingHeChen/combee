@@ -114,6 +114,86 @@ pub async fn admin_generate_vouchers(
     }))
 }
 
+/// 迁移 Cell 到指定节点(运维;admin API):
+/// 1. 冻结写(fencing):generation +1 → 旧节点后续写被拒;
+/// 2. 源节点全量备份到对象存储;
+/// 3. 目标节点从该快照恢复;
+/// 4. 切换路由(storage_node_id = 目标)+ 失效路由缓存。
+#[derive(Debug, Deserialize)]
+pub struct MigrateCellRequest {
+    pub to_node_id: combee_common::NodeId,
+}
+
+#[derive(Debug, Serialize)]
+pub struct MigrateCellResponse {
+    pub cell_id: combee_common::DatabaseId,
+    pub from_node: Option<combee_common::NodeId>,
+    pub to_node: combee_common::NodeId,
+    pub generation: i64,
+}
+
+pub async fn admin_migrate_cell(
+    State(state): State<AppState>,
+    Path(id): Path<combee_common::DatabaseId>,
+    Json(req): Json<MigrateCellRequest>,
+) -> Result<Json<MigrateCellResponse>, ApiError> {
+    let record = state.metadata.get_database_by_id(id).await?;
+    let from_node = record.storage_node_id;
+
+    // 目标节点必须存在且不是当前主节点
+    if Some(req.to_node_id) == from_node {
+        return Err(ApiError(combee_common::CombeeError::InvalidRequest(
+            "to_node_id is already the storage node".into(),
+        )));
+    }
+    state
+        .data_node
+        .client_for_node(req.to_node_id)
+        .await?;
+
+    // 1) 冻结写:fencing(generation +1)
+    let frozen = state
+        .metadata
+        .migrate_database(record.tenant_id, id, req.to_node_id)
+        .await?;
+    let generation = frozen.generation;
+
+    // 2) 源节点备份(全量快照 → 对象存储)
+    let backup_info = match state.data_node.client_for(id).await {
+        Ok(src) => src.backup(id).await,
+        Err(e) => {
+            tracing::error!(%id, to_node = %req.to_node_id, "migrate: source backup skipped ({e})");
+            // 源节点不可达:仍尝试直接恢复(目标节点从最新快照兜底)
+            Err(e)
+        }
+    };
+    let version = backup_info.ok().map(|b| b.key);
+
+    // 3) 目标节点恢复(优先用刚上传的快照;否则用目标侧最新)
+    state
+        .data_node
+        .client_for_node(req.to_node_id)
+        .await?
+        .restore(id, version)
+        .await?;
+
+    // 4) 切路由:metadata 已在第 1 步切好;清理路由缓存让新请求立即走新节点
+    state.data_node.invalidate_route(id);
+    tracing::info!(
+        %id,
+        from = %from_node.map(|n| n.to_string()).unwrap_or_else(|| "-".into()),
+        to = %req.to_node_id,
+        generation,
+        "cell migrated"
+    );
+    Ok(Json(MigrateCellResponse {
+        cell_id: id,
+        from_node,
+        to_node: req.to_node_id,
+        generation,
+    }))
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ListVouchersQuery {
     pub limit: Option<i64>,

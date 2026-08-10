@@ -107,6 +107,10 @@ pub fn build_app(state: AppState) -> Router {
         .route("/admin/vouchers", get(admin::admin_list_vouchers))
         .route("/admin/waitlist", get(waitlist::admin_list))
         .route(
+            "/admin/cells/{id}/migrate",
+            post(admin::admin_migrate_cell),
+        )
+        .route(
             "/admin/pricing/versions",
             post(admin::admin_create_pricing_version),
         )

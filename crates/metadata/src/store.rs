@@ -183,6 +183,15 @@ pub trait MetadataStore: Send + Sync {
     /// `replica_node_id = NULL`、`generation += 1`。无副本时报错。
     async fn promote_replica(&self, tenant: TenantId, id: DatabaseId) -> Result<DatabaseRecord>;
 
+    /// 迁移(运维):把 Cell 主节点切到新节点 —— `storage_node_id = new_node`、
+    /// `generation += 1`(fencing:旧节点后续写被拒)。副本保留。
+    async fn migrate_database(
+        &self,
+        tenant: TenantId,
+        id: DatabaseId,
+        new_node: NodeId,
+    ) -> Result<DatabaseRecord>;
+
     /// 列出全部 Cell(自动 failover 扫描用,跨租户)。
     async fn list_all_databases(&self) -> Result<Vec<DatabaseRecord>>;
 
@@ -598,6 +607,22 @@ impl MetadataStore for InMemoryStore {
         record.generation += 1;
         Ok(record.clone())
     }
+    async fn migrate_database(
+        &self,
+        tenant: TenantId,
+        id: DatabaseId,
+        new_node: NodeId,
+    ) -> Result<DatabaseRecord> {
+        let mut inner = self.inner.lock().unwrap();
+        let rec = inner
+            .databases
+            .get_mut(&(tenant, id))
+            .ok_or(CombeeError::DatabaseNotFound(id))?;
+        rec.storage_node_id = Some(new_node);
+        rec.generation += 1;
+        Ok(rec.clone())
+    }
+
 
     async fn list_all_databases(&self) -> Result<Vec<DatabaseRecord>> {
         let inner = self.inner.lock().unwrap();

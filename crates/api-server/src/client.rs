@@ -512,6 +512,8 @@ pub trait DataNodeProvider: Send + Sync {
     async fn client_for(&self, db: DatabaseId) -> Result<Arc<dyn DataNodeClient>>;
     /// 按节点 ID 解析出客户端(failover 等控制面操作用)。
     async fn client_for_node(&self, node: NodeId) -> Result<Arc<dyn DataNodeClient>>;
+    /// 使某 Cell 的路由缓存失效(迁移/failover 后调用;默认实现:无缓存,空操作)。
+    fn invalidate_route(&self, _db: DatabaseId) {}
 }
 
 /// 单进程模式:所有 Cell 都走同一个本地客户端。

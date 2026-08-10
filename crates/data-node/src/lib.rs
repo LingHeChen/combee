@@ -358,6 +358,7 @@ impl DataNode {
         generation: i64,
     ) -> Result<SqlResult> {
         self.check_generation(db, generation)?;
+        self.check_writable(db)?;
         let quota = self.quota.clone();
         self.timeout_sql(
             self.manager.with_conn(db, move |conn| {
@@ -376,6 +377,7 @@ impl DataNode {
         generation: i64,
     ) -> Result<Vec<SqlResult>> {
         self.check_generation(db, generation)?;
+        self.check_writable(db)?;
         let quota = self.quota.clone();
         self.timeout_sql(
             self.manager.with_conn(db, move |conn| {
@@ -432,6 +434,16 @@ impl DataNode {
     /// SET key value [NX|XX]。返回是否真正写入。
     /// 写入 SQLite(权威)成功后更新缓存;NX/XX 未写入时不动缓存。
     #[allow(clippy::too_many_arguments)]
+    /// 只读保护:完整性校验失败的 Cell 拒绝写操作(roadmap 4.1)。
+    fn check_writable(&self, db: DatabaseId) -> Result<()> {
+        if self.manager.is_readonly(db) {
+            return Err(CombeeError::Internal(format!(
+                "cell {db} is read-only (integrity check failed); contact operator to restore from backup"
+            )));
+        }
+        Ok(())
+    }
+
     /// KV TTL 上限校验(0 = 不限)。
     fn check_ttl(&self, ttl_seconds: Option<u64>) -> Result<()> {
         let max = self.quota.max_ttl_seconds;
@@ -458,6 +470,7 @@ impl DataNode {
         generation: i64,
     ) -> Result<bool> {
         self.check_generation(db, generation)?;
+        self.check_writable(db)?;
         self.check_ttl(ttl_seconds)?;
         // 配额:key/value 大小、存储硬上限
         let quota = &self.quota;
@@ -511,6 +524,7 @@ impl DataNode {
     /// DEL key。返回是否删除了 key。删除成功后失效缓存。
     pub async fn kv_del(&self, db: DatabaseId, key: String, generation: i64) -> Result<bool> {
         self.check_generation(db, generation)?;
+        self.check_writable(db)?;
         let cache = self.cache.clone();
         self.manager
             .with_conn(db, move |conn| {
@@ -575,6 +589,7 @@ impl DataNode {
         generation: i64,
     ) -> Result<()> {
         self.check_generation(db, generation)?;
+        self.check_writable(db)?;
         let cache = self.cache.clone();
         // 配额:MSET 逐项校验 key/value/ttl(与 kv_set 一致,避免绕过)
         let quota = &self.quota;
@@ -636,6 +651,7 @@ impl DataNode {
     ) -> Result<bool> {
         self.check_generation(db, generation)?;
         self.check_ttl(ttl_seconds)?;
+        self.check_writable(db)?;
         let cache = self.cache.clone();
         self.manager
             .with_conn(db, move |conn| {
@@ -659,6 +675,7 @@ impl DataNode {
     ) -> Result<i64> {
         self.check_generation(db, generation)?;
         self.check_ttl(ttl_seconds)?;
+        self.check_writable(db)?;
         let cache = self.cache.clone();
         self.manager
             .with_conn(db, move |conn| {

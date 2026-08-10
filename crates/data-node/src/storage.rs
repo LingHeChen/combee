@@ -56,6 +56,47 @@ pub fn storage_bytes(data_dir: &Path, db: DatabaseId) -> u64 {
 
 /// 打开(必要时创建)一个 Cell 的 SQLite 连接,并初始化 schema。
 /// `durability` 决定 `synchronous` pragma(设计文档第 14 节)。
+/// Cell manifest 文件路径(记录格式版本/时间戳;数据完整性见 quick_check)。
+pub fn manifest_path(data_dir: &Path, db: DatabaseId) -> PathBuf {
+    PathBuf::from(format!("{}.manifest.json", db_path(data_dir, db).display()))
+}
+
+/// 读取 manifest;缺失或损坏返回 None(首次创建前/旧版本兼容)。
+pub fn read_manifest(data_dir: &Path, db: DatabaseId) -> Option<serde_json::Value> {
+    let p = manifest_path(data_dir, db);
+    let bytes = fs::read(&p).ok()?;
+    serde_json::from_slice(&bytes).ok()
+}
+
+/// 写入/更新 manifest(format_version 恒为 1)。
+pub fn write_manifest(data_dir: &Path, db: DatabaseId, durability: KvDurability) -> Result<()> {
+    let p = manifest_path(data_dir, db);
+    let now = crate::ttl::unix_now();
+    let meta = serde_json::json!({
+        "format_version": 1,
+        "cell_id": db.to_string(),
+        "created_at": now.max(0) as u64,
+        "updated_at": now.max(0) as u64,
+        "durability": format!("{durability}"),
+    });
+    fs::write(&p, serde_json::to_vec(&meta).expect("json"))
+        .map_err(|e| CombeeError::Internal(format!("write manifest {}: {e}", p.display())))
+}
+
+/// SQLite 完整性快速校验(PRAGMA quick_check):返回 "ok" 才通过。
+pub fn quick_check(conn: &Connection) -> Result<()> {
+    let res: String = conn
+        .query_row("PRAGMA quick_check", [], |r| r.get(0))
+        .map_err(sql_err)?;
+    if res.trim() == "ok" {
+        Ok(())
+    } else {
+        Err(CombeeError::Internal(format!(
+            "cell integrity check failed: {res}"
+        )))
+    }
+}
+
 pub fn open(path: &Path, durability: KvDurability) -> Result<Connection> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| {
@@ -77,6 +118,8 @@ pub fn open(path: &Path, durability: KvDurability) -> Result<Connection> {
     conn.pragma_update(None, "foreign_keys", "ON")
         .map_err(sql_err)?;
     init_schema(&conn)?;
+    // 启动完整性校验(roadmap 4.1):打开即 quick_check,失败拒绝服务(只读保护由调用方标记)。
+    quick_check(&conn)?;
     Ok(conn)
 }
 

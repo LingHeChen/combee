@@ -408,6 +408,29 @@ impl MetadataStore for PostgresStore {
         self.get_database(tenant, id).await
     }
 
+    async fn migrate_database(
+        &self,
+        tenant: TenantId,
+        id: DatabaseId,
+        new_node: NodeId,
+    ) -> Result<DatabaseRecord> {
+        let row = sqlx::query(
+            "UPDATE databases SET storage_node_id = $1, generation = generation + 1 \
+             WHERE id = $2 AND tenant_id = $3 \
+             RETURNING id, tenant_id, state, created_at, storage_node_id, replica_node_id, generation, name",
+        )
+        .bind(new_node.0)
+        .bind(id.0)
+        .bind(tenant.0)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(PostgresStore::internal)?;
+        match row {
+            Some(row) => row_to_record(&row),
+            None => Err(CombeeError::DatabaseNotFound(id)),
+        }
+    }
+
     async fn list_replicas_of(&self, node: NodeId) -> Result<Vec<DatabaseRecord>> {
         let rows = sqlx::query(
             "SELECT id, tenant_id, state, created_at, storage_node_id, replica_node_id FROM databases

@@ -10,7 +10,7 @@
 //! - 同一 Cell 内的操作通过 per-db 锁串行化(为未来 Actor 模型预留),不同 Cell 并行;
 //! - 所有 SQLite 阻塞操作都在 `spawn_blocking` 中执行,不阻塞 async 运行时。
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -68,6 +68,8 @@ struct Inner {
     interrupts: Mutex<HashMap<DatabaseId, rusqlite::InterruptHandle>>,
     /// per-db 串行化信号量;条目在删除数据库时清理(V0 规模下内存可接受)。
     db_locks: Mutex<HashMap<DatabaseId, Arc<tokio::sync::Mutex<()>>>>,
+    /// 完整性校验失败的 Cell(只读保护:拒绝写操作,见 DataNode::check_writable)。
+    readonly: Mutex<HashSet<DatabaseId>>,
 }
 
 pub struct ActiveDbManager {
@@ -117,6 +119,7 @@ impl ActiveDbManager {
                 conns: Mutex::new(HashMap::new()),
                 db_locks: Mutex::new(HashMap::new()),
                 interrupts: Mutex::new(HashMap::new()),
+                readonly: Mutex::new(HashSet::new()),
             }),
             lock_wait_ns: AtomicU64::new(0),
             lock_wait_samples: AtomicU64::new(0),
@@ -160,6 +163,24 @@ impl ActiveDbManager {
         }
     }
 
+    /// 标记 Cell 为只读(完整性校验失败;写操作将被拒绝,同时日志告警)。
+    pub fn mark_readonly(&self, db: DatabaseId) {
+        let mut set = self.inner.readonly.lock().unwrap();
+        if set.insert(db) {
+            tracing::error!(
+                service = "combee-data-node",
+                event = "cell.readonly",
+                cell_id = %db,
+                "integrity check failed, cell entered read-only protection mode"
+            );
+        }
+    }
+
+    /// Cell 是否处于只读保护模式。
+    pub fn is_readonly(&self, db: DatabaseId) -> bool {
+        self.inner.readonly.lock().unwrap().contains(&db)
+    }
+
     /// 清零锁统计(供 benchmark 按窗口测量)。
     pub fn reset_lock_stats(&self) {
         self.lock_wait_ns.store(0, Ordering::Relaxed);
@@ -193,9 +214,28 @@ impl ActiveDbManager {
                         evict_lru(&mut conns);
                     }
                     let path = storage::db_path(&data_dir, db);
-                    let conn = storage::open(&path, durability)?;
+                    let conn = match storage::open(&path, durability) {
+                        Ok(c) => c,
+                        Err(e) => {
+                            // 完整性校验失败(或打开失败):进入只读保护模式并告警,
+                            // 而不是静默提供服务(roadmap 4.1:不静默修复)。
+                            inner.readonly.lock().unwrap().insert(db);
+                            tracing::error!(
+                                service = "combee-data-node",
+                                event = "cell.readonly",
+                                cell_id = %db,
+                                error = %e,
+                                "cell open failed, entered read-only protection mode"
+                            );
+                            return Err(e);
+                        }
+                    };
                     let interrupt = conn.get_interrupt_handle();
                     inner.interrupts.lock().unwrap().insert(db, interrupt);
+                    // manifest:首次打开维护格式版本/时间戳(失败仅告警,不阻塞)。
+                    if let Err(e) = storage::write_manifest(&data_dir, db, durability) {
+                        tracing::warn!(%db, "write manifest failed: {e}");
+                    }
                     debug!(service = "combee-data-node", event = "cell.open", cell_id = %db, active = conns.len() + 1);
                     conns.insert(
                         db,
