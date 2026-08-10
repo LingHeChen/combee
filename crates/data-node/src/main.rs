@@ -104,6 +104,7 @@ async fn main() {
                 &advertise,
                 cfg.max_active_dbs,
                 Some(&id_file),
+                cfg.control_plane_token.clone(),
             )
             .await;
             Some(agent)

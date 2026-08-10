@@ -34,6 +34,7 @@ impl NodeAgent {
         advertise_url: &str,
         capacity: usize,
         id_file: Option<&std::path::Path>,
+        control_token: Option<String>,
     ) -> (std::sync::Arc<Self>, tokio::task::JoinHandle<()>) {
         // 读取持久化 ID(重启后沿用,存量 Cell 路由不失效)
         let persisted = id_file
@@ -43,10 +44,23 @@ impl NodeAgent {
             api_url: api_url.trim_end_matches('/').to_string(),
             advertise_url: advertise_url.to_string(),
             capacity,
-            http: reqwest::Client::builder()
-                .timeout(Duration::from_secs(5))
-                .build()
-                .expect("reqwest client"),
+            http: {
+                // 控制面认证:api-server 配置了 COMBEE_CONTROL_PLANE_TOKEN 时,
+                // /internal/* 需要 x-control-token(或 Authorization Bearer)。
+                let mut headers = reqwest::header::HeaderMap::new();
+                if let Some(t) = &control_token {
+                    headers.insert(
+                        "x-control-token",
+                        reqwest::header::HeaderValue::from_str(t)
+                            .expect("invalid control token"),
+                    );
+                }
+                let mut builder = reqwest::Client::builder().timeout(Duration::from_secs(5));
+                if !headers.is_empty() {
+                    builder = builder.default_headers(headers);
+                }
+                builder.build().expect("reqwest client")
+            },
             id: RwLock::new(persisted),
             stopped: AtomicBool::new(false),
             id_file: id_file.map(|p| p.to_path_buf()),
