@@ -296,13 +296,20 @@ impl RemoteDataNodeClient {
         }
         // 节点不可达 / 响应损坏属于路由类失败:触发 on_error(失效路由缓存),
         // 让下一次请求立即从 authority 重新解析。业务错误(RPC 内错误码)不触发。
-        let resp = req
-            .send()
-            .await
-            .map_err(|e| {
-                self.notify_error();
-                CombeeError::Internal(format!("data node rpc {path}: {e}"))
-            })?;
+        let resp = req.send().await.map_err(|e| {
+            self.notify_error();
+            CombeeError::Internal(format!("data node rpc {path}: {e}"))
+        })?;
+        // 先检查 HTTP status:404(端点缺失/旧节点)/401(控制面认证失败)/500
+        // 都给出明确错误,而不是误报 decode failure
+        let status = resp.status();
+        if !status.is_success() {
+            let text = resp.text().await.unwrap_or_default();
+            self.notify_error();
+            return Err(CombeeError::Internal(format!(
+                "data node rpc {path}: HTTP {status}: {text}"
+            )));
+        }
         let rpc: RpcResponse<R> = resp.json().await.map_err(|e| {
             self.notify_error();
             CombeeError::Internal(format!("data node rpc {path} decode: {e}"))
@@ -650,7 +657,6 @@ impl DataNodeProvider for RoutingProvider {
             }),
         }
     }
-
 
     async fn client_for_node(&self, node: NodeId) -> Result<Arc<dyn DataNodeClient>> {
         let addr = self
