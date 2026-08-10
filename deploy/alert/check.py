@@ -158,10 +158,25 @@ def _err_fields(row):
     """从 tracing JSON 行提取 (message, operation, status, target);兼容字段在顶层或 fields 下。"""
     fields = row.get("fields", {}) if isinstance(row.get("fields"), dict) else {}
     message = fields.get("message") or row.get("message") or ""
-    operation = fields.get("operation") or fields.get("event") or row.get("target") or "-"
+    operation = fields.get("operation") or fields.get("event") or "-"
     status = fields.get("status") or row.get("status")
     target = row.get("target") or "-"
+    # tower on_failure 层没有 operation;用 classification(如 "Status code: 500")补消息
+    if operation == "-":
+        classification = fields.get("classification") or ""
+        if classification:
+            message = classification if not message or message == "response failed" else message
+        if target == "tower_http::trace::on_failure" and not message:
+            message = "response failed (tower on_failure layer; see request.failed logs for operation)"
     return message, operation, status, target
+
+
+def _sample_errs(errs, n=5):
+    """采样:优先带 operation 的具体错误(tower on_failure 冗余层排后)。"""
+    def rank(r):
+        _, op, _, target = _err_fields(r)
+        return (target == "tower_http::trace::on_failure", op == "-")
+    return sorted(errs, key=rank)[:n]
 
 
 def _grep_logs(cfg, service, pattern):
@@ -226,9 +241,9 @@ def error_volume(cfg):
     errs = [r for r in rows if str(r.get("level", "")).upper() == "ERROR"]
     if len(errs) >= 5:
         samples = []
-        for r in errs[:5]:
+        for r in _sample_errs(errs):
             message, operation, status, target = _err_fields(r)
-            samples.append("- %s: %s (status=%s, %s)" % (operation, message[:120], status, target))
+            samples.append("- %s: %s (status=%s, %s)" % (operation, message[:140], status, target))
         return ("P1", "最近 %s 分钟 %s 条 ERROR,样本:\n%s" % (win, len(errs), "\n".join(samples)))
     return None
 
@@ -247,9 +262,9 @@ def auth_failures(cfg):
             bad.append(r)
     if len(bad) >= 20:
         samples = []
-        for r in bad[:5]:
+        for r in _sample_errs(bad):
             message, operation, status, target = _err_fields(r)
-            samples.append("- %s: %s (status=%s, %s)" % (operation, message[:120], status, target))
+            samples.append("- %s: %s (status=%s, %s)" % (operation, message[:140], status, target))
         return ("P1", "最近 %s 分钟 %s 次认证失败(401),样本:\n%s" % (win, len(bad), "\n".join(samples)))
     return None
 
