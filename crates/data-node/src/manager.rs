@@ -230,6 +230,10 @@ impl ActiveDbManager {
                             return Err(e);
                         }
                     };
+                    // 格式版本校验(roadmap §12):版本过旧/未知格式明确报错,不静默打开。
+                    if let Err(e) = storage::check_format_version(&data_dir, db) {
+                        return Err(e);
+                    }
                     let interrupt = conn.get_interrupt_handle();
                     inner.interrupts.lock().unwrap().insert(db, interrupt);
                     // manifest:首次打开维护格式版本/时间戳(失败仅告警,不阻塞)。

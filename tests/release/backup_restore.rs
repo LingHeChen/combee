@@ -226,3 +226,100 @@ async fn backup_restorable_after_full_destruction() {
 
 // sha2 依赖声明在文件顶部 use;保持 import 使用。
 use sha2::Digest;
+
+// ---------------------------------------------------------------------------
+// Roadmap §3.1 完整恢复流程:Create → Write → Backup → Delete Cell →
+// Restore → 数据一致 → Destroy。
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn delete_cell_then_restore_from_backup() {
+    let dir = tempfile::tempdir().unwrap();
+    let os = tempfile::tempdir().unwrap();
+    let n = node(dir.path(), os.path());
+    let db = DatabaseId::new();
+
+    // ---- 写代表性数据(SQL + KV + TTL) ----
+    n.kv_set(db, "k:a".into(), "value-1".into(), None, false, false, 0)
+        .await
+        .unwrap();
+    n.kv_set(
+        db,
+        "k:b".into(),
+        "value-2".into(),
+        Some(3600),
+        false,
+        false,
+        0,
+    )
+    .await
+    .unwrap();
+    n.execute_sql(
+        db,
+        SqlRequest {
+            sql: "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT)".into(),
+            params: vec![],
+        },
+        0,
+    )
+    .await
+    .unwrap();
+    n.execute_sql(
+        db,
+        SqlRequest {
+            sql: "INSERT INTO users (id, name) VALUES (1, 'alice')".into(),
+            params: vec![],
+        },
+        0,
+    )
+    .await
+    .unwrap();
+
+    // ---- 备份(全量快照,带 checksum) ----
+    let info = n.backup(db).await.unwrap();
+    assert!(info.checksum.is_some(), "backup carries sha256 checksum");
+    let dump_before = logical_dump(&n, db).await;
+
+    // ---- 删除 Cell(本地文件 + 缓存全清) ----
+    n.delete_database(db).await.unwrap();
+    assert!(
+        !combee_data_node::storage::db_path(dir.path(), db).exists(),
+        "cell files removed after delete"
+    );
+
+    // ---- 从备份恢复(指定版本 = 刚上传的快照) ----
+    n.restore(db, Some(info.key.clone())).await.unwrap(); // 内部 integrity_check,失败即 panic
+
+    // ---- 数据一致 ----
+    let v = n.kv_get(db, "k:a".into()).await.unwrap().map(|e| e.value);
+    assert_eq!(v.as_deref(), Some("value-1"), "KV 恢复");
+    let ttl = n
+        .kv_ttl(db, "k:b".into())
+        .await
+        .unwrap()
+        .unwrap_or(0);
+    assert!(ttl > 0, "TTL 恢复(k:b 应仍有剩余秒数,实际 {ttl})");
+    let r = n
+        .execute_sql(
+            db,
+            SqlRequest {
+                sql: "SELECT name FROM users WHERE id = 1".into(),
+                params: vec![],
+            },
+            0,
+        )
+        .await
+        .unwrap();
+    assert!(
+        format!("{}", r.rows[0][0]).contains("alice"),
+        "SQL 数据恢复"
+    );
+
+    // 逻辑 dump 一致(恢复前 == 恢复后)
+    let dump_after = logical_dump(&n, db).await;
+    assert_eq!(sha256(&dump_before), sha256(&dump_after), "恢复前后逻辑一致");
+
+    // ---- 销毁 ----
+    n.delete_database(db).await.unwrap();
+    n.shutdown().await;
+}

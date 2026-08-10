@@ -87,6 +87,7 @@ async fn create_database_round_robin_placement() {
             std::time::Duration::from_secs(3600),
         ),
         admin_token: None,
+        admin_api_key: None,
         quota: Default::default(),
         concurrency: Default::default(),
     });
@@ -224,6 +225,7 @@ async fn agent_registers_heartbeats_and_unregisters() {
         usage: usage_meter,
         pricing: pricing_meter,
         admin_token: None,
+        admin_api_key: None,
         quota: Default::default(),
         concurrency: Default::default(),
     });

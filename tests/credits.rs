@@ -94,6 +94,7 @@ async fn make_harness() -> Harness {
         usage: usage.clone(),
         pricing: pricing.clone(),
         admin_token: Some(ADMIN.into()),
+        admin_api_key: None,
         quota: Default::default(),
         concurrency: Default::default(),
     };

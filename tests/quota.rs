@@ -70,6 +70,7 @@ async fn make_app(quota: QuotaConfig) -> (Router, TempDir) {
             Duration::from_secs(3600),
         ),
         admin_token: None,
+        admin_api_key: None,
         quota,
         concurrency: Default::default(),
     };

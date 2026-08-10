@@ -101,6 +101,7 @@ async fn make_app() -> (Router, TempDir, TenantId) {
         usage: usage_meter,
         pricing: pricing_meter,
         admin_token: None,
+        admin_api_key: None,
         quota: Default::default(),
         concurrency: Default::default(),
     };

@@ -50,6 +50,7 @@ pub fn test_app(max_active: usize) -> (Router, Arc<LocalDataNodeClient>, tempfil
         usage: usage_meter,
         pricing: pricing_meter,
         admin_token: None,
+        admin_api_key: None,
         quota: Default::default(),
         concurrency: Default::default(),
     };
@@ -97,6 +98,7 @@ pub async fn test_app_with_keys(keys: &[&str]) -> (Router, tempfile::TempDir) {
         usage: usage_meter,
         pricing: pricing_meter,
         admin_token: None,
+        admin_api_key: None,
         quota: Default::default(),
         concurrency: Default::default(),
     };

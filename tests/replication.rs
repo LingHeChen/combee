@@ -165,6 +165,7 @@ async fn replication_api_sets_replica() {
             std::time::Duration::from_secs(3600),
         ),
         admin_token: None,
+        admin_api_key: None,
         quota: Default::default(),
         concurrency: Default::default(),
     });

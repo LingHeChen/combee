@@ -143,6 +143,7 @@ async fn failover_promotes_replica_and_fences_old_primary() {
             std::time::Duration::from_secs(3600),
         ),
         admin_token: None,
+        admin_api_key: None,
         quota: Default::default(),
         concurrency: Default::default(),
     };

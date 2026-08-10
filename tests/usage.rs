@@ -72,6 +72,7 @@ async fn make_app() -> (Router, Arc<UsageMeter>, Arc<dyn MetadataStore>, TempDir
             std::time::Duration::from_secs(3600),
         ),
         admin_token: None,
+        admin_api_key: None,
         quota: Default::default(),
         concurrency: Default::default(),
     };

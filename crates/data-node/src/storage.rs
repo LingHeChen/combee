@@ -56,6 +56,24 @@ pub fn storage_bytes(data_dir: &Path, db: DatabaseId) -> u64 {
 
 /// 打开(必要时创建)一个 Cell 的 SQLite 连接,并初始化 schema。
 /// `durability` 决定 `synchronous` pragma(设计文档第 14 节)。
+/// 当前支持的 Cell 磁盘格式版本(roadmap §12:格式演进通过版本迁移,不靠"不会变")。
+pub const CELL_FORMAT_VERSION: u64 = 1;
+
+/// 校验 Cell 格式版本:manifest 存在且 format_version > 当前支持版本 → 拒绝打开
+/// (需要升级二进制/迁移,而不是静默读取错误格式)。
+pub fn check_format_version(data_dir: &Path, db: DatabaseId) -> Result<()> {
+    if let Some(meta) = read_manifest(data_dir, db) {
+        if let Some(v) = meta["format_version"].as_u64() {
+            if v > CELL_FORMAT_VERSION {
+                return Err(CombeeError::Internal(format!(
+                    "cell {db} uses format_version {v}, this binary supports up to {CELL_FORMAT_VERSION}; upgrade required"
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Cell manifest 文件路径(记录格式版本/时间戳;数据完整性见 quick_check)。
 pub fn manifest_path(data_dir: &Path, db: DatabaseId) -> PathBuf {
     PathBuf::from(format!("{}.manifest.json", db_path(data_dir, db).display()))
