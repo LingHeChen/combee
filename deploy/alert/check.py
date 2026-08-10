@@ -134,6 +134,36 @@ def _recent_logs(cfg, service):
     return stack, service, win, since_str
 
 
+def _raw_logs(cfg, service):
+    """取指定服务窗口内的原始日志(JSON 行,已去容器前缀)。"""
+    stack, svc, win, since_str = _recent_logs(cfg, service)
+    cmd = "docker service logs --since %s %s_%s --no-trunc 2>&1" % (since_str, stack, svc)
+    out = []
+    for line in run(cmd).splitlines():
+        # docker service logs 前缀:"combee_api-server.1.xxx@node | {...}"
+        if " | " in line:
+            line = line.split(" | ", 1)[1]
+        line = line.strip()
+        if line.startswith("{"):
+            try:
+                obj = json.loads(line)
+                if isinstance(obj, dict):
+                    out.append(obj)
+            except Exception:
+                pass
+    return out
+
+
+def _err_fields(row):
+    """从 tracing JSON 行提取 (message, operation, status, target);兼容字段在顶层或 fields 下。"""
+    fields = row.get("fields", {}) if isinstance(row.get("fields"), dict) else {}
+    message = fields.get("message") or row.get("message") or ""
+    operation = fields.get("operation") or fields.get("event") or row.get("target") or "-"
+    status = fields.get("status") or row.get("status")
+    target = row.get("target") or "-"
+    return message, operation, status, target
+
+
 def _grep_logs(cfg, service, pattern):
     stack, svc, win, since_str = _recent_logs(cfg, service)
     cmd = "docker service logs --since %s %s_%s --no-trunc 2>&1 | grep -cE '%s'" % (since_str, stack, svc, pattern)
@@ -157,10 +187,20 @@ def error_rate(cfg):
     rate = fivexx / len(codes) * 100
     p0 = int(cfg.get("ERR5_P0", 10))
     p1 = int(cfg.get("ERR5_P1", 2))
+    samples = ""
+    if fivexx > 0:
+        rows = _raw_logs(cfg, "api-server")
+        errs = [r for r in rows if _err_fields(r)[2] is not None and int(str(_err_fields(r)[2]).lstrip("-")) >= 500][:3]
+        if errs:
+            lines = []
+            for r in errs:
+                message, operation, status, target = _err_fields(r)
+                lines.append("- %s: %s (status=%s)" % (operation, message[:120], status))
+            samples = "\n" + "\n".join(lines)
     if rate >= p0:
-        return ("P0", "5xx 率 %.1f%%(%s/%s 请求,最近 %s 分钟)" % (rate, fivexx, len(codes), win))
+        return ("P0", "5xx 率 %.1f%%(%s/%s 请求,最近 %s 分钟)%s" % (rate, fivexx, len(codes), win, samples))
     if rate >= p1:
-        return ("P1", "5xx 率 %.1f%%(%s/%s 请求,最近 %s 分钟)" % (rate, fivexx, len(codes), win))
+        return ("P1", "5xx 率 %.1f%%(%s/%s 请求,最近 %s 分钟)%s" % (rate, fivexx, len(codes), win, samples))
     return None
 
 
@@ -181,16 +221,36 @@ def api_health(cfg):
 
 
 def error_volume(cfg):
-    n = _grep_logs(cfg, "api-server", '"level":"ERROR"')
-    if n >= 5:
-        return ("P1", "最近 5 分钟 %s 条 ERROR 日志" % n)
+    win = int(cfg.get("LOG_WINDOW_MIN", 5))
+    rows = _raw_logs(cfg, "api-server")
+    errs = [r for r in rows if str(r.get("level", "")).upper() == "ERROR"]
+    if len(errs) >= 5:
+        samples = []
+        for r in errs[:5]:
+            message, operation, status, target = _err_fields(r)
+            samples.append("- %s: %s (status=%s, %s)" % (operation, message[:120], status, target))
+        return ("P1", "最近 %s 分钟 %s 条 ERROR,样本:\n%s" % (win, len(errs), "\n".join(samples)))
     return None
 
 
 def auth_failures(cfg):
-    n = _grep_logs(cfg, "api-server", "unauthorized|401")
-    if n >= 20:
-        return ("P1", "最近 5 分钟 %s 次认证失败(401/unauthorized)" % n)
+    win = int(cfg.get("LOG_WINDOW_MIN", 5))
+    rows = _raw_logs(cfg, "api-server")
+    bad = []
+    for r in rows:
+        f = r.get("fields", {}) if isinstance(r.get("fields"), dict) else {}
+        status = f.get("status") or r.get("status")
+        code = f.get("error_code") or r.get("error_code") or ""
+        msg = f.get("message") or r.get("message") or ""
+        if status == 401 or str(code).upper() in ("UNAUTHORIZED", "AUTH_FAILED") \
+                or "unauthorized" in str(msg).lower():
+            bad.append(r)
+    if len(bad) >= 20:
+        samples = []
+        for r in bad[:5]:
+            message, operation, status, target = _err_fields(r)
+            samples.append("- %s: %s (status=%s, %s)" % (operation, message[:120], status, target))
+        return ("P1", "最近 %s 分钟 %s 次认证失败(401),样本:\n%s" % (win, len(bad), "\n".join(samples)))
     return None
 
 
