@@ -90,7 +90,7 @@ services:
       COMBEE_DATA_DIR: /data
       COMBEE_CONTROL_PLANE_TOKEN: ${COMBEE_CONTROL_PLANE_TOKEN:-}
       # 认证:Key 模式(x-api-key 查表);测试用户/API key 创建见 README
-      COMBEE_AUTH: ${COMBEE_AUTH:-key}
+      COMBEE_AUTH: ${COMBEE_AUTH:-off}
       COMBEE_ADMIN_TOKEN: ${COMBEE_ADMIN_TOKEN:-}
       # 预配置的 admin API key + 预置 key 列表(启动时注入 api_keys 表)
       COMBEE_ADMIN_API_KEY: ${COMBEE_ADMIN_API_KEY:-}

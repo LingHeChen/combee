@@ -1,0 +1,32 @@
+# Rust
+target/
+.docker-target/
+*.rs.bk
+
+# Git
+.git/
+.gitignore
+
+# Node
+node_modules/
+.next/
+out/
+
+# 本地数据/产物
+data/
+.venv/
+*.log
+tmp/
+
+# 测试/脚本产物
+tests/.tmp/
+artifacts/
+
+# 设计/文档素材(构建不需要)
+design/
+site/
+
+# IDE
+.idea/
+.vscode/
+.DS_Store
