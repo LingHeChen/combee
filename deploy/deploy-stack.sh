@@ -25,20 +25,28 @@ echo "==> 2/4 校验控制面 token 非空"
 echo "==> 3/4 部署 stack"
 docker stack deploy -c docker-stack.yml combee
 
-echo "==> 4/4 等待并验证 api-server 容器 token"
-sleep 20
-CID=$(docker ps -q -f name=combee_api-server.1 | head -1)
-if [ -n "$CID" ]; then
+echo "==> 4/4 等待并验证所有 api-server 副本的 token"
+# 注意:replicas=2 + start-first 滚动,旧副本会继续服务直到新副本就绪。
+# 等待滚动完成:旧任务全部退出后,再验证每个运行中副本。
+for i in $(seq 1 24); do
+  OLD=$(docker service ps combee_api-server --no-trunc -f desired-state=Shutdown --format '{{.ID}}' 2>/dev/null | wc -l | tr -d ' ')
+  NEW=$(docker service ps combee_api-server --no-trunc -f desired-state=Running --format '{{.ID}}' 2>/dev/null | wc -l | tr -d ' ')
+  # 等 2 个副本都 Running 且没有新的 Shutdown 计数增长(简单起见:等 Running == replicas)
+  REPLICAS=$(docker service inspect combee_api-server --format '{{.Spec.Mode.Replicated.Replicas}}' 2>/dev/null)
+  if [ "${NEW:-0}" -ge "${REPLICAS:-2}" ]; then break; fi
+  sleep 5
+done
+FAIL=0
+for CID in $(docker ps -q -f name=combee_api-server); do
   TOK=$(docker exec "$CID" printenv COMBEE_CONTROL_PLANE_TOKEN 2>/dev/null || true)
   if [ -n "$TOK" ]; then
-    echo "OK api-server token: ${TOK:0:8}…"
+    echo "OK ${CID:0:12} token: ${TOK:0:8}…"
   else
-    echo "!! api-server 容器 token 为空 —— 部署失败或 .env 未生效,重跑本脚本" >&2
-    exit 1
+    echo "!! ${CID:0:12} token 为空" >&2
+    FAIL=1
   fi
-else
-  echo "!! 未找到 api-server 容器(可能仍在滚动),稍后手动验证" >&2
-fi
+done
+[ "$FAIL" = "0" ] || { echo "存在副本 token 为空,检查 .env 并重跑" >&2; exit 1; }
 
 echo "==> 完成。检查:"
 echo "    docker service logs combee_api-server --since=1m | grep -c no_token   # 应为 0"
