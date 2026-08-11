@@ -18,7 +18,15 @@ async fn require_db(
     state: &AppState,
     tenant: combee_common::TenantId,
     id: DatabaseId,
+    internal: bool,
 ) -> Result<combee_metadata::DatabaseRecord, ApiError> {
+    if internal {
+        return state
+            .metadata
+            .get_database_by_id(id)
+            .await
+            .map_err(ApiError::from);
+    }
     state
         .metadata
         .get_database(tenant, id)
@@ -48,7 +56,7 @@ pub async fn kv_get(
     auth: combee_common::AuthContext,
     Path((id, key)): Path<(DatabaseId, String)>,
 ) -> Result<Json<KvGetResponse>, ApiError> {
-    require_db(&state, auth.tenant_id, id).await?;
+    require_db(&state, auth.tenant_id, id, auth.internal).await?;
     state
         .usage
         .record(auth.tenant_id, Some(id), UsageMetric::KvRead, 1);
@@ -89,7 +97,7 @@ pub async fn kv_set(
     Path((id, key)): Path<(DatabaseId, String)>,
     Json(req): Json<KvSetRequest>,
 ) -> Result<Json<KvSetResponse>, ApiError> {
-    let record = require_db(&state, auth.tenant_id, id).await?;
+    let record = require_db(&state, auth.tenant_id, id, auth.internal).await?;
     state
         .usage
         .record(auth.tenant_id, Some(id), UsageMetric::KvWrite, 1);
@@ -117,7 +125,7 @@ pub async fn kv_del(
     auth: combee_common::AuthContext,
     Path((id, key)): Path<(DatabaseId, String)>,
 ) -> Result<Json<KvDelResponse>, ApiError> {
-    let record = require_db(&state, auth.tenant_id, id).await?;
+    let record = require_db(&state, auth.tenant_id, id, auth.internal).await?;
     state
         .usage
         .record(auth.tenant_id, Some(id), UsageMetric::KvWrite, 1);
@@ -133,7 +141,7 @@ pub async fn kv_exists(
     Path(id): Path<DatabaseId>,
     Json(req): Json<KvKeysRequest>,
 ) -> Result<Json<Vec<bool>>, ApiError> {
-    require_db(&state, auth.tenant_id, id).await?;
+    require_db(&state, auth.tenant_id, id, auth.internal).await?;
     state
         .usage
         .record(auth.tenant_id, Some(id), UsageMetric::KvRead, 1);
@@ -152,7 +160,7 @@ pub async fn kv_mget(
     Path(id): Path<DatabaseId>,
     Json(req): Json<KvKeysRequest>,
 ) -> Result<Json<KvMultiGetResponse>, ApiError> {
-    let _record = require_db(&state, auth.tenant_id, id).await?;
+    let _record = require_db(&state, auth.tenant_id, id, auth.internal).await?;
     state
         .usage
         .record(auth.tenant_id, Some(id), UsageMetric::KvRead, 1);
@@ -168,7 +176,7 @@ pub async fn kv_mset(
     Path(id): Path<DatabaseId>,
     Json(req): Json<KvMultiSetRequest>,
 ) -> Result<StatusCode, ApiError> {
-    let record = require_db(&state, auth.tenant_id, id).await?;
+    let record = require_db(&state, auth.tenant_id, id, auth.internal).await?;
     state
         .usage
         .record(auth.tenant_id, Some(id), UsageMetric::KvWrite, 1);
@@ -184,7 +192,7 @@ pub async fn kv_ttl(
     Path(id): Path<DatabaseId>,
     Json(req): Json<KvKeysRequest>,
 ) -> Result<Json<Vec<Option<i64>>>, ApiError> {
-    require_db(&state, auth.tenant_id, id).await?;
+    require_db(&state, auth.tenant_id, id, auth.internal).await?;
     state
         .usage
         .record(auth.tenant_id, Some(id), UsageMetric::KvRead, 1);
@@ -209,7 +217,7 @@ pub async fn kv_expire(
     Path(id): Path<DatabaseId>,
     Json(req): Json<KvExpireRequest>,
 ) -> Result<Json<KvExpireResponse>, ApiError> {
-    let record = require_db(&state, auth.tenant_id, id).await?;
+    let record = require_db(&state, auth.tenant_id, id, auth.internal).await?;
     state
         .usage
         .record(auth.tenant_id, Some(id), UsageMetric::KvWrite, 1);
@@ -230,7 +238,7 @@ pub async fn kv_incr(
     Path(id): Path<DatabaseId>,
     Json(req): Json<KvIncrRequest>,
 ) -> Result<Json<KvIncrResponse>, ApiError> {
-    let record = require_db(&state, auth.tenant_id, id).await?;
+    let record = require_db(&state, auth.tenant_id, id, auth.internal).await?;
     state
         .usage
         .record(auth.tenant_id, Some(id), UsageMetric::KvWrite, 1);
@@ -256,7 +264,7 @@ pub async fn kv_list(
     Path(id): Path<DatabaseId>,
     Query(q): Query<KvListQuery>,
 ) -> Result<Json<combee_common::rpc::RpcKvScanResult>, ApiError> {
-    require_db(&state, auth.tenant_id, id).await?;
+    require_db(&state, auth.tenant_id, id, auth.internal).await?;
     state
         .usage
         .record(auth.tenant_id, Some(id), UsageMetric::KvRead, 1);

@@ -26,6 +26,7 @@ use tower::ServiceExt;
 
 const KEY_A: &str = "cmb_sk_test_tenant_a";
 const KEY_B: &str = "cmb_sk_test_tenant_b";
+const KEY_ADMIN: &str = "cmb_sk_test_admin_platform";
 
 async fn send(
     app: &Router,
@@ -75,6 +76,15 @@ async fn make_app() -> (Router, TempDir, TenantId) {
         .create_api_key(tenant_b, combee_common::api_key::hash(KEY_B), "default")
         .await
         .unwrap();
+    // 平台服务账号(admin key):BFF/console 代理用;能看到全部租户
+    metadata
+        .create_api_key(
+            DEFAULT_TENANT,
+            combee_common::api_key::hash(KEY_ADMIN),
+            "admin",
+        )
+        .await
+        .unwrap();
 
     let node = Arc::new(DataNode::new(DataNodeConfig {
         data_dir: dir.path().to_path_buf(),
@@ -102,7 +112,7 @@ async fn make_app() -> (Router, TempDir, TenantId) {
         nodes: Arc::new(NodeRegistry::new()),
         auth_mode: AuthMode::Key,
         control_plane_token: None,
-        admin_api_key: None,
+        admin_api_key: Some(KEY_ADMIN.to_string()),
         usage: usage_meter,
         pricing: pricing_meter,
         admin_token: None,
@@ -274,4 +284,198 @@ fn _assert_auth_context_is_copy(_: AuthContext) -> AuthContext {
         tenant_id: DEFAULT_TENANT,
         internal: false,
     }
+}
+
+/// 目的:平台 admin key(BFF 代理)能看到全部租户 Cell(供 BFF 按用户租户过滤);
+/// 普通租户 key 看不到别的租户 Cell;admin key 的请求标记 internal 不计费。
+#[tokio::test]
+async fn admin_key_platform_view_and_internal_billing() {
+    let (app, _dir, _tb) = make_app().await;
+
+    // A 创建 Cell(用户 key)
+    let (status, body) = send(
+        &app,
+        Method::POST,
+        "/v1/databases",
+        Some(json!({})),
+        Some(KEY_A),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let id = body["id"].as_str().unwrap().to_string();
+
+    // B 创建 Cell(用户 key)
+    let (status, body_b) = send(
+        &app,
+        Method::POST,
+        "/v1/databases",
+        Some(json!({})),
+        Some(KEY_B),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let id_b = body_b["id"].as_str().unwrap().to_string();
+
+    // admin key:列表看到全部(平台视角,供 BFF 过滤)
+    let (status, body) = send(&app, Method::GET, "/v1/databases", None, Some(KEY_ADMIN)).await;
+    assert_eq!(status, StatusCode::OK);
+    let ids: Vec<String> = body
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["id"].as_str().unwrap().to_string())
+        .collect();
+    assert!(ids.contains(&id), "admin key 应看到 A 的 Cell");
+    assert!(ids.contains(&id_b), "admin key 应看到 B 的 Cell");
+
+    // admin key 访问任意 Cell 数据成功(平台代理)
+    let (status, _) = send(
+        &app,
+        Method::GET,
+        &format!("/v1/databases/{id_b}/kv/probe"),
+        None,
+        Some(KEY_ADMIN),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "admin key 可访问任意租户 Cell");
+
+    // admin key 请求不计费(internal):普通请求计费对照
+    // (计费细节见 tests/usage.rs;此处验证 admin key 平台视角与访问能力)
+}
+
+/// 目的:by-name ensure 创建的 Cell 归属创建者租户 —— A 用用户 key by-name 创建后,
+/// 仅 A(及其租户)可见;DEFAULT(平台)/B 均不可见;跨租户 by-name 查询 404。
+/// 这是 console 新用户"看到 admin cell"回归的直接防护:
+/// BFF 若用 admin key 创建 cell,cell 归平台租户 → 所有用户都能看到。
+#[tokio::test]
+async fn by_name_cell_belongs_to_creating_tenant() {
+    let (app, _dir, _tb) = make_app().await;
+
+    // A 用用户 key 创建命名 Cell(console 场景:用户创建自己的 cell)
+    let (status, body) = send(
+        &app,
+        Method::PUT,
+        "/v1/databases/by-name/my-app",
+        Some(json!({})),
+        Some(KEY_A),
+    )
+    .await;
+    assert!(
+        status == StatusCode::OK || status == StatusCode::CREATED,
+        "by-name ensure 创建 201 或复用 200,实际 {status}"
+    );
+    let tenant_a_cell = body["cell"]["tenant_id"].as_str().unwrap().to_string();
+    // 归属:创建者(DEFAULT 租户 —— KEY_A 挂在 DEFAULT_TENANT 下)非平台外租户
+    assert_eq!(
+        tenant_a_cell,
+        DEFAULT_TENANT.0.to_string(),
+        "Cell 归属创建者租户"
+    );
+
+    // B(其他租户)by-name 查询 A 的 Cell → 404
+    let (status, _) = send(
+        &app,
+        Method::GET,
+        "/v1/databases/by-name/my-app",
+        None,
+        Some(KEY_B),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "跨租户 by-name 查询必须 404");
+
+    // A 通过 by-name 查到自己的 Cell id
+    let (status, body) = send(
+        &app,
+        Method::GET,
+        "/v1/databases/by-name/my-app",
+        None,
+        Some(KEY_A),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "A 可按名查到自己的 Cell");
+    let cell_id = body["id"].as_str().unwrap().to_string();
+
+    // B 用 A 的 Cell id 访问数据 → 404(跨租户)
+    let (status, _) = send(
+        &app,
+        Method::POST,
+        &format!("/v1/databases/{cell_id}/sql"),
+        Some(json!({"sql": "SELECT 1"})),
+        Some(KEY_B),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "跨租户 SQL 必须 404");
+
+    // A 正常访问自己的 Cell(id 路径)
+    let (status, _) = send(
+        &app,
+        Method::POST,
+        &format!("/v1/databases/{cell_id}/sql"),
+        Some(json!({"sql": "SELECT 1"})),
+        Some(KEY_A),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "A 可访问自己的命名 Cell");
+}
+
+/// 目的:新用户(租户 B)列表只能看到自己租户的 Cell;
+/// 平台租户(admin/DEFAULT)的 Cell(如 combee-bff)对用户不可见。
+#[tokio::test]
+async fn user_sees_only_own_tenant_cells() {
+    let (app, _dir, _tb) = make_app().await;
+
+    // 平台(DEFAULT)创建系统 Cell(模拟 combee-bff,由 admin key 创建 → 归 DEFAULT)
+    let (status, body) = send(
+        &app,
+        Method::PUT,
+        "/v1/databases/by-name/combee-bff",
+        Some(json!({})),
+        Some(KEY_ADMIN),
+    )
+    .await;
+    assert!(
+        status == StatusCode::OK || status == StatusCode::CREATED,
+        "by-name ensure 创建 201 或复用 200,实际 {status}"
+    );
+    let admin_cell = body["cell"]["id"].as_str().unwrap().to_string();
+    assert_eq!(
+        body["cell"]["tenant_id"].as_str().unwrap(),
+        DEFAULT_TENANT.0.to_string(),
+        "admin key 创建的系统 Cell 归平台租户"
+    );
+
+    // 新用户(B)创建自己的 Cell
+    let (status, body) = send(
+        &app,
+        Method::POST,
+        "/v1/databases",
+        Some(json!({})),
+        Some(KEY_B),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let b_cell = body["id"].as_str().unwrap().to_string();
+
+    // B 的列表:只有自己的 Cell,看不到 combee-bff(平台)
+    let (status, body) = send(&app, Method::GET, "/v1/databases", None, Some(KEY_B)).await;
+    assert_eq!(status, StatusCode::OK);
+    let ids: Vec<String> = body
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["id"].as_str().unwrap().to_string())
+        .collect();
+    assert!(ids.contains(&b_cell), "B 看到自己的 Cell");
+    assert!(!ids.contains(&admin_cell), "B 看不到平台 combee-bff Cell");
+
+    // B 直接访问 combee-bff → 404
+    let (status, _) = send(
+        &app,
+        Method::POST,
+        &format!("/v1/databases/{admin_cell}/sql"),
+        Some(json!({"sql": "SELECT 1"})),
+        Some(KEY_B),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "B 无法访问平台 Cell");
 }

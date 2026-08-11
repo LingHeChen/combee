@@ -16,7 +16,7 @@ pub async fn backup(
     auth: combee_common::AuthContext,
     Path(id): Path<DatabaseId>,
 ) -> Result<Json<BackupInfo>, crate::ApiError> {
-    require_db(&state, auth.tenant_id, id).await?;
+    require_db(&state, auth.tenant_id, id, auth.internal).await?;
     let client = state.data_node.client_for(id).await?;
     let info = client.backup(id).await?;
     Ok(Json(info))
@@ -28,7 +28,7 @@ pub async fn incremental_backup(
     auth: combee_common::AuthContext,
     Path(id): Path<DatabaseId>,
 ) -> Result<Json<BackupInfo>, crate::ApiError> {
-    require_db(&state, auth.tenant_id, id).await?;
+    require_db(&state, auth.tenant_id, id, auth.internal).await?;
     let client = state.data_node.client_for(id).await?;
     let info = client.incremental_backup(id).await?;
     Ok(Json(info))
@@ -41,7 +41,7 @@ pub async fn restore(
     Path(id): Path<DatabaseId>,
     Json(req): Json<RestoreRequest>,
 ) -> Result<axum::http::StatusCode, crate::ApiError> {
-    require_db(&state, auth.tenant_id, id).await?;
+    require_db(&state, auth.tenant_id, id, auth.internal).await?;
     let client = state.data_node.client_for(id).await?;
     client.restore(id, req.version).await?;
     Ok(axum::http::StatusCode::NO_CONTENT)

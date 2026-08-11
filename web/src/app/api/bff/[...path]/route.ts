@@ -259,9 +259,14 @@ async function proxy(req: NextRequest, target: string) {
       body = undefined;
     }
   }
+  // 创建 Cell(by-name ensure)是用户资源行为:用用户 key,使 Cell 归属用户租户
+  // (admin key 创建会归到平台租户,导致归属隔离失效)。其余 console 操作统一
+  // admin key 代理(不计费),权限已在上方校验。
+  const isCellCreate =
+    method === "PUT" && target.match(/^v1\/databases\/by-name\//) !== null;
+  const apiKey = isCellCreate ? session.api_key : bffKey();
   try {
-    // 统一用平台 admin key 代理(Combee 侧 internal,不计费);权限已在上方校验。
-    const data = await combeeRequest(`/${target}${query}`, { method, body, apiKey: bffKey() });
+    const data = await combeeRequest(`/${target}${query}`, { method, body, apiKey });
     if (data === undefined) return NextResponse.json({ ok: true });
     return NextResponse.json(data);
   } catch (err) {

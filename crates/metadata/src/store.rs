@@ -156,6 +156,8 @@ pub trait MetadataStore: Send + Sync {
 
     /// 列出该租户下全部记录。
     async fn list_databases(&self, tenant: TenantId) -> Result<Vec<DatabaseRecord>>;
+    /// 全租户列表(平台内部用;仅 admin/internal 请求可调用)。
+    async fn list_databases_all(&self) -> Result<Vec<DatabaseRecord>>;
 
     /// 删除目录记录;不存在报 [`CombeeError::DatabaseNotFound`]。
     async fn delete_database(&self, tenant: TenantId, id: DatabaseId) -> Result<()>;
@@ -530,6 +532,13 @@ impl MetadataStore for InMemoryStore {
             .filter(|((t, _), _)| *t == tenant)
             .map(|(_, r)| r.clone())
             .collect();
+        records.sort_by_key(|r| (r.created_at, r.id));
+        Ok(records)
+    }
+
+    async fn list_databases_all(&self) -> Result<Vec<DatabaseRecord>> {
+        let inner = self.inner.lock().unwrap();
+        let mut records: Vec<_> = inner.databases.values().cloned().collect();
         records.sort_by_key(|r| (r.created_at, r.id));
         Ok(records)
     }

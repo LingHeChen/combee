@@ -12,7 +12,16 @@ pub(crate) async fn require_db(
     state: &AppState,
     tenant: combee_common::TenantId,
     id: DatabaseId,
+    internal: bool,
 ) -> Result<combee_metadata::DatabaseRecord, ApiError> {
+    if internal {
+        // 平台内部请求(BFF/admin key 代理):跨租户查询;归属校验由 BFF 层负责。
+        return state
+            .metadata
+            .get_database_by_id(id)
+            .await
+            .map_err(ApiError::from);
+    }
     state
         .metadata
         .get_database(tenant, id)
@@ -36,7 +45,7 @@ pub async fn execute_sql(
     Path(id): Path<DatabaseId>,
     Json(req): Json<SqlRequest>,
 ) -> Result<Json<SqlResult>, ApiError> {
-    let record = require_db(&state, auth.tenant_id, id).await?;
+    let record = require_db(&state, auth.tenant_id, id, auth.internal).await?;
     let client = state.data_node.client_for(id).await?;
     let metric = if crate::usage::is_read_sql(&req.sql) {
         UsageMetric::SqlRead
@@ -64,7 +73,7 @@ pub async fn execute_transaction(
     Path(id): Path<DatabaseId>,
     Json(req): Json<TransactionRequest>,
 ) -> Result<Json<Vec<SqlResult>>, ApiError> {
-    let record = require_db(&state, auth.tenant_id, id).await?;
+    let record = require_db(&state, auth.tenant_id, id, auth.internal).await?;
     let client = state.data_node.client_for(id).await?;
     for stmt in &req.statements {
         let metric = if crate::usage::is_read_sql(&stmt.sql) {

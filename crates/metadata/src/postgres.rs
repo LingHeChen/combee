@@ -350,6 +350,17 @@ impl MetadataStore for PostgresStore {
         }
     }
 
+    async fn list_databases_all(&self) -> Result<Vec<DatabaseRecord>> {
+        let rows = sqlx::query(
+            "SELECT id, tenant_id, state, created_at, storage_node_id, replica_node_id, generation, name FROM databases
+             ORDER BY created_at, id",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(PostgresStore::internal)?;
+        rows.iter().map(row_to_record).collect()
+    }
+
     async fn list_databases(&self, tenant: TenantId) -> Result<Vec<DatabaseRecord>> {
         let rows = sqlx::query(
             "SELECT id, tenant_id, state, created_at, storage_node_id, replica_node_id, generation, name FROM databases

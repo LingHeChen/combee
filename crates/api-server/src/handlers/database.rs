@@ -130,7 +130,11 @@ pub async fn list_databases(
     State(state): State<AppState>,
     auth: combee_common::AuthContext,
 ) -> Result<Json<Vec<DatabaseRecord>>, ApiError> {
-    let records = state.metadata.list_databases(auth.tenant_id).await?;
+    let records = if auth.internal {
+        state.metadata.list_databases_all().await?
+    } else {
+        state.metadata.list_databases(auth.tenant_id).await?
+    };
     Ok(Json(records))
 }
 
@@ -282,7 +286,7 @@ pub async fn reset_database(
     Path(id): Path<DatabaseId>,
 ) -> Result<Json<DatabaseRecord>, ApiError> {
     // 先校验归属
-    crate::handlers::sql::require_db(&state, auth.tenant_id, id).await?;
+    crate::handlers::sql::require_db(&state, auth.tenant_id, id, auth.internal).await?;
     // 清数据面文件
     let client = state.data_node.client_for(id).await?;
     client

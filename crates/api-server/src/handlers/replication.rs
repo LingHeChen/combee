@@ -34,7 +34,7 @@ pub async fn set_replica(
     Path(id): Path<DatabaseId>,
     Json(req): Json<SetReplicaRequest>,
 ) -> Result<Json<ReplicationStatus>, ApiError> {
-    require_db(&state, auth.tenant_id, id).await?;
+    require_db(&state, auth.tenant_id, id, auth.internal).await?;
     let record = state
         .metadata
         .set_replica_node(auth.tenant_id, id, Some(req.replica_node))
@@ -51,7 +51,7 @@ pub async fn unset_replica(
     auth: combee_common::AuthContext,
     Path(id): Path<DatabaseId>,
 ) -> Result<StatusCode, ApiError> {
-    require_db(&state, auth.tenant_id, id).await?;
+    require_db(&state, auth.tenant_id, id, auth.internal).await?;
     state
         .metadata
         .set_replica_node(auth.tenant_id, id, None)
