@@ -43,7 +43,7 @@ pub async fn execute_sql(
     } else {
         UsageMetric::SqlWrite
     };
-    state.usage.record(auth.tenant_id, Some(id), metric, 1);
+    state.usage.record_billed(&auth, Some(id), metric, 1);
     let result = client.execute_sql(id, req, record.generation).await?;
     Ok(Json(result))
 }
@@ -72,7 +72,7 @@ pub async fn execute_transaction(
         } else {
             UsageMetric::SqlWrite
         };
-        state.usage.record(auth.tenant_id, Some(id), metric, 1);
+        state.usage.record_billed(&auth, Some(id), metric, 1);
     }
     let results = client
         .execute_transaction(id, req, record.generation)

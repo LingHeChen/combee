@@ -42,6 +42,21 @@ impl UsageMeter {
     }
 
     /// 热路径:累加一个增量(无 IO,内存锁)。
+    /// 计费口径:仅对非 internal(平台内部)请求记录 usage。
+    /// 内部请求(BFF/Console 服务账号)不产生用户 usage、不参与 credits 结算。
+    pub fn record_billed(
+        &self,
+        auth: &AuthContext,
+        cell: Option<DatabaseId>,
+        metric: UsageMetric,
+        delta: u64,
+    ) {
+        if auth.internal {
+            return;
+        }
+        self.record(auth.tenant_id, cell, metric, delta);
+    }
+
     pub fn record(
         &self,
         tenant: TenantId,
@@ -147,9 +162,12 @@ fn parse_cell_from_path(path: &str) -> Option<DatabaseId> {
 
 /// Usage 中间件:统计 requests / bytes_in / bytes_out(挂在 auth 之后,可读 AuthContext)。
 pub async fn usage_tracking(State(state): State<AppState>, req: Request, next: Next) -> Response {
-    let tenant = req
-        .extensions()
-        .get::<AuthContext>()
+    let auth = req.extensions().get::<AuthContext>().copied();
+    // 计费口径:内部请求(平台/BFF 服务账号)不产生 usage,不参与结算。
+    if auth.map(|a| a.internal).unwrap_or(false) {
+        return next.run(req).await;
+    }
+    let tenant = auth
         .map(|a| a.tenant_id)
         .unwrap_or(combee_metadata::DEFAULT_TENANT);
     let cell = parse_cell_from_path(req.uri().path());
@@ -261,6 +279,31 @@ mod tests {
         assert!(parse_cell_from_path("/v1/databases").is_none());
         assert!(parse_cell_from_path("/v1/api-keys").is_none());
         assert!(parse_cell_from_path("/v1/databases/not-a-uuid/sql").is_none());
+    }
+
+    #[test]
+    fn internal_requests_not_billed() {
+        let metadata: Arc<dyn MetadataStore> = Arc::new(InMemoryStore::new());
+        let meter = UsageMeter::new(metadata.clone(), Duration::from_secs(3600));
+        let t = TenantId::new();
+        let c = DatabaseId::new();
+        // 计费请求(用户 API key 直连):internal=false → 记录
+        let billed = AuthContext {
+            tenant_id: t,
+            internal: false,
+        };
+        meter.record_billed(&billed, Some(c), UsageMetric::KvRead, 5);
+        assert_eq!(meter.pending(), 1, "非 internal 请求应计费");
+        // 内部请求(BFF/Console 服务账号):internal=true → 跳过,不产生 usage
+        let internal = AuthContext {
+            tenant_id: t,
+            internal: true,
+        };
+        meter.record_billed(&internal, Some(c), UsageMetric::KvRead, 99);
+        assert_eq!(meter.pending(), 1, "internal 请求不应计费");
+        // 普通 record(不受 internal 影响,供计费路径内部使用)
+        meter.record(t, Some(c), UsageMetric::KvWrite, 1);
+        assert_eq!(meter.pending(), 2);
     }
 
     #[tokio::test]

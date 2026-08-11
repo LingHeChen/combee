@@ -40,6 +40,9 @@ pub fn is_valid_format(key: &str) -> bool {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AuthContext {
     pub tenant_id: crate::TenantId,
+    /// 内部请求(平台/BFF 服务账号)标记:计费(usage/credits)跳过。
+    /// 由 auth 中间件在 key 明文等于 BFF 服务账号 key 时置位,无法伪造。
+    pub internal: bool,
 }
 
 #[cfg(test)]

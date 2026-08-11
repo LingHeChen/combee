@@ -95,6 +95,9 @@ pub struct Config {
     /// - 未配置(dev):放行,但携带租户 `x-api-key` 的请求一律拒绝;
     /// - 配置:必须提供 `Authorization: Bearer <token>` 或 `x-control-token: <token>`。
     pub control_plane_token: Option<String>,
+    /// BFF/Console 服务账号 key(`COMBEE_BFF_API_KEY`):匹配时请求标记为
+    /// internal(平台内部),不计费、不算用户 usage。未配置时无内部请求。
+    pub bff_api_key: Option<String>,
     /// Usage 聚合 flush 周期。
     pub usage_flush_interval: Duration,
     /// Pricing 热更新轮询周期。
@@ -179,6 +182,10 @@ impl Config {
             let v = env_str("COMBEE_CONTROL_PLANE_TOKEN", "");
             if v.is_empty() { None } else { Some(v) }
         };
+        let bff_api_key = {
+            let v = env_str("COMBEE_BFF_API_KEY", "");
+            if v.is_empty() { None } else { Some(v) }
+        };
         let usage_flush_interval =
             Duration::from_secs(env_parse("COMBEE_USAGE_FLUSH_INTERVAL_SECS", 5));
         let pricing_refresh_interval =
@@ -239,6 +246,7 @@ impl Config {
             kv_durability,
             sql_timeout_secs,
             control_plane_token,
+            bff_api_key,
             usage_flush_interval,
             pricing_refresh_interval,
             settlement_interval,

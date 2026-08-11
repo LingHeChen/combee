@@ -51,6 +51,7 @@ impl FromRequestParts<AppState> for AuthContext {
             .copied()
             .unwrap_or(AuthContext {
                 tenant_id: DEFAULT_TENANT,
+                internal: false,
             }))
     }
 }
@@ -193,9 +194,20 @@ pub async fn auth_middleware(
     mut req: Request,
     next: Next,
 ) -> Response {
+    let mut internal = false;
     let tenant: TenantId = if state.auth_mode == AuthMode::Key {
         match req.headers().get("x-api-key").and_then(|v| v.to_str().ok()) {
             Some(key) => {
+                // 平台/BFF 服务账号:key 明文等于 COMBEE_BFF_API_KEY → internal(不计费)。
+                // 仅比对明文,避免伪造;该 key 仍需在 metadata 中有效。
+                if state
+                    .bff_api_key
+                    .as_deref()
+                    .map(|bff| bff == key)
+                    .unwrap_or(false)
+                {
+                    internal = true;
+                }
                 let key_hash = hash(key);
                 match state.metadata.lookup_api_key_by_hash(&key_hash).await {
                     Ok(Some(record)) => record.tenant_id,
@@ -225,7 +237,9 @@ pub async fn auth_middleware(
     } else {
         DEFAULT_TENANT
     };
-    req.extensions_mut()
-        .insert(AuthContext { tenant_id: tenant });
+    req.extensions_mut().insert(AuthContext {
+        tenant_id: tenant,
+        internal,
+    });
     next.run(req).await
 }

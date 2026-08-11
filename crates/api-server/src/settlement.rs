@@ -163,3 +163,83 @@ impl Settlement {
 // 保持 UsageKey / DatabaseId 引用(供后续按 Cell 粒度结算扩展)。
 #[allow(dead_code)]
 fn _unused(_: &UsageKey, _: DatabaseId) {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use combee_common::TenantId;
+    use combee_common::credit::{
+        CREDIT_UNITS_PER_CREDIT, CreditTransaction, CreditTransactionType, PricingRule,
+    };
+    use combee_common::usage::UsageKey;
+    use combee_metadata::InMemoryStore;
+
+    #[tokio::test]
+    async fn usage_is_settled_against_tenant_credits() {
+        let metadata: Arc<dyn MetadataStore> = Arc::new(InMemoryStore::new());
+        let t = TenantId::new();
+
+        // 定价:Requests 每 1 单位计 100 microcredits
+        metadata
+            .create_pricing_version(vec![PricingRule {
+                pricing_version: 0,
+                metric: UsageMetric::Requests,
+                unit_size: 1,
+                price_units: 100,
+            }])
+            .await
+            .unwrap();
+
+        metadata.create_tenant(t).await.unwrap();
+        // 充值 10 credits = 10_000_000 microcredits
+        metadata
+            .append_credit_transaction(CreditTransaction {
+                id: uuid::Uuid::new_v4(),
+                tenant_id: t,
+                txn_type: CreditTransactionType::Grant,
+                amount_units: 10 * CREDIT_UNITS_PER_CREDIT,
+                pricing_version: None,
+                reference_id: Some("grant:test".into()),
+                description: Some("test grant".into()),
+                created_at: 100,
+                balance_after: None,
+            })
+            .await
+            .unwrap();
+
+        // 用户租户产生 100 次请求(过去桶)
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+        let past_bucket = bucket_start(now - 180);
+        metadata
+            .usage_add(
+                &UsageKey {
+                    tenant_id: t,
+                    cell_id: None,
+                    metric: UsageMetric::Requests,
+                    bucket_start: past_bucket,
+                },
+                100,
+            )
+            .await
+            .unwrap();
+
+        let pricing = PricingManager::new(metadata.clone(), Duration::from_secs(3600));
+        pricing.refresh().await.unwrap(); // 加载 active pricing version
+        let settlement = Settlement::new(metadata.clone(), pricing, Duration::from_secs(60));
+        // 水位:从 past_bucket 之前开始结算(覆盖 past_bucket 桶)
+        settlement
+            .last_settled_bucket
+            .store(past_bucket - 60, Ordering::Relaxed);
+
+        let written = settlement.settle_once().await.unwrap();
+        assert_eq!(written, 1, "100 次请求应产生 1 条 usage 结算");
+
+        let account = metadata.get_credit_account(t).await.unwrap();
+        let spent = 10 * CREDIT_UNITS_PER_CREDIT - account.balance_units;
+        assert_eq!(spent, 100 * 100, "100 请求 × 100 microcredits 应从租户扣减");
+        assert!(account.balance_units < 10 * CREDIT_UNITS_PER_CREDIT);
+    }
+}

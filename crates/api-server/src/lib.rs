@@ -42,6 +42,8 @@ pub struct AppState {
     pub auth_mode: crate::auth::AuthMode,
     /// 控制面令牌;`/internal/*` 端点必须匹配它(未配置时 dev 放行)。
     pub control_plane_token: Option<String>,
+    /// BFF/Console 服务账号 key:匹配的请求标记 internal(不计费)。
+    pub bff_api_key: Option<String>,
     /// Usage Metering:内存聚合 + 周期 flush 到 metadata。
     pub usage: Arc<crate::usage::UsageMeter>,
     /// Pricing:active 版本热切换。

@@ -36,6 +36,18 @@ async function cellHasUsers(cellId: string): Promise<boolean> {
   }
 }
 
+/** 注册专用会话 Cell:固定名 combee-bff,ensure 语义,**不扫描**旧 cell。
+ *  新注册用户数据统一落在固定名 cell,避免分散到历史随机 id cell。 */
+async function ensureRegistrationCell(): Promise<string> {
+  if (process.env.COMBEE_BFF_CELL) return process.env.COMBEE_BFF_CELL;
+  const name = process.env.COMBEE_BFF_CELL_NAME ?? "combee-bff";
+  const r = await combeeRequest<{ cell: { id: string } }>(
+    `/v1/databases/by-name/${encodeURIComponent(name)}`,
+    { method: "PUT", apiKey: bffKey() },
+  );
+  return r.cell.id;
+}
+
 async function ensureSessionCell(): Promise<string> {
   // ensure 语义:固定名会话 Cell,幂等复用(同名不再创建)。
   // 兼容旧数据:新 cell 无用户时,扫描租户内其他 cell 找含 console_users 的
@@ -105,8 +117,8 @@ const CREATE_TABLE_SQL = `CREATE TABLE IF NOT EXISTS console_users (
   created_at INTEGER NOT NULL
 )`;
 
-export async function ensureUsersTable(): Promise<string> {
-  const cell = await ensureSessionCell();
+export async function ensureUsersTable(registration = false): Promise<string> {
+  const cell = registration ? await ensureRegistrationCell() : await ensureSessionCell();
   await combeeRequest(`/v1/databases/${cell}/sql`, {
     method: "POST",
     body: { sql: CREATE_TABLE_SQL },
@@ -189,8 +201,8 @@ export async function registerUser(
       }
     } catch (err) {
       try { require("node:fs").appendFileSync("/tmp/auth-debug.log", `${new Date().toISOString()} redeem-err msg=${(err as Error).message} code=${(err as { code?: string }).code} status=${(err as { status?: number }).status}\n`); } catch {}
-      // 邀请码无效/已用:清理刚建的用户,报错
-      const cell = await ensureUsersTable();
+      // 邀请码无效/已用:清理刚建的用户,报错(与写入同一固定 cell)
+      const cell = await ensureUsersTable(true);
       await combeeRequest(`/v1/databases/${cell}/sql`, {
         method: "POST",
         body: { sql: "DELETE FROM console_users WHERE username = ?", params: [username] },
@@ -204,7 +216,7 @@ export async function registerUser(
     }
   }
 
-  const cell = await ensureUsersTable();
+  const cell = await ensureUsersTable(true); // 新注册:固定 combee-bff cell
   await combeeRequest(`/v1/databases/${cell}/sql`, {
     method: "POST",
     body: {

@@ -156,6 +156,7 @@ async fn replication_api_sets_replica() {
         nodes: registry,
         auth_mode: combee_api_server::auth::AuthMode::Off,
         control_plane_token: None,
+        bff_api_key: None,
         usage: combee_api_server::usage::UsageMeter::new(
             metadata.clone(),
             std::time::Duration::from_secs(3600),

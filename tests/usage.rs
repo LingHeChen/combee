@@ -66,6 +66,7 @@ async fn make_app() -> (Router, Arc<UsageMeter>, Arc<dyn MetadataStore>, TempDir
         nodes: Arc::new(NodeRegistry::new()),
         auth_mode: AuthMode::Off,
         control_plane_token: None,
+        bff_api_key: None,
         usage: meter.clone(),
         pricing: combee_api_server::pricing::PricingManager::new(
             metadata.clone(),

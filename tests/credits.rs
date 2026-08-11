@@ -91,6 +91,7 @@ async fn make_harness() -> Harness {
         nodes: Arc::new(NodeRegistry::new()),
         auth_mode: AuthMode::Off,
         control_plane_token: None,
+        bff_api_key: None,
         usage: usage.clone(),
         pricing: pricing.clone(),
         admin_token: Some(ADMIN.into()),

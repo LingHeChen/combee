@@ -102,6 +102,7 @@ async fn make_app() -> (Router, TempDir, TenantId) {
         nodes: Arc::new(NodeRegistry::new()),
         auth_mode: AuthMode::Key,
         control_plane_token: None,
+        bff_api_key: None,
         usage: usage_meter,
         pricing: pricing_meter,
         admin_token: None,
@@ -272,5 +273,6 @@ async fn tenant_a_data_invisible_to_tenant_b() {
 fn _assert_auth_context_is_copy(_: AuthContext) -> AuthContext {
     AuthContext {
         tenant_id: DEFAULT_TENANT,
+    internal: false,
     }
 }

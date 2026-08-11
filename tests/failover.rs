@@ -141,6 +141,7 @@ async fn failover_promotes_replica_and_fences_old_primary() {
         nodes: registry.clone(),
         auth_mode: combee_api_server::auth::AuthMode::Off,
         control_plane_token: None,
+        bff_api_key: None,
         usage: usage_meter,
         pricing: combee_api_server::pricing::PricingManager::new(
             metadata.clone(),
