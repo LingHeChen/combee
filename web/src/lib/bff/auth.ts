@@ -23,21 +23,8 @@ export interface BffSession {
   created_at: number;
 }
 
-/** 探测 Cell 是否已有用户数据(console_users 表非空)。 */
-async function cellHasUsers(cellId: string): Promise<boolean> {
-  try {
-    const r = await combeeRequest<{ rows: unknown[][] }>(
-      `/v1/databases/${cellId}/sql`,
-      { method: "POST", body: { sql: "SELECT 1 FROM console_users LIMIT 1" }, apiKey: bffKey() },
-    );
-    return (r.rows ?? []).length > 0;
-  } catch {
-    return false; // 表不存在/查询失败 → 视为空
-  }
-}
-
 /** 注册专用会话 Cell:固定名 combee-bff,ensure 语义,**不扫描**旧 cell。
- *  新注册用户数据统一落在固定名 cell,避免分散到历史随机 id cell。 */
+ *  所有新数据统一落在固定名 cell,避免分散到历史随机 id cell。 */
 async function ensureRegistrationCell(): Promise<string> {
   if (process.env.COMBEE_BFF_CELL) return process.env.COMBEE_BFF_CELL;
   const name = process.env.COMBEE_BFF_CELL_NAME ?? "combee-bff";
@@ -46,32 +33,6 @@ async function ensureRegistrationCell(): Promise<string> {
     { method: "PUT", apiKey: bffKey() },
   );
   return r.cell.id;
-}
-
-async function ensureSessionCell(): Promise<string> {
-  // ensure 语义:固定名会话 Cell,幂等复用(同名不再创建)。
-  // 兼容旧数据:新 cell 无用户时,扫描租户内其他 cell 找含 console_users 的
-  // 旧会话 cell 复用(ensure 改固定名前的随机 id cell),避免用户数据"丢失"。
-  if (process.env.COMBEE_BFF_CELL) return process.env.COMBEE_BFF_CELL;
-  const name = process.env.COMBEE_BFF_CELL_NAME ?? "combee-bff";
-  const r = await combeeRequest<{ cell: { id: string } }>(
-    `/v1/databases/by-name/${encodeURIComponent(name)}`,
-    { method: "PUT", apiKey: bffKey() },
-  );
-  const fresh = r.cell.id;
-  if (await cellHasUsers(fresh)) return fresh;
-  try {
-    const cells = await combeeRequest<Array<{ id: string }>>("/v1/databases?limit=1000", {
-      apiKey: bffKey(),
-    });
-    for (const c of cells) {
-      if (c.id === fresh) continue;
-      if (await cellHasUsers(c.id)) return c.id; // 复用旧会话 cell(保留旧用户)
-    }
-  } catch {
-    /* 扫描失败不影响默认返回 */
-  }
-  return fresh;
 }
 
 /** BFF 服务账号 key:dev(auth=off)可空;生产必填(用于建表/建用户 key)。 */
@@ -117,8 +78,10 @@ const CREATE_TABLE_SQL = `CREATE TABLE IF NOT EXISTS console_users (
   created_at INTEGER NOT NULL
 )`;
 
-export async function ensureUsersTable(registration = false): Promise<string> {
-  const cell = registration ? await ensureRegistrationCell() : await ensureSessionCell();
+export async function ensureUsersTable(): Promise<string> {
+  // 所有新数据(用户/会话/用户辅助数据)统一写入固定 combee-bff cell;
+  // 不再扫描复用旧会话 cell(读取兼容见 findUser 的旧 cell 扫描兜底)。
+  const cell = await ensureRegistrationCell();
   await combeeRequest(`/v1/databases/${cell}/sql`, {
     method: "POST",
     body: { sql: CREATE_TABLE_SQL },
@@ -127,8 +90,7 @@ export async function ensureUsersTable(registration = false): Promise<string> {
   return cell;
 }
 
-async function findUser(username: string): Promise<ConsoleUserRow | null> {
-  const cell = await ensureUsersTable();
+async function findUserInCell(cell: string, username: string): Promise<ConsoleUserRow | null> {
   const res = await combeeRequest<{ rows: unknown[][] }>(
     `/v1/databases/${cell}/sql`,
     {
@@ -144,6 +106,27 @@ async function findUser(username: string): Promise<ConsoleUserRow | null> {
   if (rows.length === 0) return null;
   const r = rows[0] as [string, string, string, number];
   return { username: r[0], password_hash: r[1], api_key: r[2], created_at: r[3] };
+}
+
+async function findUser(username: string): Promise<ConsoleUserRow | null> {
+  // 1) 先查固定 combee-bff(新用户数据统一在这里)
+  const cell = await ensureUsersTable();
+  const hit = await findUserInCell(cell, username);
+  if (hit) return hit;
+  // 2) 兼容历史:扫描旧会话 cell(ensure 固定名之前的随机 id cell 里的旧用户)
+  try {
+    const cells = await combeeRequest<Array<{ id: string }>>("/v1/databases?limit=1000", {
+      apiKey: bffKey(),
+    });
+    for (const c of cells) {
+      if (c.id === cell) continue;
+      const old = await findUserInCell(c.id, username);
+      if (old) return old;
+    }
+  } catch {
+    /* 扫描失败不影响 */
+  }
+  return null;
 }
 
 function normalizeUsername(raw: string): string {
@@ -202,7 +185,7 @@ export async function registerUser(
     } catch (err) {
       try { require("node:fs").appendFileSync("/tmp/auth-debug.log", `${new Date().toISOString()} redeem-err msg=${(err as Error).message} code=${(err as { code?: string }).code} status=${(err as { status?: number }).status}\n`); } catch {}
       // 邀请码无效/已用:清理刚建的用户,报错(与写入同一固定 cell)
-      const cell = await ensureUsersTable(true);
+      const cell = await ensureUsersTable();
       await combeeRequest(`/v1/databases/${cell}/sql`, {
         method: "POST",
         body: { sql: "DELETE FROM console_users WHERE username = ?", params: [username] },
@@ -216,7 +199,7 @@ export async function registerUser(
     }
   }
 
-  const cell = await ensureUsersTable(true); // 新注册:固定 combee-bff cell
+  const cell = await ensureUsersTable(); // 新注册:固定 combee-bff cell
   await combeeRequest(`/v1/databases/${cell}/sql`, {
     method: "POST",
     body: {
@@ -248,7 +231,7 @@ export async function login(rawUsername: string, password: string): Promise<stri
     api_key: user.api_key,
     created_at: Math.floor(Date.now() / 1000),
   };
-  const cell = await ensureSessionCell();
+  const cell = await ensureUsersTable(); // session 写入统一 combee-bff
   await combeeRequest(`/v1/databases/${cell}/kv/${encodeURIComponent(sessionKey(sid))}`, {
     method: "PUT",
     body: { value: JSON.stringify(session), ttl_seconds: SESSION_TTL },
@@ -261,7 +244,7 @@ export async function login(rawUsername: string, password: string): Promise<stri
 export async function getSession(sid: string | undefined): Promise<BffSession | null> {
   if (!sid) return null;
   try {
-    const cell = await ensureSessionCell();
+    const cell = await ensureUsersTable(); // session 读取统一 combee-bff
     const raw = await combeeRequest<{ value?: string }>(
       `/v1/databases/${cell}/kv/${encodeURIComponent(sessionKey(sid))}`,
       { apiKey: bffKey() },
@@ -277,7 +260,7 @@ export async function getSession(sid: string | undefined): Promise<BffSession | 
 export async function destroySession(sid: string | undefined): Promise<void> {
   if (!sid) return;
   try {
-    const cell = await ensureSessionCell();
+    const cell = await ensureUsersTable(); // session 销毁统一 combee-bff
     await combeeRequest(`/v1/databases/${cell}/kv/${encodeURIComponent(sessionKey(sid))}`, {
       method: "DELETE",
       apiKey: bffKey(),
