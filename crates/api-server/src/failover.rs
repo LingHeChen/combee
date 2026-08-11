@@ -104,7 +104,6 @@ pub fn spawn_failover_scanner(
                         nodes: nodes.clone(),
                         auth_mode: crate::auth::AuthMode::Off,
                         control_plane_token: None,
-                        bff_api_key: None,
                         usage: crate::usage::UsageMeter::new(
                             metadata.clone(),
                             std::time::Duration::from_secs(3600),

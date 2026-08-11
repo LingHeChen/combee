@@ -18,8 +18,10 @@ const SESSION_TTL = 86_400; // 24h
 export interface BffSession {
   /** console 用户名 */
   username: string;
-  /** 该用户专属的 Combee API key(代理请求用) */
+  /** 该用户专属的 Combee API key(登录回填/兼容;业务请求不再用它代理) */
   api_key: string;
+  /** 用户租户 id:console 数据归属过滤(admin key 能看到全部,靠它隔离) */
+  tenant_id: string | null;
   created_at: number;
 }
 
@@ -36,8 +38,10 @@ async function ensureRegistrationCell(): Promise<string> {
 }
 
 /** BFF 服务账号 key:dev(auth=off)可空;生产必填(用于建表/建用户 key)。 */
-function bffKey(): string {
-  return process.env.COMBEE_BFF_API_KEY ?? "";
+/** 平台服务账号 key(COMBEE_ADMIN_API_KEY):BFF 所有请求统一用它,
+ *  Combee 侧匹配该 key 即 internal(不计费)。兼容旧 env 名(COMBEE_BFF_API_KEY)。 */
+export function bffKey(): string {
+  return process.env.COMBEE_ADMIN_API_KEY ?? process.env.COMBEE_BFF_API_KEY ?? "";
 }
 
 function sessionKey(sid: string): string {
@@ -68,6 +72,7 @@ interface ConsoleUserRow {
   username: string;
   password_hash: string;
   api_key: string;
+  tenant_id: string | null;
   created_at: number;
 }
 
@@ -75,8 +80,11 @@ const CREATE_TABLE_SQL = `CREATE TABLE IF NOT EXISTS console_users (
   username TEXT PRIMARY KEY,
   password_hash TEXT NOT NULL,
   api_key TEXT NOT NULL,
+  tenant_id TEXT,
   created_at INTEGER NOT NULL
 )`;
+/** 兼容旧表:补 tenant_id 列(ALTER 失败忽略——已存在)。 */
+const ALTER_ADD_TENANT_SQL = `ALTER TABLE console_users ADD COLUMN tenant_id TEXT`;
 
 export async function ensureUsersTable(): Promise<string> {
   // 所有新数据(用户/会话/用户辅助数据)统一写入固定 combee-bff cell;
@@ -87,6 +95,11 @@ export async function ensureUsersTable(): Promise<string> {
     body: { sql: CREATE_TABLE_SQL },
     apiKey: bffKey(),
   }).catch(() => undefined);
+  await combeeRequest(`/v1/databases/${cell}/sql`, {
+    method: "POST",
+    body: { sql: ALTER_ADD_TENANT_SQL },
+    apiKey: bffKey(),
+  }).catch(() => undefined); // 旧表已有该列时忽略
   return cell;
 }
 
@@ -96,7 +109,7 @@ async function findUserInCell(cell: string, username: string): Promise<ConsoleUs
     {
       method: "POST",
       body: {
-        sql: "SELECT username, password_hash, api_key, created_at FROM console_users WHERE username = ?",
+        sql: "SELECT username, password_hash, api_key, tenant_id, created_at FROM console_users WHERE username = ?",
         params: [username],
       },
       apiKey: bffKey(),
@@ -104,8 +117,8 @@ async function findUserInCell(cell: string, username: string): Promise<ConsoleUs
   ).catch(() => null);
   const rows = res?.rows ?? [];
   if (rows.length === 0) return null;
-  const r = rows[0] as [string, string, string, number];
-  return { username: r[0], password_hash: r[1], api_key: r[2], created_at: r[3] };
+  const r = rows[0] as [string, string, string, string | null, number];
+  return { username: r[0], password_hash: r[1], api_key: r[2], tenant_id: r[3], created_at: r[4] };
 }
 
 async function findUser(username: string): Promise<ConsoleUserRow | null> {
@@ -203,8 +216,8 @@ export async function registerUser(
   await combeeRequest(`/v1/databases/${cell}/sql`, {
     method: "POST",
     body: {
-      sql: "INSERT INTO console_users (username, password_hash, api_key, created_at) VALUES (?, ?, ?, ?)",
-      params: [username, hashPassword(password), created.key, Math.floor(Date.now() / 1000)],
+      sql: "INSERT INTO console_users (username, password_hash, api_key, tenant_id, created_at) VALUES (?, ?, ?, ?, ?)",
+      params: [username, hashPassword(password), created.key, created.tenant_id, Math.floor(Date.now() / 1000)],
     },
     apiKey: bffKey(),
   });
@@ -213,6 +226,7 @@ export async function registerUser(
     username,
     password_hash: "",
     api_key: created.key,
+    tenant_id: created.tenant_id,
     created_at: Math.floor(Date.now() / 1000),
   };
   return { row, apiKey: created.key };
@@ -226,9 +240,23 @@ export async function login(rawUsername: string, password: string): Promise<stri
     throw new Error("invalid username or password");
   }
   const sid = randomUUID();
+  // 旧用户(tenant_id 缺失)回填:用用户 key 查一次 cell 列表,取其租户。
+  // 新用户注册时已存 tenant_id,无需回填。
+  let tenantId = user.tenant_id;
+  if (!tenantId) {
+    try {
+      const probe = await combeeRequest<Array<{ tenant_id?: string }>>("/v1/databases?limit=1", {
+        apiKey: user.api_key,
+      });
+      tenantId = (Array.isArray(probe) ? probe[0]?.tenant_id : null) ?? null;
+    } catch {
+      /* 回填失败不影响登录 */
+    }
+  }
   const session: BffSession = {
     username: user.username,
     api_key: user.api_key,
+    tenant_id: tenantId,
     created_at: Math.floor(Date.now() / 1000),
   };
   const cell = await ensureUsersTable(); // session 写入统一 combee-bff

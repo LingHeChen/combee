@@ -161,10 +161,24 @@ fn parse_cell_from_path(path: &str) -> Option<DatabaseId> {
 }
 
 /// Usage 中间件:统计 requests / bytes_in / bytes_out(挂在 auth 之后,可读 AuthContext)。
+/// 查询自身用量的端点不产生 usage(否则"查用量"本身会涨用量,自指)。
+const USAGE_SELF_PATHS: [&str; 5] = [
+    "/v1/usage/summary",
+    "/v1/usage/timeseries",
+    "/v1/cells/",
+    "/v1/credits/balance",
+    "/v1/credits/transactions",
+];
+
 pub async fn usage_tracking(State(state): State<AppState>, req: Request, next: Next) -> Response {
     let auth = req.extensions().get::<AuthContext>().copied();
-    // 计费口径:内部请求(平台/BFF 服务账号)不产生 usage,不参与结算。
+    // 计费口径:内部请求(平台服务账号)不产生 usage,不参与结算。
     if auth.map(|a| a.internal).unwrap_or(false) {
+        return next.run(req).await;
+    }
+    // 查询自身用量/余额的端点不计数(自指修复)。
+    let path = req.uri().path();
+    if USAGE_SELF_PATHS.iter().any(|p| path.starts_with(p)) {
         return next.run(req).await;
     }
     let tenant = auth

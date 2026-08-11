@@ -79,7 +79,7 @@ async fn create_database_round_robin_placement() {
         nodes: registry.clone(),
         auth_mode: combee_api_server::auth::AuthMode::Off,
         control_plane_token: None,
-        bff_api_key: None,
+        admin_api_key: None,
         usage: combee_api_server::usage::UsageMeter::new(
             metadata.clone(),
             std::time::Duration::from_secs(3600),
@@ -89,7 +89,6 @@ async fn create_database_round_robin_placement() {
             std::time::Duration::from_secs(3600),
         ),
         admin_token: None,
-        admin_api_key: None,
         quota: Default::default(),
         concurrency: Default::default(),
     });
@@ -226,11 +225,10 @@ async fn agent_registers_heartbeats_and_unregisters() {
         nodes: registry.clone(),
         auth_mode: combee_api_server::auth::AuthMode::Off,
         control_plane_token: None,
-        bff_api_key: None,
+        admin_api_key: None,
         usage: usage_meter,
         pricing: pricing_meter,
         admin_token: None,
-        admin_api_key: None,
         quota: Default::default(),
         concurrency: Default::default(),
     });

@@ -195,27 +195,16 @@ pub async fn auth_middleware(
     next: Next,
 ) -> Response {
     let mut internal = false;
-    // BFF 内部请求标记(与 auth_mode 无关,off 开发模式同样生效):
-    // 带 x-bff-token(平台服务账号 key)即内部请求——允许 BFF 用用户 key
-    // (x-api-key)做租户隔离查询,同时不计费。token 为机密平台 key,无法伪造。
-    if let Some(bff) = state.bff_api_key.as_deref()
-        && req
-            .headers()
-            .get("x-bff-token")
-            .and_then(|v| v.to_str().ok())
-            == Some(bff)
-    {
-        internal = true;
-    }
+    // 平台服务账号(COMBEE_ADMIN_API_KEY):key 明文匹配 → internal,不计费。
+    // BFF/console 平台请求统一用它;租户 API key 直连(SDK/curl)不计 internal。
+    // 仅比对明文避免伪造;该 key 仍需在 metadata 中有效(admin_auth 也校验)。
     let tenant: TenantId = if state.auth_mode == AuthMode::Key {
         match req.headers().get("x-api-key").and_then(|v| v.to_str().ok()) {
             Some(key) => {
-                // 平台/BFF 服务账号:key 明文等于 COMBEE_BFF_API_KEY → internal(不计费)。
-                // 仅比对明文,避免伪造;该 key 仍需在 metadata 中有效。
                 if state
-                    .bff_api_key
+                    .admin_api_key
                     .as_deref()
-                    .map(|bff| bff == key)
+                    .map(|admin| admin == key)
                     .unwrap_or(false)
                 {
                     internal = true;

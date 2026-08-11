@@ -41,10 +41,6 @@ export async function combeeRequest<T = unknown>(
   const base = needUrl();
   const headers: Record<string, string> = { "content-type": "application/json" };
   if (opts.apiKey) headers["x-api-key"] = opts.apiKey;
-  // BFF 内部请求标记:平台服务账号 key 校验(api-server 匹配 → internal,不计费)。
-  // 与 x-api-key(可能是用户 key,用于租户隔离)并存,两者独立。
-  const bffToken = process.env.COMBEE_BFF_API_KEY ?? "";
-  if (bffToken) headers["x-bff-token"] = bffToken;
   if (opts.idempotencyKey) headers["idempotency-key"] = opts.idempotencyKey;
   // request_id 贯穿:从 BFF 上下文读并透传 Combee API
   const rid = (await import("@/lib/bff/context")).currentRequestId();

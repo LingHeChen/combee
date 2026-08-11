@@ -8,7 +8,7 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { combeeRequest } from "@/lib/combee-client";
-import { ensureUsersTable, type BffSession } from "@/lib/bff/auth";
+import { bffKey, ensureUsersTable, type BffSession } from "@/lib/bff/auth";
 
 // ---- Schema(逐条建表:Combee 拒绝多语句)----
 
@@ -180,14 +180,20 @@ export interface OnboardingState {
 }
 
 export async function getOnboarding(session: BffSession): Promise<OnboardingState> {
-  // 用用户自己的 key 聚合 Combee 实际数据
-  const [cells, keys, usage] = await Promise.all([
-    combeeRequest<unknown[] | null>("/v1/databases?limit=1000", { apiKey: session.api_key }).catch(() => null),
-    combeeRequest<unknown[] | null>("/v1/api-keys", { apiKey: session.api_key }).catch(() => null),
-    combeeRequest<{ request_count?: number } | null>("/v1/usage/summary", { apiKey: session.api_key }).catch(() => null),
+  // cells 用平台 key + 租户过滤;注册即创建了用户 key(api_key_created 恒为注册状态);
+  // usage 用用户 key 查(Combee 对查询自身用量不计费)。
+  const [cells, usage] = await Promise.all([
+    combeeRequest<Array<{ tenant_id?: string }> | null>("/v1/databases?limit=1000", {
+      apiKey: bffKey(),
+    }).catch(() => null),
+    combeeRequest<{ request_count?: number } | null>("/v1/usage/summary", {
+      apiKey: session.api_key,
+    }).catch(() => null),
   ]);
-  const firstCell = Array.isArray(cells) && cells.length > 0;
-  const firstKey = Array.isArray(keys) && keys.length > 0;
+  const firstCell = Array.isArray(cells)
+    ? cells.some((c) => !!session.tenant_id && c.tenant_id === session.tenant_id)
+    : false;
+  const firstKey = true; // 注册流程必然为用户创建了专属 API key
   const firstRequest = (usage?.request_count ?? 0) > 0;
   const completed = firstCell && firstKey && firstRequest;
   return {

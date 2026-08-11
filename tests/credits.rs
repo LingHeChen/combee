@@ -91,11 +91,10 @@ async fn make_harness() -> Harness {
         nodes: Arc::new(NodeRegistry::new()),
         auth_mode: AuthMode::Off,
         control_plane_token: None,
-        bff_api_key: None,
+        admin_api_key: None,
         usage: usage.clone(),
         pricing: pricing.clone(),
         admin_token: Some(ADMIN.into()),
-        admin_api_key: None,
         quota: Default::default(),
         concurrency: Default::default(),
     };

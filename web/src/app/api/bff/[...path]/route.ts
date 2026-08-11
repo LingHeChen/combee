@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { bffContext, bffLog } from "@/lib/bff/context";
 import { combeeRequest, CombeeApiError } from "@/lib/combee-client";
-import { SESSION_COOKIE, destroySession, getSession, login, registerUser } from "@/lib/bff/auth";
+import { bffKey, SESSION_COOKIE, destroySession, getSession, login, registerUser, type BffSession } from "@/lib/bff/auth";
 import { aggregateOverview } from "@/lib/bff/aggregate";
 import {
   appendQueryHistory,
@@ -225,10 +225,29 @@ async function withLog(
   });
 }
 
+/** cell 归属校验:该 cell 必须属于当前用户租户(admin key 能看到全部,BFF 负责隔离)。
+ *  返回 true 才允许代理执行 SQL/KV/备份等操作。 */
+async function cellBelongsTo(session: BffSession, cellId: string): Promise<boolean> {
+  if (!session.tenant_id) return false;
+  const cell = await combeeRequest<{ tenant_id?: string }>(`/v1/databases/${cellId}`, {
+    apiKey: bffKey(),
+  }).catch(() => null);
+  return !!cell && cell.tenant_id === session.tenant_id;
+}
+
 async function proxy(req: NextRequest, target: string) {
   const session = await getSession(req.cookies.get(SESSION_COOKIE)?.value);
   if (!session) {
     return NextResponse.json({ code: "unauthorized", error: "not authenticated" }, { status: 401 });
+  }
+  // 归属校验:cell 数据操作(/v1/databases/{id}/…)必须属于当前用户;
+  // by-name 与列表/创建(无 cell id)不走校验。
+  const m = target.match(/^v1\/databases\/([^/]+)/);
+  if (m && m[1] !== "by-name") {
+    const cellId = m[1];
+    if (!(await cellBelongsTo(session, cellId))) {
+      return NextResponse.json({ code: "database_not_found", error: "database not found" }, { status: 404 });
+    }
   }
   const query = req.nextUrl.search;
   const method = req.method;
@@ -241,7 +260,8 @@ async function proxy(req: NextRequest, target: string) {
     }
   }
   try {
-    const data = await combeeRequest(`/${target}${query}`, { method, body, apiKey: session.api_key });
+    // 统一用平台 admin key 代理(Combee 侧 internal,不计费);权限已在上方校验。
+    const data = await combeeRequest(`/${target}${query}`, { method, body, apiKey: bffKey() });
     if (data === undefined) return NextResponse.json({ ok: true });
     return NextResponse.json(data);
   } catch (err) {

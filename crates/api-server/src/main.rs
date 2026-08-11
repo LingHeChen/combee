@@ -148,7 +148,6 @@ async fn main() {
         nodes: registry,
         auth_mode: combee_api_server::auth::AuthMode::from_env(),
         control_plane_token: config.control_plane_token.clone(),
-        bff_api_key: config.bff_api_key.clone(),
         usage: usage_meter,
         pricing: pricing_manager,
         admin_token: config.admin_token.clone(),
