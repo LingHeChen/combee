@@ -44,7 +44,9 @@ async fn send(app: &Router, method: Method, uri: &str, body: Option<Value>) -> (
     (status, value)
 }
 
-async fn make_app() -> (Router, Arc<UsageMeter>, Arc<dyn MetadataStore>, TempDir) {
+async fn make_app_with_bff(
+    bff_api_key: Option<String>,
+) -> (Router, Arc<UsageMeter>, Arc<dyn MetadataStore>, TempDir) {
     let dir = tempfile::tempdir().unwrap();
     let metadata: Arc<dyn MetadataStore> = Arc::new(InMemoryStore::new());
     let node = Arc::new(DataNode::new(DataNodeConfig {
@@ -66,7 +68,7 @@ async fn make_app() -> (Router, Arc<UsageMeter>, Arc<dyn MetadataStore>, TempDir
         nodes: Arc::new(NodeRegistry::new()),
         auth_mode: AuthMode::Off,
         control_plane_token: None,
-        bff_api_key: None,
+        bff_api_key,
         usage: meter.clone(),
         pricing: combee_api_server::pricing::PricingManager::new(
             metadata.clone(),
@@ -78,6 +80,41 @@ async fn make_app() -> (Router, Arc<UsageMeter>, Arc<dyn MetadataStore>, TempDir
         concurrency: Default::default(),
     };
     (build_app(state), meter, metadata, dir)
+}
+
+async fn make_app() -> (Router, Arc<UsageMeter>, Arc<dyn MetadataStore>, TempDir) {
+    make_app_with_bff(None).await
+}
+
+/// 目的:BFF 内部请求(x-bff-token)不计费——即使用户 key(x-api-key)做租户隔离,
+/// 打开 console 页面(列表/详情等)不增加 usage 请求数。
+#[tokio::test]
+async fn bff_internal_requests_not_billed() {
+    let (app, meter, _md, _dir) = make_app_with_bff(Some("cmb_sk_bff_internal_token".into())).await;
+
+    // 模拟 BFF:带用户 key + x-bff-token(平台服务账号 key)的请求
+    let req = axum::http::Request::builder()
+        .method(Method::GET)
+        .uri("/v1/databases?limit=1000")
+        .header("content-type", "application/json")
+        .header("x-api-key", "cmb_sk_user_key_for_isolation")
+        .header("x-bff-token", "cmb_sk_bff_internal_token")
+        .body("{}".to_string())
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    // 非 internal 对照:同一请求不带 x-bff-token → 应计入 usage
+    let req2 = axum::http::Request::builder()
+        .method(Method::GET)
+        .uri("/v1/databases?limit=1000")
+        .header("content-type", "application/json")
+        .body("{}".to_string())
+        .unwrap();
+    let resp2 = app.clone().oneshot(req2).await.unwrap();
+    assert_eq!(resp2.status(), StatusCode::OK);
+
+    // 两个请求都是 GET /v1/databases:internal 的不计,bff token 缺失的计 1
+    assert_eq!(meter.pending(), 1, "x-bff-token 请求不计费;对照请求计 1");
 }
 
 /// 目的:操作计数按类型区分,flush 后 usage API 返回正确数字;storage bytes > 0。
