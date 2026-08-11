@@ -17,6 +17,7 @@
 import json
 import os
 import re
+import re
 import subprocess
 import sys
 import time
@@ -131,26 +132,60 @@ def _recent_logs(cfg, service):
     win = int(cfg.get("LOG_WINDOW_MIN", 5))
     since = datetime.utcnow().timestamp() - win * 60
     since_str = datetime.utcfromtimestamp(since).strftime("%Y-%m-%dT%H:%M")
-    return stack, service, win, since_str
+    return stack, service, win, since_str, since
+
+
+def _container_log_paths(cfg, service):
+    """返回该服务当前运行副本的宿主日志文件路径(Docker json-file,持久化落盘)。"""
+    stack = cfg.get("STACK_NAME", "combee")
+    paths = []
+    cmd = "docker ps --no-trunc --filter name=%s_%s --format '{{.ID}}'" % (stack, service)
+    for cid in run(cmd).split():
+        p = "/var/lib/docker/containers/%s/%s-json.log" % (cid, cid)
+        if os.path.exists(p):
+            paths.append(p)
+    return paths
 
 
 def _raw_logs(cfg, service):
-    """取指定服务窗口内的原始日志(JSON 行,已去容器前缀)。"""
-    stack, svc, win, since_str = _recent_logs(cfg, service)
-    cmd = "docker service logs --since %s %s_%s --no-trunc 2>&1" % (since_str, stack, svc)
+    """取指定服务窗口内的原始日志:直接读宿主机 /var/lib/docker/containers/*-json.log
+    (持久化,滚动更新/容器重建后仍可读;由 logrotate 滚动保留最近 7 天)。
+    json-file 每行: {"log":"<内层 JSON>","time":"2026-08-10T15:57:40.123Z",...}"""
+    stack, svc, win, since_str, since_ts = _recent_logs(cfg, service)
     out = []
-    for line in run(cmd).splitlines():
-        # docker service logs 前缀:"combee_api-server.1.xxx@node | {...}"
-        if " | " in line:
-            line = line.split(" | ", 1)[1]
-        line = line.strip()
-        if line.startswith("{"):
-            try:
-                obj = json.loads(line)
-                if isinstance(obj, dict):
-                    out.append(obj)
-            except Exception:
-                pass
+    for path in _container_log_paths(cfg, service):
+        try:
+            with open(path, "r", errors="replace") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        frame = json.loads(line)
+                    except Exception:
+                        continue
+                    # 时间过滤:窗口外跳过
+                    t = frame.get("time", "") or ""
+                    if t:
+                        ts = None
+                        for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ"):
+                            try:
+                                ts = datetime.strptime(t, fmt).timestamp()
+                                break
+                            except ValueError:
+                                continue
+                        if ts is not None and ts < since_ts:
+                            continue
+                    log = (frame.get("log", "") or "").strip()
+                    if log.startswith("{"):
+                        try:
+                            obj = json.loads(log)
+                            if isinstance(obj, dict):
+                                out.append(obj)
+                        except Exception:
+                            pass
+        except OSError:
+            continue
     return out
 
 
@@ -180,13 +215,11 @@ def _sample_errs(errs, n=5):
 
 
 def _grep_logs(cfg, service, pattern):
-    stack, svc, win, since_str = _recent_logs(cfg, service)
-    cmd = "docker service logs --since %s %s_%s --no-trunc 2>&1 | grep -cE '%s'" % (since_str, stack, svc, pattern)
-    out = run(cmd)
-    try:
-        return int(out.strip() or 0)
-    except ValueError:
-        return 0
+    n = 0
+    for row in _raw_logs(cfg, service):
+        if re.search(pattern, json.dumps(row, ensure_ascii=False)):
+            n += 1
+    return n
 
 
 def error_rate(cfg):

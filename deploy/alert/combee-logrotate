@@ -1,0 +1,23 @@
+# Combee Swarm 容器日志滚动(logrotate)
+# 安装:cp deploy/alert/combee-logrotate /etc/logrotate.d/combee-containers
+# 验证:logrotate -d /etc/logrotate.d/combee-containers
+#
+# 说明:
+# - Docker 默认 json-file driver 已把容器日志写盘到 /var/lib/docker/containers/<id>/<id>-json.log;
+#   `docker service logs` 只是聚合展示,容器被滚动替换后旧日志不可见(但仍在本文件历史中,
+#   由本配置滚动保留 7 天)。
+# - copytruncate:重命名后截断原文件,docker 持续写入的 fd 不受影响(无需重启容器)。
+# - rotate 7:每日一份,保留最近 7 天;compress 压缩旧档。
+# - 多副本/容器重建:id 变化,`*` 通配自动覆盖新容器文件。
+
+/var/lib/docker/containers/*/*-json.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    copytruncate
+    missingok
+    notifempty
+    nomail
+    su root root
+}

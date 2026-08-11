@@ -56,3 +56,22 @@ crontab -e
 
 - 应用加 `/healthz` + `/metrics` 后,可升级到 **Prometheus + Alertmanager**(规则更灵活、支持静默/路由)。
 - 备份失败告警(检查 COS 备份)可加进 `check.py`,等备份指标落地后补。
+
+## 四、日志持久化 + 滚动(7 天)
+
+`docker service logs` 不持久化(容器被滚动替换后旧日志从聚合里消失)。日志实际落在宿主
+`/var/lib/docker/containers/<id>/<id>-json.log`(Docker 默认 json-file driver)。
+
+1. 安装 logrotate 配置(滚动保留最近 7 天):
+
+```bash
+cp /opt/combee/deploy/alert/combee-logrotate /etc/logrotate.d/combee-containers
+logrotate -d /etc/logrotate.d/combee-containers   # 试运行验证
+```
+
+2. check.py 已改为**直接读宿主机日志文件**(不依赖 docker service logs):
+   - 滚动更新/容器重建后告警仍能读到日志;
+   - 按 json-file 的 time 字段过滤最近 N 分钟(LOG_WINDOW_MIN);
+   - 多副本自动遍历全部运行容器。
+
+> 注意:logrotate 默认由 cron.daily 触发;若日志增长极快,可加 `maxsize 500M` 按大小提前滚动。

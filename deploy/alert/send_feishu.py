@@ -6,14 +6,38 @@
 """
 import base64
 import hashlib
+import os
 import hmac
 import json
 import sys
 import time
 import urllib.parse
 import urllib.request
+from typing import Optional
 
 TIMEOUT = 10
+
+
+def _secret_for(webhook: str) -> Optional[str]:
+    """自动从同目录 config.env 匹配 secret:
+    `FEISHU_X_WEBHOOK=<webhook>` → 取 `FEISHU_X_SECRET`。
+    这样手动调用 send(webhook, ...) 不传 secret 也能正确加签(机器人签名校验)。"""
+    cfg = {}
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.env")
+    try:
+        with open(path) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                cfg[k.strip()] = v.strip().strip('"').strip("'")
+    except OSError:
+        return None
+    for k, v in cfg.items():
+        if v == webhook and k.endswith("_WEBHOOK"):
+            return cfg.get(k.replace("_WEBHOOK", "_SECRET"))
+    return None
 
 
 def _signed_url(webhook: str, secret: str) -> str:
@@ -44,6 +68,9 @@ def send(webhook: str, title: str, content: str, level: str = "P2", secret=None)
             "elements": [{"tag": "markdown", "content": content}],
         },
     }
+    # secret 未显式传入时,从 config.env 自动匹配(手动调用/脚本调用都正确加签)
+    if not secret:
+        secret = _secret_for(webhook)
     url = _signed_url(webhook, secret) if secret else webhook
     req = urllib.request.Request(
         url,
