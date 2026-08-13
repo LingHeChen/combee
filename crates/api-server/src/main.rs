@@ -19,10 +19,19 @@ fn init_tracing() {
     let fmt = tracing_subscriber::fmt().with_env_filter(
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,combee=debug")),
     );
+    // 日志时间戳:默认东八区(UTC+8)。可用 COMBEE_LOG_TZ_HOURS 覆盖(如 0 表示 UTC)。
+    let tz_hours: i8 = std::env::var("COMBEE_LOG_TZ_HOURS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(8);
+    let timer = tracing_subscriber::fmt::time::OffsetTime::new(
+        time::UtcOffset::from_hms(tz_hours, 0, 0).unwrap_or(time::UtcOffset::UTC),
+        time::format_description::well_known::Rfc3339,
+    );
     if std::env::var("COMBEE_LOG_FORMAT").as_deref() == Ok("text") {
-        fmt.init();
+        fmt.with_timer(timer).init();
     } else {
-        fmt.json().with_span_list(false).init();
+        fmt.json().with_span_list(false).with_timer(timer).init();
     }
     // root span:所有事件自动带 service 字段
     let root = tracing::info_span!("service", service = "combee-api");

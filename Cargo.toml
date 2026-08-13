@@ -49,8 +49,9 @@ utoipa = { version = "4", features = ["axum_extras"] }
 utoipa-axum = { version = "0.1" }
 thiserror = "2"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "time"] }
 bytes = "1"
+time = { version = "0.3", features = ["formatting"] }
 async-trait = "0.1"
 moka = { version = "0.12", features = ["sync"] }
 rand = "0.8"
