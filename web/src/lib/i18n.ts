@@ -204,6 +204,7 @@ export interface Dict {
     cardNoteRunRate: string;
     chartTitle: string;
     chartRequests: string;
+    noChartData: string;
     chartSqlOps: string;
     chartKvOps: string;
     consumptionByCell: string;
@@ -614,6 +615,7 @@ export const dict: Record<Locale, Dict> = {
       cardNoteRunRate: "预估月消耗",
       chartTitle: "计算与数据操作",
       chartRequests: "请求",
+      noChartData: "暂无用量数据",
       chartSqlOps: "SQL 操作",
       chartKvOps: "KV 操作",
       consumptionByCell: "按 Cell 消耗",
@@ -1023,6 +1025,7 @@ export const dict: Record<Locale, Dict> = {
       cardNoteRunRate: "Est. run rate",
       chartTitle: "Compute & Data Ops",
       chartRequests: "Requests",
+      noChartData: "No usage data yet",
       chartSqlOps: "SQL Ops",
       chartKvOps: "KV Ops",
       consumptionByCell: "Consumption by Cell",
