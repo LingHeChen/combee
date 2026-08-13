@@ -229,9 +229,12 @@ async function withLog(
  *  返回 true 才允许代理执行 SQL/KV/备份等操作。 */
 async function cellBelongsTo(session: BffSession, cellId: string): Promise<boolean> {
   if (!session.tenant_id) return false;
-  const cell = await combeeRequest<{ tenant_id?: string }>(`/v1/databases/${cellId}`, {
-    apiKey: bffKey(),
-  }).catch(() => null);
+  // 注意:无 GET /v1/databases/{id} 详情端点;用列表(bff key → 全量)找该 cell 的归属。
+  const all = await combeeRequest<Array<{ id: string; tenant_id?: string }>>(
+    "/v1/databases?limit=1000",
+    { apiKey: bffKey() },
+  ).catch(() => []);
+  const cell = (Array.isArray(all) ? all : []).find((c) => c.id === cellId);
   return !!cell && cell.tenant_id === session.tenant_id;
 }
 
