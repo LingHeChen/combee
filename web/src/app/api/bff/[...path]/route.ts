@@ -277,7 +277,11 @@ async function proxy(req: NextRequest, target: string) {
   // admin key 代理(不计费),权限已在上方校验。
   const isCellCreate =
     method === "PUT" && target.match(/^v1\/databases\/by-name\//) !== null;
-  const apiKey = isCellCreate ? session.api_key : bffKey();
+  // credits/usage 查询是"用户自己的数据":用用户 key(租户聚合正确;admin key 会
+  // 查到平台租户的余额/用量,导致 credits 页面显示 0)。
+  const isUserScopedQuery =
+    method === "GET" && /^v1\/(credits|usage)\//.test(target);
+  const apiKey = isCellCreate || isUserScopedQuery ? session.api_key : bffKey();
   try {
     const data = await combeeRequest(`/${target}${query}`, { method, body, apiKey });
     if (data === undefined) return NextResponse.json({ ok: true });

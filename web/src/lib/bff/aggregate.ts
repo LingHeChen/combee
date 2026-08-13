@@ -32,7 +32,9 @@ export async function aggregateOverview(session: BffSession): Promise<OverviewDa
     cellsActive: active,
     requests: usage?.request_count ?? 0,
     storageBytes: usage?.current_storage_bytes ?? 0,
-    creditsBalance: credits?.available ?? "0",
+    creditsBalance: credits
+      ? (Number(credits.available) / 1_000_000).toFixed(2)
+      : "0.00",
     recentCells: list.slice(0, 5).map((c, i) => ({
       id: c.id,
       name: (c as { name?: string }).name ?? c.id,
