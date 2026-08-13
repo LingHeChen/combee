@@ -1,38 +1,40 @@
-// 用量时序柱状图:纯 SVG,无第三方图表依赖。
-// points 为 /v1/usage/timeseries 返回的 { bucket_start, value } 序列。
+"use client";
+
+// 用量时序柱状图:基于 shadcn chart + recharts。
+import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
+
+const chartConfig = {
+  requests: {
+    label: "Requests",
+    color: "#d79921",
+  },
+} satisfies ChartConfig;
+
 export function UsageChart({ points }: { points: Array<{ bucket_start: string; value: number }> }) {
-  const max = Math.max(...points.map((p) => p.value), 1);
-  const w = 600;
-  const h = 200;
-  const barW = points.length > 0 ? w / points.length : 0;
+  const data = points.map((p) => ({
+    bucket: p.bucket_start.slice(11, 16) || p.bucket_start,
+    requests: p.value,
+  }));
 
   return (
-    <svg
-      viewBox={`0 0 ${w} ${h}`}
-      className="w-full h-48"
-      preserveAspectRatio="none"
-      role="img"
-      aria-label="usage chart"
-      data-testid="usage-chart"
-    >
-      {points.map((p, i) => {
-        const bh = Math.max((p.value / max) * (h - 24), p.value > 0 ? 2 : 0);
-        const x = i * barW + 1;
-        const y = h - bh - 12;
-        return (
-          <g key={p.bucket_start}>
-            <rect
-              x={x}
-              y={y}
-              width={Math.max(barW - 2, 1)}
-              height={bh}
-              rx={2}
-              className="fill-[#7c6f64]/60 hover:fill-[#d79921]"
-            />
-            <title>{`${p.bucket_start}: ${p.value}`}</title>
-          </g>
-        );
-      })}
-    </svg>
+    <ChartContainer config={chartConfig} className="h-48 w-full">
+      <BarChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+        <CartesianGrid vertical={false} strokeDasharray="3 3" />
+        <XAxis
+          dataKey="bucket"
+          tickLine={false}
+          axisLine={false}
+          tickMargin={8}
+          minTickGap={24}
+          fontSize={10}
+        />
+        <ChartTooltip
+          cursor={{ fill: "rgba(124,111,100,0.12)" }}
+          content={<ChartTooltipContent />}
+        />
+        <Bar dataKey="requests" fill="var(--color-requests)" radius={[3, 3, 0, 0]} />
+      </BarChart>
+    </ChartContainer>
   );
 }
