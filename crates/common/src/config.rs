@@ -108,6 +108,9 @@ pub struct Config {
     pub bff_service_key: String,
     /// 资源配额(安全护栏,非商业功能;0 = 不限)。
     pub quota: QuotaConfig,
+    /// 余额护栏:余额(单位 microcredits)低于该阈值时,非 internal 请求 402。
+    /// 默认 -100 credits(允许透支 100 credits);0 表示余额 <= 0 即拒。
+    pub min_credit_balance_units: i64,
 }
 
 /// 资源配额(安全护栏):公网 signup 开放前的硬保护。
@@ -246,6 +249,10 @@ impl Config {
             admin_token,
             bff_service_key,
             quota,
+            min_credit_balance_units: env_parse(
+                "COMBEE_MIN_CREDIT_BALANCE_UNITS",
+                -100 * crate::credit::CREDIT_UNITS_PER_CREDIT,
+            ),
         }
     }
 }

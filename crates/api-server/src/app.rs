@@ -149,6 +149,10 @@ pub fn build_app(state: AppState) -> Router {
         ))
         .layer(middleware::from_fn_with_state(
             state.clone(),
+            crate::quota::credit_quota,
+        ))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
             auth::auth_middleware,
         ))
         .merge(admin_routes)

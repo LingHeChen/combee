@@ -97,6 +97,7 @@ async fn make_harness() -> Harness {
         admin_token: Some(ADMIN.into()),
         quota: Default::default(),
         concurrency: Default::default(),
+        min_credit_balance_units: -100 * combee_common::credit::CREDIT_UNITS_PER_CREDIT,
     };
     Harness {
         app: build_app(state),

@@ -60,6 +60,27 @@ fn parse_cell_from_path(path: &str) -> Option<DatabaseId> {
     id.parse::<DatabaseId>().ok()
 }
 
+/// 余额护栏:非 internal 请求在余额低于阈值时 402(预充值模型的拒付边界)。
+/// 挂载在 auth 之后、usage 计费之前;internal(BFF/admin 平台请求)豁免。
+pub async fn credit_quota(State(state): State<AppState>, req: Request, next: Next) -> Response {
+    if let Some(auth) = req.extensions().get::<AuthContext>().copied()
+        && !auth.internal
+        && let Ok(account) = state.metadata.get_credit_account(auth.tenant_id).await
+        && account.balance_units < state.min_credit_balance_units
+    {
+        return (
+            axum::http::StatusCode::PAYMENT_REQUIRED,
+            axum::Json(serde_json::json!({
+                "code": "insufficient_credits",
+                "error": "credit balance below minimum; top up to continue"
+            })),
+        )
+            .into_response();
+    }
+    // 余额查询失败或无 AuthContext:放行(降级,避免计费故障阻塞业务面)
+    next.run(req).await
+}
+
 /// 并发配额中间件(挂在 auth 之后;读 AuthContext 与路径 Cell)。
 pub async fn concurrency_quota(
     State(state): State<AppState>,

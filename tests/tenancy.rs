@@ -118,6 +118,7 @@ async fn make_app() -> (Router, TempDir, TenantId) {
         admin_token: None,
         quota: Default::default(),
         concurrency: Default::default(),
+        min_credit_balance_units: -100 * combee_common::credit::CREDIT_UNITS_PER_CREDIT,
     };
     (build_app(state), dir, tenant_b)
 }

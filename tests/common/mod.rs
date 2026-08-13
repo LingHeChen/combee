@@ -53,6 +53,7 @@ pub fn test_app(max_active: usize) -> (Router, Arc<LocalDataNodeClient>, tempfil
         admin_token: None,
         quota: Default::default(),
         concurrency: Default::default(),
+        min_credit_balance_units: -100 * combee_common::credit::CREDIT_UNITS_PER_CREDIT,
     };
     (build_app(state), client, dir)
 }
@@ -100,6 +101,7 @@ pub async fn test_app_with_keys(keys: &[&str]) -> (Router, tempfile::TempDir) {
         admin_token: None,
         quota: Default::default(),
         concurrency: Default::default(),
+        min_credit_balance_units: -100 * combee_common::credit::CREDIT_UNITS_PER_CREDIT,
     };
     (build_app(state), dir)
 }

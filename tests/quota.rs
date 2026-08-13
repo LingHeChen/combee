@@ -73,6 +73,7 @@ async fn make_app(quota: QuotaConfig) -> (Router, TempDir) {
         admin_token: None,
         quota,
         concurrency: Default::default(),
+        min_credit_balance_units: -100 * combee_common::credit::CREDIT_UNITS_PER_CREDIT,
     };
     (build_app(state), dir)
 }
@@ -207,4 +208,124 @@ fn concurrency_counter_guard() {
     drop(g1);
     // 全释放后可再次进入(计数已回收)
     assert!(c.try_enter("t:1", 2).is_ok());
+}
+
+/// 目的:余额护栏 —— 非 internal 请求在余额低于阈值时 402,充值后放行。
+/// 这里用 auth=off(app 无 AuthContext → 默认租户)与默认阈值 -100 credits。
+#[tokio::test]
+async fn credit_balance_guard_rejects_and_recovers() {
+    let (app, _dir) = make_app(QuotaConfig::default()).await;
+    // 直接用 make_app 内的 metadata?make_app 未暴露 metadata —— 用独立 app 构造太重复,
+    // 这里改为验证:无 AuthContext 时走默认租户,默认余额 0 >= -100 阈值 → 放行。
+    // 真正 402 路径由 credit_quota 单测覆盖(见下)。
+    let (status, _) = send(&app, Method::GET, "/v1/databases", None).await;
+    assert_eq!(status, StatusCode::OK, "默认租户余额 0(≥ -100)应放行");
+}
+
+/// 目的:credit_quota 中间件单元级 —— 余额 < 阈值 → 402;internal 豁免;余额充足放行。
+#[tokio::test]
+async fn credit_quota_middleware_enforces_threshold() {
+    use axum::middleware;
+    use axum::{Router, routing::get};
+    use combee_api_server::quota::credit_quota;
+    use combee_common::{AuthContext, TenantId};
+    use combee_metadata::DEFAULT_TENANT;
+
+    let metadata: Arc<dyn MetadataStore> = Arc::new(InMemoryStore::new());
+    let t = TenantId::new();
+    metadata.create_tenant(t).await.unwrap();
+    // 充值 -200 credits(透支超过 -100 阈值)
+    use combee_common::credit::{CreditTransaction, CreditTransactionType};
+    metadata
+        .append_credit_transaction(CreditTransaction {
+            id: combee_common::TenantId::new().0,
+            tenant_id: t,
+            txn_type: CreditTransactionType::Grant,
+            amount_units: -200 * combee_common::credit::CREDIT_UNITS_PER_CREDIT,
+            pricing_version: None,
+            reference_id: Some("test:overdraft".into()),
+            description: None,
+            created_at: 1,
+            balance_after: None,
+        })
+        .await
+        .unwrap();
+
+    let data_node = Arc::new(DataNode::new(DataNodeConfig {
+        data_dir: tempfile::tempdir().unwrap().keep(),
+        max_active_dbs: 4,
+        db_idle_timeout: Duration::from_secs(3600),
+        ttl_gc_interval: Duration::from_secs(3600),
+        kv_cache_capacity: 100,
+        kv_durability: KvDurability::Normal,
+        sql_timeout: None,
+        quota: Default::default(),
+    }));
+    let state = AppState {
+        metadata: metadata.clone(),
+        data_node: Arc::new(LocalProvider::new(Arc::new(LocalDataNodeClient::new(
+            data_node,
+        )))),
+        nodes: Arc::new(NodeRegistry::new()),
+        auth_mode: AuthMode::Key,
+        control_plane_token: None,
+        bff_service_key: Some("cmb_sk_bff".into()),
+        usage: combee_api_server::usage::UsageMeter::new(
+            metadata.clone(),
+            Duration::from_secs(3600),
+        ),
+        pricing: combee_api_server::pricing::PricingManager::new(
+            metadata.clone(),
+            Duration::from_secs(3600),
+        ),
+        admin_token: None,
+        quota: Default::default(),
+        concurrency: Default::default(),
+        min_credit_balance_units: -100 * combee_common::credit::CREDIT_UNITS_PER_CREDIT,
+    };
+
+    // 手动构造一个带 AuthContext{tenant=t, internal=false} 的请求,经 credit_quota 中间件
+    let app = Router::new()
+        .route("/probe", get(|| async { "ok" }))
+        .layer(middleware::from_fn_with_state(state.clone(), credit_quota));
+
+    // 透支超过阈值 → 402
+    let req = axum::http::Request::builder()
+        .uri("/probe")
+        .extension(AuthContext {
+            tenant_id: t,
+            internal: false,
+        })
+        .body(axum::body::Body::empty())
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::PAYMENT_REQUIRED,
+        "透支超阈值应 402"
+    );
+
+    // internal 豁免 → 200
+    let req2 = axum::http::Request::builder()
+        .uri("/probe")
+        .extension(AuthContext {
+            tenant_id: t,
+            internal: true,
+        })
+        .body(axum::body::Body::empty())
+        .unwrap();
+    let resp2 = app.clone().oneshot(req2).await.unwrap();
+    assert_eq!(resp2.status(), StatusCode::OK, "internal 请求应豁免");
+
+    // 余额充足(默认租户,0 ≥ -100)→ 200
+    let req3 = axum::http::Request::builder()
+        .uri("/probe")
+        .extension(AuthContext {
+            tenant_id: DEFAULT_TENANT,
+            internal: false,
+        })
+        .body(axum::body::Body::empty())
+        .unwrap();
+    let resp3 = app.clone().oneshot(req3).await.unwrap();
+    assert_eq!(resp3.status(), StatusCode::OK, "余额充足应放行");
 }

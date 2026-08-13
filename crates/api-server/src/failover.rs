@@ -116,6 +116,8 @@ pub fn spawn_failover_scanner(
                         bff_service_key: None,
                         quota: Default::default(),
                         concurrency: Default::default(),
+                        min_credit_balance_units: -100
+                            * combee_common::credit::CREDIT_UNITS_PER_CREDIT,
                     };
                     match failover_cell(&state, rec.tenant_id, rec.id).await {
                         Ok(promoted) => tracing::info!(

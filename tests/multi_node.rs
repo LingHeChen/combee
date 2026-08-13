@@ -91,6 +91,7 @@ async fn create_database_round_robin_placement() {
         admin_token: None,
         quota: Default::default(),
         concurrency: Default::default(),
+        min_credit_balance_units: -100 * combee_common::credit::CREDIT_UNITS_PER_CREDIT,
     });
 
     // 创建两个 db → 应分别落到节点 A / B(round-robin)
@@ -231,6 +232,7 @@ async fn agent_registers_heartbeats_and_unregisters() {
         admin_token: None,
         quota: Default::default(),
         concurrency: Default::default(),
+        min_credit_balance_units: -100 * combee_common::credit::CREDIT_UNITS_PER_CREDIT,
     });
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

@@ -150,6 +150,7 @@ async fn failover_promotes_replica_and_fences_old_primary() {
         admin_token: None,
         quota: Default::default(),
         concurrency: Default::default(),
+        min_credit_balance_units: -100 * combee_common::credit::CREDIT_UNITS_PER_CREDIT,
     };
     let promoted = combee_api_server::failover::failover_cell(&state, DEFAULT_TENANT, db)
         .await

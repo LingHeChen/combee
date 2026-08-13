@@ -54,6 +54,8 @@ pub struct AppState {
     pub quota: combee_common::config::QuotaConfig,
     /// 并发计数(per-tenant / per-Cell)。
     pub concurrency: std::sync::Arc<crate::quota::ConcurrencyCounters>,
+    /// 余额护栏阈值(单位 microcredits)。
+    pub min_credit_balance_units: i64,
 }
 
 /// 统一的 JSON 错误响应体。

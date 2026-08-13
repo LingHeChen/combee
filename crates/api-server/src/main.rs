@@ -177,6 +177,7 @@ async fn main() {
             .then_some(config.bff_service_key.clone()),
         quota: config.quota.clone(),
         concurrency: std::sync::Arc::new(combee_api_server::quota::ConcurrencyCounters::default()),
+        min_credit_balance_units: config.min_credit_balance_units,
     };
     let app = build_app(state);
 
