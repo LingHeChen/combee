@@ -259,6 +259,17 @@ pub async fn get_database_by_name(
     Ok(Json(record))
 }
 
+/// GET /v1/databases/{id} —— 按 id 查 Cell 详情(租户隔离;internal 跨租户)。
+pub async fn get_database(
+    State(state): State<AppState>,
+    auth: combee_common::AuthContext,
+    Path(id): Path<DatabaseId>,
+) -> Result<Json<DatabaseRecord>, ApiError> {
+    let record =
+        crate::handlers::sql::require_db(&state, auth.tenant_id, id, auth.internal).await?;
+    Ok(Json(record))
+}
+
 /// PATCH /v1/databases/{id} —— 重命名(租户内唯一,冲突 409)。
 pub async fn rename_database(
     State(state): State<AppState>,

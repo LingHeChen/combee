@@ -37,7 +37,9 @@ pub fn build_app(state: AppState) -> Router {
         )
         .route(
             "/v1/databases/{id}",
-            delete(database::delete_database).patch(database::rename_database),
+            get(database::get_database)
+                .delete(database::delete_database)
+                .patch(database::rename_database),
         )
         .route("/v1/databases/{id}/reset", post(database::reset_database))
         .route("/v1/databases/{id}/sql", post(sql::execute_sql))
