@@ -251,6 +251,19 @@ async function proxy(req: NextRequest, target: string) {
   }
   const query = req.nextUrl.search;
   const method = req.method;
+  // 列表请求(GET /v1/databases,无 cell id):admin key 拉全量 → 按用户租户过滤。
+  // 这是 cells 列表页的入口;不做过滤会把平台 cell(combee-bff)与所有租户 cell 暴露给用户。
+  if (method === "GET" && (target === "v1/databases" || target === "v1/databases/")) {
+    const all = await combeeRequest<Array<{ tenant_id?: string }>>(
+      `/v1/databases${query}`,
+      { apiKey: bffKey() },
+    ).catch(() => []);
+    const list = Array.isArray(all) ? all : [];
+    const filtered = session.tenant_id
+      ? list.filter((c) => c.tenant_id === session.tenant_id)
+      : [];
+    return NextResponse.json(filtered);
+  }
   let body: unknown;
   if (method !== "GET" && method !== "DELETE") {
     try {
