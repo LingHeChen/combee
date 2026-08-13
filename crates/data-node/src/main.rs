@@ -95,6 +95,31 @@ async fn main() {
         .and_then(|v| v.parse().ok())
         .unwrap_or(0);
 
+    // 内存/缓存周期采样:每 COMBEE_MEM_SAMPLE_INTERVAL_SECS(默认 30,0 关闭)打一条 INFO
+    // 记录 RSS、活跃 Cell 数、KV 缓存条目数 —— 内存异常上升可直接按 mem.sample 查曲线。
+    let mem_sample_secs: u64 = std::env::var("COMBEE_MEM_SAMPLE_INTERVAL_SECS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(30);
+    if mem_sample_secs > 0 {
+        let node = node.clone();
+        tokio::spawn(async move {
+            let mut ticker = tokio::time::interval(std::time::Duration::from_secs(mem_sample_secs));
+            ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            loop {
+                ticker.tick().await;
+                let rss_mb = current_rss_mb();
+                tracing::info!(
+                    service = "combee-data-node",
+                    event = "mem.sample",
+                    rss_mb = %rss_mb.unwrap_or(0),
+                    active_cells = node.active_count(),
+                    kv_cache_len = node.cache_len(),
+                );
+            }
+        });
+    }
+
     // 节点代理:配置了 COMBEE_API_SERVER_URL 时向 API Server 注册 + 周期心跳。
     let agent = match std::env::var("COMBEE_API_SERVER_URL") {
         Ok(api_url) => {
@@ -151,4 +176,12 @@ async fn main() {
     node.shutdown().await;
     tracing::info!("data node shutdown complete");
     result.expect("data node server error");
+}
+
+/// 当前进程 RSS 字节数(仅 Linux 有效;非 Linux 返回 None)。
+fn current_rss_mb() -> Option<u64> {
+    let s = std::fs::read_to_string("/proc/self/statm").ok()?;
+    // statm 第 2 个字段 = resident pages(通常 4KB/页)
+    let resident_pages: u64 = s.split_whitespace().nth(1)?.parse().ok()?;
+    Some(resident_pages.saturating_mul(4096) / (1024 * 1024))
 }
