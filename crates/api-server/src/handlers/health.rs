@@ -21,13 +21,20 @@ pub async fn ready(
             ),
         ));
     }
-    // 多节点模式下要求至少一个健康 DataNode(单机/未注册节点模式跳过)
+    // 多节点模式下,无健康 DataNode 是"暂时性"状态(等待 data-node 注册)。
+    // 不能返回 503 —— Swarm healthcheck 会把本实例判死 → SIGTERM → 重启,
+    // 而 data-node 又依赖 api-server 存活才能注册,形成启动死锁。
+    // 因此降级为 200 + degraded,等待 data-node 注册后自动恢复 ok。
     if state.nodes.shared() {
         let healthy = state.nodes.healthy().await;
         if healthy.is_empty() {
-            return Err((
-                axum::http::StatusCode::SERVICE_UNAVAILABLE,
-                axum::Json(serde_json::json!({"status": "not_ready", "reason": "no_data_node"})),
+            tracing::warn!(
+                event = "ready.degraded",
+                reason = "no_data_node",
+                "waiting for data-node registration"
+            );
+            return Ok(axum::Json(
+                serde_json::json!({"status": "degraded", "reason": "no_data_node"}),
             ));
         }
     }
