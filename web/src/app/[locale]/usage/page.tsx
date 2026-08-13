@@ -7,7 +7,7 @@ import { combeeRequest } from "@/lib/combee-client";
 import { sessionFromCookies } from "@/lib/bff/auth";
 import type { UsageSummary } from "@/lib/types";
 import { formatBytes } from "@/lib/utils";
-import { UsageChart } from "@/components/usage-chart";
+import { UsageChartSection } from "@/components/usage-chart-section";
 
 export default async function UsagePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: loc } = await params;
@@ -15,10 +15,6 @@ export default async function UsagePage({ params }: { params: Promise<{ locale: 
   const session = await sessionFromCookies();
   if (!session) redirect(`/${loc}/login`);
   const u = await combeeRequest<UsageSummary>("/v1/usage/summary", { apiKey: session.api_key }).catch(() => null);
-  const ts = await combeeRequest<Array<{ bucket_start: string; value: number }>>(
-    "/v1/usage/timeseries?metric=requests&interval=hour",
-    { apiKey: session.api_key },
-  ).catch(() => []);
 
   const reqs = u?.request_count ?? 0;
 
@@ -53,14 +49,10 @@ export default async function UsagePage({ params }: { params: Promise<{ locale: 
       <div className="mt-8">
         <Card className="bg-surface border-tertiary/40">
           <CardHeader>
-            <CardTitle className="font-mono-label text-on-surface text-sm">{t.usage.chartTitle ?? "Requests (hourly)"}</CardTitle>
+            <CardTitle className="font-mono-label text-on-surface text-sm">{t.usage.chartTitle}</CardTitle>
           </CardHeader>
           <CardContent>
-            {Array.isArray(ts) && ts.length > 0 ? (
-              <UsageChart points={ts} />
-            ) : (
-              <p className="text-sm text-on-surface-variant">{t.usage.noChartData ?? "No usage data yet"}</p>
-            )}
+            <UsageChartSection t={t.usage} />
           </CardContent>
         </Card>
       </div>
