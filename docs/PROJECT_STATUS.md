@@ -65,7 +65,7 @@ Combee API Server(所有数据存储)
 ```
 
 - **登录 = 用户名+密码**(修掉"用 API key 登录 Console"的死锁);注册时 BFF 服务账号自动为用户签发专属 Combee key;
-- **Closed Alpha 邀请制**:signup 默认需 Alpha access code(=voucher),注册即兑换并获 1000 Credits(复用 voucher 系统);
+- **Closed Alpha 邀请制**:signup 默认需 Alpha access code(=voucher),注册即兑换并获 1000 Credits(复用 voucher 系统;单位 microcredits,`1 Credit = 1_000_000`,故 1000 Credits = `amount_units: 1_000_000_000`);
   `COMBEE_CONSOLE_SIGNUP=code|open|off`;邀请码生成:`scripts/generate-invites.sh`;
 - **用户数据全存 Combee**:Profile(display_name/avatar/locale/timezone)、Console Preferences(默认时间范围/region/page size/UI)、Onboarding(从 Combee 实际数据推断)、saved SQL snippets、最近访问 Cells、Query history(仅截断 SQL,**不含参数**);
 - **设计稿还原**:15 页原型(overview/cells/cell-detail 7-tabs+7-bento/SQL workspace/KV browser/usage 图表/credits/api-keys modal/account 5-tabs/welcome 等)按 `design/stitch_combee_landing_page_design` 全量对齐(DESIGN_GAP 已关闭);

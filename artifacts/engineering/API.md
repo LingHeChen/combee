@@ -102,7 +102,10 @@ RateLimitError / QuotaExceededError / InsufficientCreditsError / InternalServerE
 
 - 时间参数(RFC3339):`from` / `to`(缺省最近 24h);
 - 时间桶:`interval = minute | hour | day`(缺省 minute);
-- 金额(microcredits)以 decimal string 返回,禁止浮点。
+- 金额单位:**microcredits**(整数,`CREDIT_UNITS_PER_CREDIT = 1_000_000`,
+  即 **1 Credit = 1,000,000 microcredits**);以 decimal string 返回,禁止浮点;
+- 示例:发放 1000 Credits 的邀请码 = `amount_units: 1_000_000_000`;余额/账本
+  字段(`available`/`amount_units`)单位同为 microcredits。
 
 ## 5. 版本与变更
 
