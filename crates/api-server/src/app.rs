@@ -65,10 +65,6 @@ pub fn build_app(state: AppState) -> Router {
         .route("/v1/databases/{id}/kv/ops/expire", post(kv::kv_expire))
         .route("/v1/databases/{id}/kv/ops/incr", post(kv::kv_incr))
         .route(
-            "/v1/tenants",
-            post(keys::create_tenant).get(keys::list_tenants),
-        )
-        .route(
             "/v1/api-keys",
             post(keys::create_api_key).get(keys::list_api_keys),
         )

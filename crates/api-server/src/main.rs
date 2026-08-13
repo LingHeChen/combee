@@ -46,6 +46,19 @@ async fn main() {
     init_tracing();
     let config = Config::from_env();
 
+    // 生产安全护栏:共享元数据(postgres)下禁止 COMBEE_AUTH=off。
+    // off 会让所有请求无 key 校验地落入 DEFAULT_TENANT,任意匿名请求可操作默认租户数据。
+    // 本地/单机开发用 COMBEE_METADATA=in-memory + off。
+    if config.metadata_mode == MetadataMode::Postgres
+        && combee_api_server::auth::AuthMode::from_env() == combee_api_server::auth::AuthMode::Off
+    {
+        eprintln!(
+            "refusing to start: COMBEE_METADATA=postgres requires COMBEE_AUTH=key \
+             (COMBEE_AUTH=off 会让所有请求无鉴权地落入默认租户,属高危配置)"
+        );
+        std::process::exit(1);
+    }
+
     let metadata: Arc<dyn MetadataStore> = match config.metadata_mode {
         MetadataMode::InMemory => Arc::new(InMemoryStore::new()),
         MetadataMode::Postgres => {

@@ -24,11 +24,6 @@ pub struct CreateApiKeyResponse {
     pub record: ApiKeyRecord,
 }
 
-#[derive(Serialize)]
-pub struct CreateTenantResponse {
-    pub tenant_id: combee_common::TenantId,
-}
-
 /// POST /v1/api-keys —— 创建密钥(明文仅返回一次,库中只存 sha256)。
 /// 创建 API key(明文仅返回一次)。
 /// POST body:可选 name(默认 `default`)。
@@ -82,21 +77,4 @@ pub async fn revoke_api_key(
 ) -> Result<StatusCode, ApiError> {
     state.metadata.revoke_api_key(auth.tenant_id, id).await?;
     Ok(StatusCode::NO_CONTENT)
-}
-
-/// POST /v1/tenants —— 创建租户。
-pub async fn create_tenant(
-    State(state): State<AppState>,
-) -> Result<Json<CreateTenantResponse>, ApiError> {
-    let tenant = combee_common::TenantId::new();
-    state.metadata.create_tenant(tenant).await?;
-    Ok(Json(CreateTenantResponse { tenant_id: tenant }))
-}
-
-/// GET /v1/tenants —— 列出租户(管理/计费)。
-pub async fn list_tenants(
-    State(state): State<AppState>,
-) -> Result<Json<Vec<combee_metadata::TenantRecord>>, ApiError> {
-    let tenants = state.metadata.list_tenants().await?;
-    Ok(Json(tenants))
 }
