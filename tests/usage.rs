@@ -45,7 +45,7 @@ async fn send(app: &Router, method: Method, uri: &str, body: Option<Value>) -> (
 }
 
 async fn make_app_with_bff(
-    admin_api_key: Option<String>,
+    bff_service_key: Option<String>,
 ) -> (Router, Arc<UsageMeter>, Arc<dyn MetadataStore>, TempDir) {
     let dir = tempfile::tempdir().unwrap();
     let metadata: Arc<dyn MetadataStore> = Arc::new(InMemoryStore::new());
@@ -68,7 +68,7 @@ async fn make_app_with_bff(
         nodes: Arc::new(NodeRegistry::new()),
         auth_mode: AuthMode::Off,
         control_plane_token: None,
-        admin_api_key,
+        bff_service_key,
         usage: meter.clone(),
         pricing: combee_api_server::pricing::PricingManager::new(
             metadata.clone(),

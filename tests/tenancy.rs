@@ -112,7 +112,7 @@ async fn make_app() -> (Router, TempDir, TenantId) {
         nodes: Arc::new(NodeRegistry::new()),
         auth_mode: AuthMode::Key,
         control_plane_token: None,
-        admin_api_key: Some(KEY_ADMIN.to_string()),
+        bff_service_key: Some(KEY_ADMIN.to_string()),
         usage: usage_meter,
         pricing: pricing_meter,
         admin_token: None,

@@ -103,8 +103,9 @@ pub struct Config {
     pub settlement_interval: Duration,
     /// Operator/Admin 令牌(`COMBEE_ADMIN_TOKEN`);未配置时 admin 接口 401。
     pub admin_token: Option<String>,
-    /// 预配置的 admin API key(可选):既是普通租户 key,也可调用 /admin/*。
-    pub admin_api_key: String,
+    /// BFF/Console 平台服务 key(COMBEE_BFF_SERVICE_KEY):internal(跨租户代理 +
+    /// 不计费),且仅能调用 POST /admin/tenants(注册建租户);无 admin 运维权限。
+    pub bff_service_key: String,
     /// 资源配额(安全护栏,非商业功能;0 = 不限)。
     pub quota: QuotaConfig,
 }
@@ -189,7 +190,7 @@ impl Config {
             let v = env_str("COMBEE_ADMIN_TOKEN", "");
             if v.is_empty() { None } else { Some(v) }
         };
-        let admin_api_key = env_str("COMBEE_ADMIN_API_KEY", "");
+        let bff_service_key = env_str("COMBEE_BFF_SERVICE_KEY", "");
         let quota = QuotaConfig {
             max_request_body_bytes: env_parse("COMBEE_MAX_REQUEST_BODY_BYTES", 5 * 1024 * 1024),
             max_kv_key_bytes: env_parse("COMBEE_MAX_KV_KEY_BYTES", 1024),
@@ -243,7 +244,7 @@ impl Config {
             pricing_refresh_interval,
             settlement_interval,
             admin_token,
-            admin_api_key,
+            bff_service_key,
             quota,
         }
     }

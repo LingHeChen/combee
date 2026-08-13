@@ -48,8 +48,8 @@ pub struct AppState {
     pub pricing: Arc<crate::pricing::PricingManager>,
     /// Operator/Admin 令牌(`COMBEE_ADMIN_TOKEN`);未配置时 admin 接口 401。
     pub admin_token: Option<String>,
-    /// 预配置的 admin API key(可调用 /admin/* 的租户 key)。
-    pub admin_api_key: Option<String>,
+    /// BFF/Console 平台服务 key:internal 标记 + 仅 POST /admin/tenants 放行。
+    pub bff_service_key: Option<String>,
     /// 资源配额(安全护栏)。
     pub quota: combee_common::config::QuotaConfig,
     /// 并发计数(per-tenant / per-Cell)。

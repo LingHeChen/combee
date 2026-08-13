@@ -112,14 +112,24 @@ pub async fn internal_auth(State(state): State<AppState>, req: Request, next: Ne
 /// Operator/Admin 认证:`COMBEE_ADMIN_TOKEN`(与租户 key、control-plane token 三者互不相同)。
 /// 未配置 token 时 admin 接口一律 401(必须显式配置)。
 pub async fn admin_auth(State(state): State<AppState>, req: Request, next: Next) -> Response {
-    // 预配置的 admin API key(COMBEE_ADMIN_API_KEY)可以调用 admin 接口;
-    // 其余租户 key 永远不能调用 admin 接口。
-    if let Some(admin_key) = &state.admin_api_key {
-        if req.headers().get("x-api-key").and_then(|v| v.to_str().ok()) == Some(admin_key.as_str())
-        {
-            return next.run(req).await;
+    // BFF 服务 key:仅放行"创建租户"端点(POST /admin/tenants,注册建租户+key);
+    // 其余 admin 端点(授信/定价/迁移/发券/列租户)一律拒绝 —— BFF 无运维权限。
+    if let Some(bff) = &state.bff_service_key {
+        if req.headers().get("x-api-key").and_then(|v| v.to_str().ok()) == Some(bff.as_str()) {
+            if req.method() == axum::http::Method::POST && req.uri().path() == "/admin/tenants" {
+                return next.run(req).await;
+            }
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(ErrorBody {
+                    code: "unauthorized".into(),
+                    error: "bff service key cannot call this admin endpoint".into(),
+                }),
+            )
+                .into_response();
         }
     }
+    // 其余租户 key 永远不能调用 admin 接口。
     if req.headers().contains_key("x-api-key") {
         return (
             StatusCode::UNAUTHORIZED,
@@ -195,16 +205,16 @@ pub async fn auth_middleware(
     next: Next,
 ) -> Response {
     let mut internal = false;
-    // 平台服务账号(COMBEE_ADMIN_API_KEY):key 明文匹配 → internal,不计费。
+    // 平台服务账号(COMBEE_BFF_SERVICE_KEY):key 明文匹配 → internal,不计费。
     // BFF/console 平台请求统一用它;租户 API key 直连(SDK/curl)不计 internal。
     // 仅比对明文避免伪造;该 key 仍需在 metadata 中有效(admin_auth 也校验)。
     let tenant: TenantId = if state.auth_mode == AuthMode::Key {
         match req.headers().get("x-api-key").and_then(|v| v.to_str().ok()) {
             Some(key) => {
                 if state
-                    .admin_api_key
+                    .bff_service_key
                     .as_deref()
-                    .map(|admin| admin == key)
+                    .map(|bff| bff == key)
                     .unwrap_or(false)
                 {
                     internal = true;

@@ -12,7 +12,7 @@ docker swarm init                 # 单机即 manager+worker
 mkdir -p /opt/combee && cd /opt/combee
 
 # 上传 deploy/ 目录(Caddyfile、docker-stack.yml、.env)
-# .env 必须填好:CHANGE_ME_*、COS 凭据、COMBEE_ADMIN_API_KEY 等(见 .env.example)
+# .env 必须填好:CHANGE_ME_*、COS 凭据、COMBEE_BFF_SERVICE_KEY 等(见 .env.example)
 ```
 
 ## 2. 首次部署

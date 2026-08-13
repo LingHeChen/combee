@@ -206,7 +206,7 @@ pub trait MetadataStore: Send + Sync {
     async fn list_tenants(&self) -> Result<Vec<TenantRecord>>;
 
     /// 为该租户注册一个 API key(存哈希)。返回记录。
-    /// 启动时注入预配置的 API key(COMBEE_API_KEYS / COMBEE_ADMIN_API_KEY);
+    /// 启动时注入预配置的 API key(COMBEE_API_KEYS / COMBEE_BFF_SERVICE_KEY);
     /// 每个 key 若不存在则创建独立租户 + key 记录;已存在则跳过。
     async fn bootstrap_api_keys(&self, keys: &[String]) -> Result<()>;
 

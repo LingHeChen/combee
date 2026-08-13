@@ -151,7 +151,7 @@ services:
       COMBEE_CONTROL_PLANE_TOKEN: ${COMBEE_CONTROL_PLANE_TOKEN:-}
       COMBEE_ADMIN_TOKEN: ${COMBEE_ADMIN_TOKEN:-}
       # 预配置的 admin API key + 预置 key 列表(启动时注入 api_keys 表)
-      COMBEE_ADMIN_API_KEY: ${COMBEE_ADMIN_API_KEY:-}
+      COMBEE_BFF_SERVICE_KEY: ${COMBEE_BFF_SERVICE_KEY:-}
       COMBEE_API_KEYS: ${COMBEE_API_KEYS:-}
       # API key 认证
       COMBEE_AUTH: ${COMBEE_AUTH:-key}

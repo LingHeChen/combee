@@ -113,7 +113,7 @@ pub fn spawn_failover_scanner(
                             std::time::Duration::from_secs(3600),
                         ),
                         admin_token: None,
-                        admin_api_key: None,
+                        bff_service_key: None,
                         quota: Default::default(),
                         concurrency: Default::default(),
                     };

@@ -61,7 +61,7 @@ async fn make_app(quota: QuotaConfig) -> (Router, TempDir) {
         nodes: Arc::new(NodeRegistry::new()),
         auth_mode: AuthMode::Off,
         control_plane_token: None,
-        admin_api_key: None,
+        bff_service_key: None,
         usage: combee_api_server::usage::UsageMeter::new(
             Arc::new(InMemoryStore::new()),
             Duration::from_secs(3600),

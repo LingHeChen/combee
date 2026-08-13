@@ -7,7 +7,7 @@
 
 | 变量 | 默认值 |
 |---|---|
-| `COMBEE_ADMIN_API_KEY` | `""` |
+| `COMBEE_BFF_SERVICE_KEY` | `""` |
 | `COMBEE_ADMIN_TOKEN` | `""` |
 | `COMBEE_API_KEYS` | `""` |
 | `COMBEE_BIND_ADDR` | `"127.0.0.1:8080"` |

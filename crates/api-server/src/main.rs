@@ -71,10 +71,10 @@ async fn main() {
         }
     };
 
-    // 启动时注入预配置的 API key(COMBEE_API_KEYS + COMBEE_ADMIN_API_KEY)
+    // 启动时注入预配置的 API key(COMBEE_API_KEYS + COMBEE_BFF_SERVICE_KEY)
     let mut bootstrap_keys = config.api_keys.clone();
-    if !config.admin_api_key.is_empty() {
-        bootstrap_keys.push(config.admin_api_key.clone());
+    if !config.bff_service_key.is_empty() {
+        bootstrap_keys.push(config.bff_service_key.clone());
     }
     if !bootstrap_keys.is_empty() {
         tracing::info!(
@@ -173,7 +173,8 @@ async fn main() {
         usage: usage_meter,
         pricing: pricing_manager,
         admin_token: config.admin_token.clone(),
-        admin_api_key: (!config.admin_api_key.is_empty()).then_some(config.admin_api_key.clone()),
+        bff_service_key: (!config.bff_service_key.is_empty())
+            .then_some(config.bff_service_key.clone()),
         quota: config.quota.clone(),
         concurrency: std::sync::Arc::new(combee_api_server::quota::ConcurrencyCounters::default()),
     };

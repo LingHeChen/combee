@@ -93,7 +93,7 @@ services:
       COMBEE_AUTH: ${COMBEE_AUTH:-off}
       COMBEE_ADMIN_TOKEN: ${COMBEE_ADMIN_TOKEN:-}
       # 预配置的 admin API key + 预置 key 列表(启动时注入 api_keys 表)
-      COMBEE_ADMIN_API_KEY: ${COMBEE_ADMIN_API_KEY:-}
+      COMBEE_BFF_SERVICE_KEY: ${COMBEE_BFF_SERVICE_KEY:-}
       COMBEE_API_KEYS: ${COMBEE_API_KEYS:-}
     ports:
       - "8080:8080"
@@ -135,6 +135,8 @@ services:
       COMBEE_API_URL: ${COMBEE_API_URL:-http://api-server:8080}
       COMBEE_API_KEY: ${COMBEE_API_KEY:-}
       COMBEE_BFF_API_KEY: ${COMBEE_BFF_API_KEY:-}
+      # BFF 平台服务账号 key(新命名;与 api-server 的 COMBEE_BFF_SERVICE_KEY 一致)
+      COMBEE_BFF_SERVICE_KEY: ${COMBEE_BFF_SERVICE_KEY:-}
       COMBEE_BFF_CELL: ${COMBEE_BFF_CELL:-}
       COMBEE_BFF_CELL_NAME: ${COMBEE_BFF_CELL_NAME:-}
       COMBEE_BFF_DEBUG: ${COMBEE_BFF_DEBUG:-}
