@@ -197,8 +197,14 @@ async fn restore_rejects_version_key_outside_own_prefix() {
     let (app, _dir, _tb) = make_app().await;
 
     // A 创建 Cell
-    let (status, body) = send(&app, Method::POST, "/v1/databases", Some(json!({})), Some(KEY_A))
-        .await;
+    let (status, body) = send(
+        &app,
+        Method::POST,
+        "/v1/databases",
+        Some(json!({})),
+        Some(KEY_A),
+    )
+    .await;
     assert_eq!(status, StatusCode::CREATED);
     let id = body["id"].as_str().unwrap().to_string();
 
@@ -230,7 +236,11 @@ async fn restore_rejects_version_key_outside_own_prefix() {
         Some(KEY_A),
     )
     .await;
-    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "合法前缀应进入 Data Node 而非 400");
+    assert_eq!(
+        status,
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "合法前缀应进入 Data Node 而非 400"
+    );
 }
 
 /// 目的:API key 生命周期 —— 明文仅返回一次;列表不含明文;
