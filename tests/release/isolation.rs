@@ -161,6 +161,11 @@ async fn sql_cannot_escape_filesystem() {
         "DETACH x",
         "VACUUM INTO '/tmp/esc.sqlite'",
         "VACUUM",
+        // 前导注释绕过(回归):黑名单必须作用于剥离注释后的首条语句
+        "-- note\nATTACH DATABASE '/tmp/esc.db' AS x",
+        "/* note */ VACUUM INTO '/tmp/esc.sqlite'",
+        "  -- note\nBEGIN",
+        "/* multi\nline */ DETACH x",
     ] {
         let (status, _) = send(
             &app,

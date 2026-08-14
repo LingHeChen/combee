@@ -42,6 +42,16 @@ pub async fn restore(
     Json(req): Json<RestoreRequest>,
 ) -> Result<axum::http::StatusCode, crate::ApiError> {
     require_db(&state, auth.tenant_id, id, auth.internal).await?;
+    // 越权防护:`version` 是对象存储里的快照 key,必须落在本 Cell 的备份前缀内,
+    // 否则可跨租户读取/恢复任意对象(如其它 Cell 的备份)。
+    if let Some(v) = req.version.as_deref() {
+        let allowed = format!("backups/{id}/");
+        if !v.starts_with(&allowed) {
+            return Err(crate::ApiError(combee_common::CombeeError::InvalidRequest(
+                format!("backup version must be under 'backups/{id}/'"),
+            )));
+        }
+    }
     let client = state.data_node.client_for(id).await?;
     client.restore(id, req.version).await?;
     Ok(axum::http::StatusCode::NO_CONTENT)

@@ -101,6 +101,35 @@ fn trailing_has_sql(b: &[u8], start: usize) -> bool {
     }
 }
 
+/// 跳过前导空白与注释(`--` 行注释、`/* */` 块注释),返回第一个"真实"语句字符下标。
+///
+/// 用于防止 `-- x\nATTACH ...` / `/* x */ VACUUM ...` 这类通过前导注释
+/// 绕过 [`FORBIDDEN_PREFIXES`] 前缀黑名单的沙箱逃逸。
+fn skip_leading_trivia(b: &[u8]) -> usize {
+    let mut i = 0;
+    while i < b.len() {
+        match b[i] {
+            b' ' | b'\t' | b'\r' | b'\n' => i += 1,
+            b'-' if b.get(i + 1) == Some(&b'-') => {
+                // 行注释:跳到行尾(换行交由外层空白分支继续处理)
+                while i < b.len() && b[i] != b'\n' {
+                    i += 1;
+                }
+            }
+            b'/' if b.get(i + 1) == Some(&b'*') => {
+                // 块注释:跳到 `*/`
+                i += 2;
+                while i + 1 < b.len() && !(b[i] == b'*' && b[i + 1] == b'/') {
+                    i += 1;
+                }
+                i = (i + 2).min(b.len());
+            }
+            _ => break,
+        }
+    }
+    i
+}
+
 fn check_statement(sql: &str) -> Result<()> {
     let lower = sql.trim_start().to_ascii_lowercase();
     if lower.contains("__sys") {
@@ -108,8 +137,12 @@ fn check_statement(sql: &str) -> Result<()> {
             "access to __sys_* internal tables is not allowed".into(),
         ));
     }
+    // 前缀黑名单必须作用于"剥离前导注释后的首条语句",
+    // 否则 `-- x\nATTACH ...` 会以 `--` 开头而绕过黑名单。
+    let start = skip_leading_trivia(sql.as_bytes());
+    let leading = sql[start..].trim_start().to_ascii_lowercase();
     for p in FORBIDDEN_PREFIXES {
-        if lower.starts_with(p) {
+        if leading.starts_with(p) {
             return Err(CombeeError::InvalidRequest(format!(
                 "statement starting with '{p}' is not allowed; \
                  use the /transaction endpoint for transactions"
@@ -293,6 +326,13 @@ mod tests {
             "RELEASE sp",
             "ATTACH '/etc/passwd' AS evil",
             "DETACH evil",
+            // 前导注释绕过(回归:必须剥离注释后再匹配前缀黑名单)
+            "-- note\nATTACH '/etc/passwd' AS evil",
+            "/* x */ ATTACH '/etc/passwd' AS evil",
+            "  -- comment\nVACUUM INTO '/tmp/escape.sqlite'",
+            "/* multi\nline */ BEGIN IMMEDIATE",
+            "-- c\nSAVEPOINT s1",
+            "/* c */ DETACH evil",
         ] {
             assert!(
                 matches!(check_statement(bad), Err(CombeeError::InvalidRequest(_))),
@@ -323,6 +363,10 @@ mod tests {
             "SELECT \"a;b\"",
             "SELECT 1; -- trailing comment",
             "SELECT 1; /* trailing block */",
+            // 合法语句前带注释仍应放行
+            "-- leading comment\nSELECT 1",
+            "/* leading block */ SELECT 1",
+            "  \t-- comment\n/* block */ SELECT 1;",
         ] {
             assert!(check_statement(ok).is_ok(), "should allow {ok:?}");
         }

@@ -190,6 +190,49 @@ async fn cross_tenant_access_is_rejected() {
     assert_eq!(body["value"], "hello-a");
 }
 
+/// 目的:restore 的 `version`(对象 key)必须落在本 Cell 备份前缀内,
+/// 防止通过指定任意对象 key 读取/恢复其它租户的备份对象。
+#[tokio::test]
+async fn restore_rejects_version_key_outside_own_prefix() {
+    let (app, _dir, _tb) = make_app().await;
+
+    // A 创建 Cell
+    let (status, body) = send(&app, Method::POST, "/v1/databases", Some(json!({})), Some(KEY_A))
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let id = body["id"].as_str().unwrap().to_string();
+
+    // 跨租户 / 任意对象 key → 400(前缀校验拒绝)
+    for bad in [
+        "backups/00000000-0000-0000-0000-000000000001/evil.sqlite",
+        "/etc/passwd",
+        "../../secret",
+        "backups",
+    ] {
+        let (status, _) = send(
+            &app,
+            Method::POST,
+            &format!("/v1/databases/{id}/restore"),
+            Some(json!({"version": bad})),
+            Some(KEY_A),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "version {bad:?} 应被拒绝");
+    }
+
+    // 本 Cell 前缀内的 key 通过前缀校验,继续走到 Data Node(无对象存储 → 500),
+    // 以此证明前缀校验只拦截越权 key、不误伤合法 key。
+    let (status, _) = send(
+        &app,
+        Method::POST,
+        &format!("/v1/databases/{id}/restore"),
+        Some(json!({"version": format!("backups/{id}/1700000000000-snap.sqlite")})),
+        Some(KEY_A),
+    )
+    .await;
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "合法前缀应进入 Data Node 而非 400");
+}
+
 /// 目的:API key 生命周期 —— 明文仅返回一次;列表不含明文;
 /// 撤销后立即失效(401);A 无法撤销 B 的 key。
 #[tokio::test]

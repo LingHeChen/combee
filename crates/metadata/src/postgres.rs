@@ -1071,10 +1071,13 @@ impl MetadataStore for PostgresStore {
             return Ok(existing);
         }
         let mut tx = self.pool.begin().await.map_err(PostgresStore::internal)?;
-        sqlx::query(
+        // 幂等入账:同 reference_id 只允许插入一次;RETURNING id 在冲突(DO NOTHING)时不返回行,
+        // 据此区分"本次真正入账"与"并发/历史已入账",避免重复累加余额(刷钱竞态)。
+        let inserted = sqlx::query(
             "INSERT INTO credit_transactions (id, tenant_id, txn_type, amount_units, pricing_version, reference_id, description, created_at, balance_after)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULL)
-             ON CONFLICT (reference_id) DO NOTHING",
+             ON CONFLICT (reference_id) DO NOTHING
+             RETURNING id",
         )
         .bind(txn.id)
         .bind(txn.tenant_id.0)
@@ -1084,9 +1087,20 @@ impl MetadataStore for PostgresStore {
         .bind(&txn.reference_id)
         .bind(&txn.description)
         .bind(txn.created_at)
-        .execute(&mut *tx)
+        .fetch_optional(&mut *tx)
         .await
         .map_err(PostgresStore::internal)?;
+        if inserted.is_none() {
+            // 冲突:本事务未做任何余额变更,回滚并返回既有条目。
+            tx.rollback().await.map_err(PostgresStore::internal)?;
+            let ref_id = txn.reference_id.as_deref().unwrap_or("");
+            return self
+                .find_transaction_by_reference(ref_id)
+                .await?
+                .ok_or_else(|| {
+                    CombeeError::Internal("credit transaction conflict but not found".into())
+                });
+        }
         // upsert:账户行可能不存在(首次入账),INSERT ON CONFLICT 保证总能返回新余额,
         // 避免 UPDATE ... RETURNING 匹配 0 行导致 "no rows returned" 500。
         let balance: i64 = sqlx::query_scalar(

@@ -184,6 +184,13 @@ impl DataNode {
         self.manager.close_database(db).await?;
 
         if let Some(v) = version {
+            // 越权防护:key 必须落在本 Cell 的备份前缀内(与 API 层一致,防 /rpc/restore 直连滥用)。
+            let allowed = format!("backups/{db}/");
+            if !v.starts_with(&allowed) {
+                return Err(CombeeError::InvalidRequest(format!(
+                    "backup key must be under 'backups/{db}/'"
+                )));
+            }
             // 指定版本:按对象 key 恢复(旧全量快照或增量 snapshot)
             backup::download_snapshot(&store, &ObjPath::from(v.clone()), &dest).await?;
             let _ = tokio::fs::remove_file(format!("{}-wal", dest.display())).await;
