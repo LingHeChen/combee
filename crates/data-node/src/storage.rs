@@ -138,6 +138,9 @@ pub fn open(path: &Path, durability: KvDurability) -> Result<Connection> {
     init_schema(&conn)?;
     // 启动完整性校验(roadmap 4.1):打开即 quick_check,失败拒绝服务(只读保护由调用方标记)。
     quick_check(&conn)?;
+    // 引擎层 SQL 沙箱:在 schema/pragma 初始化完成后挂载,
+    // 用户 SQL 的 prepare 阶段按动作授权(见 sandbox 模块文档)。
+    crate::sandbox::install(&conn);
     Ok(conn)
 }
 

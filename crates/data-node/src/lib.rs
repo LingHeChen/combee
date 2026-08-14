@@ -20,6 +20,7 @@ pub mod backup;
 pub mod cache;
 pub mod kv;
 pub mod manager;
+pub mod sandbox;
 pub mod server;
 pub mod sql;
 pub mod storage;
@@ -41,6 +42,8 @@ pub use manager::{ActiveDbManager, DataNodeConfig, LockStats};
 pub struct DataNode {
     manager: Arc<ActiveDbManager>,
     cache: Arc<KvCache>,
+    /// 上次上报的缓存命中/未命中累计值(指标增量用)。
+    cache_metrics_last: (std::sync::atomic::AtomicU64, std::sync::atomic::AtomicU64),
     /// 单条 SQL 执行超时。
     sql_timeout: Option<std::time::Duration>,
     /// 对象存储(备份/恢复);未启用时为 None。
@@ -78,9 +81,14 @@ impl DataNode {
         let quota = config.quota.clone();
         let manager = Arc::new(ActiveDbManager::new(config));
         let maintenance = manager.spawn_maintenance();
+        let cache_metrics_last = (
+            std::sync::atomic::AtomicU64::new(0),
+            std::sync::atomic::AtomicU64::new(0),
+        );
         Self {
             manager,
             cache,
+            cache_metrics_last,
             sql_timeout,
             store: None,
             generations: std::sync::Mutex::new(std::collections::HashMap::new()),
@@ -166,8 +174,27 @@ impl DataNode {
             })
             .await?;
         // 锁外上传
-        let info = backup::upload_snapshot(&store, db, &tmp).await?;
+        let info = match backup::upload_snapshot(&store, db, &tmp).await {
+            Ok(info) => info,
+            Err(e) => {
+                combee_common::metrics::counter_inc(
+                    "combee_backup_failures_total",
+                    &[("service", "data-node"), ("error_class", "upload")],
+                );
+                combee_common::metrics::counter_inc(
+                    "combee_object_store_errors_total",
+                    &[("service", "data-node"), ("error_class", "upload_snapshot")],
+                );
+                return Err(e);
+            }
+        };
         let _ = tokio::fs::remove_file(&tmp).await;
+        let now = crate::ttl::unix_now();
+        combee_common::metrics::gauge_set(
+            "combee_last_successful_backup_timestamp",
+            &[("service", "data-node")],
+            now,
+        );
         tracing::info!(%db, key = %info.key, size = info.size_bytes, "backup uploaded");
         Ok(info)
     }
@@ -309,6 +336,7 @@ impl DataNode {
         self: &Arc<Self>,
         interval: std::time::Duration,
         agent: Arc<crate::agent::NodeAgent>,
+        control_token: Option<String>,
     ) -> tokio::task::JoinHandle<()> {
         let this = self.clone();
         tokio::spawn(async move {
@@ -320,7 +348,12 @@ impl DataNode {
                     continue; // 尚未注册
                 };
                 let url = format!("{}/internal/nodes/{node_id}/replicas", agent.api_url());
-                let resp = match reqwest::get(&url).await {
+                // /internal/* 由 internal_auth 保护:必须带 control token(否则恒 401)。
+                let mut req = reqwest::Client::new().get(&url);
+                if let Some(tok) = &control_token {
+                    req = req.header("x-control-token", tok);
+                }
+                let resp = match req.send().await {
                     Ok(r) => r,
                     Err(e) => {
                         tracing::warn!("replica duty query failed: {e}");

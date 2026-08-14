@@ -5,20 +5,18 @@ use combee_common::{CombeeError, Result};
 use rusqlite::{Connection, Row, types::Value as SqlValue};
 use serde_json::Value as Json;
 
+use crate::sandbox::UserSqlGuard;
 use crate::sql_err;
 
 /// 这些语句会改变连接的事务状态或附加数据库,破坏连接复用模型,一律拒绝。
 /// 事务请走 `/transaction` 端点。
+///
+/// 注意:引擎层沙箱 [`crate::sandbox::install`] 已拦截 ATTACH/DETACH/事务控制/
+/// SAVEPOINT/危险 PRAGMA/危险函数/`__sys_*` 表(见 [`crate::sandbox`] 模块文档);
+/// 这里只保留 **没有 authorizer action code** 的语句:`VACUUM`。
 const FORBIDDEN_PREFIXES: &[&str] = &[
-    "begin",
-    "commit",
-    "rollback",
-    "end",
-    "savepoint",
-    "release",
-    "attach",
-    "detach",
-    // VACUUM INTO 可把 Cell 数据写到任意文件系统路径(逃逸);VACUUM 本身对用户无必要暴露
+    // VACUUM 无对应 authorizer action(引擎无法区分),只能前缀拦截;
+    // VACUUM INTO 可把 Cell 数据写到任意文件系统路径(逃逸),VACUUM 本身对用户无必要暴露
     "vacuum",
 ];
 
@@ -132,13 +130,14 @@ fn skip_leading_trivia(b: &[u8]) -> usize {
 
 fn check_statement(sql: &str) -> Result<()> {
     let lower = sql.trim_start().to_ascii_lowercase();
+    // 冗余层:提前给出友好错误(引擎层 authorizer 是硬防线,拒绝 `__sys_*` 访问)。
     if lower.contains("__sys") {
         return Err(CombeeError::Forbidden(
             "access to __sys_* internal tables is not allowed".into(),
         ));
     }
     // 前缀黑名单必须作用于"剥离前导注释后的首条语句",
-    // 否则 `-- x\nATTACH ...` 会以 `--` 开头而绕过黑名单。
+    // 否则 `-- x\nVACUUM INTO ...` 会以 `--` 开头而绕过黑名单。
     let start = skip_leading_trivia(sql.as_bytes());
     let leading = sql[start..].trim_start().to_ascii_lowercase();
     for p in FORBIDDEN_PREFIXES {
@@ -168,6 +167,8 @@ pub fn execute_sql_quota(
     req: &SqlRequest,
     quota: Option<&combee_common::config::QuotaConfig>,
 ) -> Result<SqlResult> {
+    // 进入用户 SQL 上下文:authorizer 据此对该线程上的语句执行沙箱授权。
+    let _user_ctx = UserSqlGuard::enter();
     check_statement(&req.sql)?;
     let values = to_sql_values(&req.params)?;
     let refs: Vec<&dyn rusqlite::ToSql> =
@@ -233,12 +234,21 @@ pub fn execute_transaction(
             "transaction requires at least one statement".into(),
         ));
     }
-    let tx = conn.transaction().map_err(sql_err)?;
+    // BEGIN 由 rusqlite 内部发出,须临时退出用户 SQL 上下文(authorizer 放行),
+    // 否则事务端点会被自己的沙箱拦掉。语句仍走 execute_sql_quota(带沙箱)。
+    let tx = {
+        let _internal = UserSqlGuard::leave();
+        conn.transaction().map_err(sql_err)?
+    };
     let mut results = Vec::with_capacity(req.statements.len());
     for st in &req.statements {
         results.push(execute_sql_quota(&tx, st, quota)?);
     }
-    tx.commit().map_err(sql_err)?;
+    // COMMIT 同样由 rusqlite 内部发出,退出沙箱上下文后提交。
+    {
+        let _internal = UserSqlGuard::leave();
+        tx.commit().map_err(sql_err)?;
+    }
     Ok(results)
 }
 
@@ -315,24 +325,13 @@ mod tests {
                 "should reject {bad}"
             );
         }
-        // 事务控制 / 附加库:前导空格、大小写
+        // VACUUM(无 authorizer action code,只能字符串层拦截):前导空格、大小写、注释绕过
         for bad in [
-            "BEGIN",
-            "begin",
-            "  BEGIN IMMEDIATE",
-            "COMMIT",
-            "ROLLBACK",
-            "SAVEPOINT sp",
-            "RELEASE sp",
-            "ATTACH '/etc/passwd' AS evil",
-            "DETACH evil",
-            // 前导注释绕过(回归:必须剥离注释后再匹配前缀黑名单)
-            "-- note\nATTACH '/etc/passwd' AS evil",
-            "/* x */ ATTACH '/etc/passwd' AS evil",
+            "VACUUM",
+            "vacuum",
+            "  VACUUM INTO '/tmp/escape.sqlite'",
             "  -- comment\nVACUUM INTO '/tmp/escape.sqlite'",
-            "/* multi\nline */ BEGIN IMMEDIATE",
-            "-- c\nSAVEPOINT s1",
-            "/* c */ DETACH evil",
+            "/* x */ VACUUM INTO '/tmp/escape.sqlite'",
         ] {
             assert!(
                 matches!(check_statement(bad), Err(CombeeError::InvalidRequest(_))),
@@ -369,6 +368,94 @@ mod tests {
             "  \t-- comment\n/* block */ SELECT 1;",
         ] {
             assert!(check_statement(ok).is_ok(), "should allow {ok:?}");
+        }
+    }
+
+    /// 引擎层 authorizer:危险语句在 prepare 阶段被拒绝(不再依赖字符串黑名单),
+    /// 且各种绕过变体(注释/空白/大小写/嵌套)同样被拒。
+    #[test]
+    fn authorizer_rejects_at_engine_level() {
+        let (conn, _d) = sql_conn();
+        let run = |sql: &str| {
+            execute_sql(
+                &conn,
+                &SqlRequest {
+                    sql: sql.to_string(),
+                    params: vec![],
+                },
+            )
+        };
+
+        // 事务控制 / 附加库 / 分离 / SAVEPOINT:含注释、大小写、空白变体
+        for bad in [
+            "BEGIN",
+            "begin",
+            "  BEGIN IMMEDIATE",
+            "COMMIT",
+            "ROLLBACK",
+            "END",
+            "SAVEPOINT sp",
+            "RELEASE sp",
+            "ATTACH '/etc/passwd' AS evil",
+            "DETACH evil",
+            "-- note\nATTACH '/etc/passwd' AS evil",
+            "/* x */ ATTACH '/etc/passwd' AS evil",
+            "/* multi\nline */ BEGIN IMMEDIATE",
+            "-- c\nSAVEPOINT s1",
+            "/* c */ DETACH evil",
+        ] {
+            assert!(run(bad).is_err(), "authorizer should reject {bad}");
+        }
+
+        // 危险 PRAGMA:修改持久性 / 安全相关 / 扩展加载
+        for bad in [
+            "PRAGMA journal_mode = DELETE",
+            "PRAGMA journal_mode = OFF",
+            "PRAGMA journal_mode=WAL",
+            "PRAGMA synchronous = OFF",
+            "PRAGMA locking_mode = EXCLUSIVE",
+            "PRAGMA temp_store = FILE",
+            "PRAGMA page_size = 4096",
+            "PRAGMA wal_autocheckpoint = 100",
+            "PRAGMA trusted_schema = OFF",
+            "PRAGMA load_extension = 'x'",
+        ] {
+            assert!(run(bad).is_err(), "authorizer should reject {bad}");
+        }
+
+        // 危险函数:任意文件读写 / 扩展加载
+        for bad in [
+            "SELECT load_extension('evil')",
+            "SELECT readfile('/etc/passwd')",
+            "SELECT writefile('/tmp/x', 'y')",
+            "select LOAD_EXTENSION('evil')",
+        ] {
+            assert!(run(bad).is_err(), "authorizer should reject {bad}");
+        }
+
+        // 内部表访问(引擎层,与大小写无关)
+        for bad in [
+            "SELECT * FROM __sys_kv",
+            "INSERT INTO __SYS_META VALUES (1, 2)",
+        ] {
+            assert!(run(bad).is_err(), "authorizer should reject {bad}");
+        }
+
+        // 合法语句放行:含只读 PRAGMA、事务关键字字面量、带注释的语句
+        for ok in [
+            "SELECT 1",
+            "SELECT 'BEGIN'",
+            "PRAGMA user_version",
+            "PRAGMA quick_check",
+            "PRAGMA journal_mode",
+            "-- leading comment\nSELECT 1",
+            "/* leading block */ SELECT 1",
+            "PRAGMA table_info(t)",
+            "CREATE TABLE users (id INTEGER)",
+            "INSERT INTO users VALUES (1)",
+            "SELECT * FROM users",
+        ] {
+            assert!(run(ok).is_ok(), "authorizer should allow {ok:?}");
         }
     }
 
