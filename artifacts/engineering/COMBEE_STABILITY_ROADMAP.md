@@ -202,14 +202,20 @@ DELETED
 
 Reason:
 
-Future operations are asynchronous:
+> **实现现状(2026-08 修订,与 `handlers/database.rs` 对齐)**:创建是**同步**的 ——
+> `POST /v1/databases` 立即初始化磁盘并返回 `201 Created`(状态 `active`),
+> 不是 `202 Accepted + status:"creating"` 的异步模型。后续运维操作
+> (migration / backup restore / failover / replication)内部也有同步与异步之分:
+> backup/restore 同步返回、failover 由扫描器异步触发。
+
+异步创建(`202 Accepted + status:"creating"`)是 **Future / Non-Goal before Alpha**:
 
 - Migration
-- Backup restore
-- Failover
+- Backup restore(异步化)
+- Failover(扫描器已异步触发;创建本身保持同步)
 - Replication
 
-Example:
+Example(未来形态,当前未实现):
 
 ```
 create cell

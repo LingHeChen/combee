@@ -244,3 +244,28 @@ Gate 发现并修复 2 个真实缺陷(首次运行 5 FAIL 后修复复跑全绿
 | 2 | `usage_buckets` 复合主键使 `cell_id` 隐式 NOT NULL;租户级用量(NULL cell)插入失败 | usage flush 持续失败(告警循环) | `cell_id NOT NULL DEFAULT 全零 UUID` 哨兵 + 幂等 ALTER 迁移;`usage_add/set` 绑定 `Uuid::nil()` |
 
 WARN:docker build 不可用(buildx 环境问题)→ 回退容器内 cargo build(单测 / 场景全部通过)。
+
+
+---
+
+## 2026-08-14 Release Gate 复跑(198 tests + docker 场景)→ RELEASEABLE
+
+`./scripts/release-test.sh`(含 §0 Hardening 补丁): **21 PASS / 0 FAIL / 1 WARN → RELEASEABLE**。
+
+本次复跑在三个安全补丁(521b562f)之上,并随 Hardening 落地:
+
+| 变更 | 说明 |
+|---|---|
+| SQL 沙箱换引擎层 authorizer | `crates/data-node/src/sandbox.rs`:`Connection::authorizer` 在 prepare 阶段按动作授权(拒绝 ATTACH/DETACH/事务控制/危险 PRAGMA/危险函数/`__sys_*` 表),字符串层只保留无 authorizer code 的 VACUUM 与多语句检查;thread-local 区分用户 SQL 与内部操作 |
+| credits 并发幂等回归 | `metadata/src/postgres.rs` 新增并发测试(同 reference_id × 16 并发 → 余额只加一次 + 顺序幂等),由 gate 的 Postgres 段执行 |
+| 可观测性最小闭环 | API Server 与 Data Node 均暴露 `/metrics`(Prometheus 文本);请求量/延迟/错误、active cells、连接数、缓存命中率、usage/settlement/failover/backup 成败;`deploy/alert/check.py` 新增 Cell 只读(P0)/failover(P1)/后台任务失败(P1)告警 |
+| ENOSPC 场景进 gate | 容器小文件系统(tmpfs 24MB)填满验证:写被明确拒绝(SQL/KV 均 400 database or disk is full)、读可用、integrity_check ok、进程存活、清理后写恢复 |
+| gate 基建修复 | 独立网络 + 独立 postgres/minio(与宿主机 compose 全家桶隔离);data-node 注册/心跳/RPC 带 control token;`replica duty` 查询带 token(此前恒 401 导致 failover 复制链路不可用);S3 凭据与 gate 内 minio 对齐;删卷场景保留 `node-id`(节点身份不变,restore 路由正常) |
+| Cloud 数据保护默认开启 | `deploy/docker-compose.cloud.yml` 默认 `WAL_BACKUP_INTERVAL_SECS=15` / `REPLICA_INTERVAL_SECS=30` / `FAILOVER_INTERVAL_SECS=30`;`deploy/DEPLOY.md` §8.1 写清 RPO(≤30s)与 RTO(秒级 failover / 分钟级 restore) |
+
+WARN:docker build 不可用(buildx 环境问题)→ 回退容器内 cargo build(场景全部通过)。
+
+**差距清单更新**:
+- #3(注册表重启抖动)→ **已解决**:`NodeRegistry::with_pg`(PG 为 authority,本地 TTL 缓存),API Server 重启后从 PG 恢复节点状态;
+- #4(failover 默认关闭)→ **已解决**:Cloud compose 默认 `COMBEE_FAILOVER_INTERVAL_SECS=30`;
+- #2(ENOSPC 未验证)→ **已解决**:gate ENOSPC 场景(见上)。
