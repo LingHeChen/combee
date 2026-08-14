@@ -91,8 +91,31 @@ impl UsageMeter {
             ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
             loop {
                 ticker.tick().await;
-                if let Err(e) = this.flush_once().await {
-                    warn!("usage flush failed: {e}");
+                match this.flush_once().await {
+                    Ok(_) => {
+                        combee_common::metrics::gauge_set(
+                            "combee_usage_flush_lag_seconds",
+                            &[("service", "api")],
+                            0,
+                        );
+                        combee_common::metrics::counter_inc(
+                            "combee_usage_flush_successes_total",
+                            &[("service", "api")],
+                        );
+                    }
+                    Err(e) => {
+                        warn!("usage flush failed: {e}");
+                        combee_common::metrics::counter_inc(
+                            "combee_usage_flush_failures_total",
+                            &[("service", "api")],
+                        );
+                        // 至少滞后一个 flush 周期
+                        combee_common::metrics::gauge_set(
+                            "combee_usage_flush_lag_seconds",
+                            &[("service", "api")],
+                            interval.as_secs() as i64,
+                        );
+                    }
                 }
             }
         })

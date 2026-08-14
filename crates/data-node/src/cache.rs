@@ -120,6 +120,16 @@ impl KvCache {
         self.len() == 0
     }
 
+    /// 累计命中数(指标上报用)。
+    pub fn hits(&self) -> u64 {
+        self.hits.load(Ordering::Relaxed)
+    }
+
+    /// 累计未命中数(指标上报用)。
+    pub fn misses(&self) -> u64 {
+        self.misses.load(Ordering::Relaxed)
+    }
+
     /// 命中/未命中统计(hits, misses)。
     pub fn stats(&self) -> (u64, u64) {
         (

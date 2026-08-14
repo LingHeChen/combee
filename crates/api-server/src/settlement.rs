@@ -147,13 +147,36 @@ impl Settlement {
             ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
             loop {
                 ticker.tick().await;
-                if let Err(_e) = this.settle_once().await {
-                    warn!(
-                        service = "combee-api",
-                        event = "credits.settlement.failed",
-                        job = "credit_settlement",
-                        error_code = "SETTLEMENT_FAILED"
-                    );
+                match this.settle_once().await {
+                    Ok(_) => {
+                        combee_common::metrics::gauge_set(
+                            "combee_credit_settlement_lag_seconds",
+                            &[("service", "api")],
+                            0,
+                        );
+                        combee_common::metrics::counter_inc(
+                            "combee_credit_settlement_successes_total",
+                            &[("service", "api")],
+                        );
+                    }
+                    Err(e) => {
+                        warn!(
+                            service = "combee-api",
+                            event = "credits.settlement.failed",
+                            job = "credit_settlement",
+                            error_code = "SETTLEMENT_FAILED",
+                            error = %e,
+                        );
+                        combee_common::metrics::counter_inc(
+                            "combee_credit_settlement_failures_total",
+                            &[("service", "api")],
+                        );
+                        combee_common::metrics::gauge_set(
+                            "combee_credit_settlement_lag_seconds",
+                            &[("service", "api")],
+                            interval.as_secs() as i64,
+                        );
+                    }
                 }
             }
         })

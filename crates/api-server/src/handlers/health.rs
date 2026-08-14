@@ -44,3 +44,26 @@ pub async fn ready(
 // 占位避免未使用告警
 #[allow(dead_code)]
 fn _unused(_: CombeeError) {}
+
+/// Prometheus 文本指标端点(观测计划 §14;不挂租户认证,供监控探针抓取)。
+/// 渲染前刷新进程内已知的动态仪表(活跃 Cell 数等,低基数)。
+pub async fn metrics(State(state): State<AppState>) -> axum::response::Response {
+    // 活跃 Cell 数(逻辑数据库数):惰性查询 metadata,低频率(监控默认 15s 抓取)。
+    match state.metadata.list_databases_all().await {
+        Ok(dbs) => {
+            combee_common::metrics::gauge_set(
+                "combee_active_cells",
+                &[("service", "api")],
+                dbs.len() as i64,
+            );
+        }
+        Err(e) => {
+            tracing::warn!(event = "metrics.active_cells_failed", error = %e);
+            combee_common::metrics::counter_inc(
+                "combee_postgres_errors_total",
+                &[("service", "api"), ("error_class", "list_databases_all")],
+            );
+        }
+    }
+    axum::response::Response::new(axum::body::Body::from(combee_common::metrics::render()))
+}

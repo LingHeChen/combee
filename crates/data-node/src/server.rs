@@ -120,11 +120,13 @@ pub fn router(node: Arc<DataNode>, control_token: Option<String>) -> Router {
         ))
         .with_state(node.clone());
 
-    // 探活/就绪:不经过 control-token 认证(供外部探针/Swarm healthcheck)。
+    // 探活/就绪/指标:不经过 control-token 认证(供外部探针/Swarm healthcheck/监控采集)。
+    let ready_node = node.clone();
+    let metrics_node = node.clone();
     Router::new()
         .route("/health", get(|| async { axum::Json(serde_json::json!({"status": "ok"})) }))
         .route("/ready", get(move || {
-            let n = node.clone();
+            let n = ready_node;
             async move {
                 if n.ready().await {
                     axum::Json(serde_json::json!({"status": "ok"})).into_response()
@@ -134,6 +136,26 @@ pub fn router(node: Arc<DataNode>, control_token: Option<String>) -> Router {
                         axum::Json(serde_json::json!({"status": "not_ready", "reason": "storage_not_writable"})),
                     ).into_response()
                 }
+            }
+        }))
+        .route("/metrics", get(move || {
+            let n = metrics_node;
+            async move {
+                // 渲染前刷新进程内仪表:打开连接数 / 活跃 Cell(低基数)。
+                let active = n.active_count();
+                combee_common::metrics::gauge_set(
+                    "combee_open_sqlite_connections",
+                    &[("service", "data-node"), ("node_role", "data")],
+                    active as i64,
+                );
+                combee_common::metrics::gauge_set(
+                    "combee_active_cells",
+                    &[("service", "data-node"), ("node_role", "data")],
+                    active as i64,
+                );
+                axum::response::Response::new(axum::body::Body::from(
+                    combee_common::metrics::render(),
+                ))
             }
         }))
         .merge(rpc)

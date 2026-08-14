@@ -21,6 +21,7 @@ pub fn build_app(state: AppState) -> Router {
             get(|| async { axum::Json(serde_json::json!({"status": "ok"})) }),
         )
         .route("/ready", get(health::ready))
+        .route("/metrics", get(health::metrics))
         .with_state(state.clone());
 
     // public 路由:走租户 key 认证(auth_middleware)

@@ -120,13 +120,25 @@ pub fn spawn_failover_scanner(
                             * combee_common::credit::CREDIT_UNITS_PER_CREDIT,
                     };
                     match failover_cell(&state, rec.tenant_id, rec.id).await {
-                        Ok(promoted) => tracing::info!(
-                            db = %rec.id,
-                            new_primary = %promoted.storage_node_id.map(|n| n.to_string()).unwrap_or_default(),
-                            generation = promoted.generation,
-                            "auto failover triggered"
-                        ),
-                        Err(e) => tracing::warn!(db = %rec.id, "auto failover failed: {}", e.0),
+                        Ok(promoted) => {
+                            combee_common::metrics::counter_inc(
+                                "combee_failovers_total",
+                                &[("service", "api"), ("trigger", "auto")],
+                            );
+                            tracing::info!(
+                                db = %rec.id,
+                                new_primary = %promoted.storage_node_id.map(|n| n.to_string()).unwrap_or_default(),
+                                generation = promoted.generation,
+                                "auto failover triggered"
+                            )
+                        }
+                        Err(e) => {
+                            combee_common::metrics::counter_inc(
+                                "combee_failover_failures_total",
+                                &[("service", "api"), ("trigger", "auto")],
+                            );
+                            tracing::warn!(db = %rec.id, "auto failover failed: {}", e.0);
+                        }
                     }
                 }
             }

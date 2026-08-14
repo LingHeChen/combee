@@ -42,6 +42,28 @@ pub async fn request_logging(State(state): State<AppState>, req: Request, next: 
     let latency_ms = started.elapsed().as_secs_f64() * 1000.0;
     let status_code = response.status().as_u16();
 
+    // ---- 指标(观测计划 §14:请求量 / 错误 / 延迟直方图)----
+    let status_class = match status_code {
+        200..=299 => "2xx",
+        300..=399 => "3xx",
+        400..=499 => "4xx",
+        _ => "5xx",
+    };
+    let labels = [
+        ("service", "api"),
+        ("op", operation.as_str()),
+        ("status_class", status_class),
+    ];
+    combee_common::metrics::counter_inc("combee_http_requests_total", &labels);
+    combee_common::metrics::histogram_observe(
+        "combee_request_duration_seconds",
+        &[("service", "api"), ("op", operation.as_str())],
+        latency_ms / 1000.0,
+    );
+    if status_code >= 500 {
+        combee_common::metrics::counter_inc("combee_http_errors_total", &labels);
+    }
+
     if latency_ms >= 500.0 && status_code < 500 {
         // 慢请求:WARN,供告警查询 request.slow;不打断上面的错误分类逻辑。
         warn!(

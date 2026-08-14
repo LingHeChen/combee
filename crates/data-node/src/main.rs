@@ -151,7 +151,7 @@ async fn main() {
         if let Some(agent) = &agent {
             if node.store_enabled() {
                 let interval = std::time::Duration::from_secs(replica_interval_secs);
-                node.spawn_replica_loop(interval, agent.clone());
+                node.spawn_replica_loop(interval, agent.clone(), cfg.control_plane_token.clone());
                 tracing::info!("replica sync every {replica_interval_secs}s");
             } else {
                 tracing::warn!("replica sync requested but object storage not configured");

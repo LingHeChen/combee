@@ -6,6 +6,7 @@ pub mod credit;
 pub mod errors;
 pub mod healthcheck;
 pub mod ids;
+pub mod metrics;
 pub mod protocol;
 pub mod rpc;
 pub mod usage;
