@@ -177,6 +177,10 @@ impl PostgresStore {
     }
 
     fn internal(e: sqlx::Error) -> CombeeError {
+        combee_common::metrics::counter_inc(
+            "combee_postgres_errors_total",
+            &[("service", "metadata")],
+        );
         CombeeError::Internal(format!("postgres error: {e}"))
     }
 }
@@ -1357,4 +1361,109 @@ fn row_to_txn(row: &sqlx::postgres::PgRow) -> Result<CreditTransaction> {
             .try_get("balance_after")
             .map_err(PostgresStore::internal)?,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use combee_common::credit::{CreditAccount, CreditTransaction, CreditTransactionType};
+    use combee_common::ids::TenantId;
+    use uuid::Uuid;
+
+    /// 测试用 PostgreSQL 连接串:优先环境变量,默认本地 gate 临时映射端口。
+    fn test_url() -> String {
+        std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://combee:combee@127.0.0.1:55432/combee".to_string())
+    }
+
+    fn now_unix() -> i64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_secs() as i64
+    }
+
+    /// 同 reference_id 并发入账:余额只累加一次、账本只有一条(刷钱竞态回归)。
+    ///
+    /// 需要真实 PostgreSQL:`#[ignore]` 防止无 DB 时误报失败;
+    /// 由 release-test.sh 的 Postgres 段(或手动
+    /// `DATABASE_URL=... cargo test -p combee-metadata -- --ignored`)执行。
+    #[tokio::test]
+    #[ignore = "requires postgres; run via release-test.sh or DATABASE_URL=... cargo test -p combee-metadata -- --ignored"]
+    async fn concurrent_append_credit_transaction_is_idempotent() {
+        let store = PostgresStore::connect(&test_url()).await.unwrap();
+        // 干净起点(只清 credit 相关表;测试用专用 tenant,本步是防御性清理)。
+        sqlx::raw_sql("TRUNCATE credit_transactions, credit_accounts RESTART IDENTITY CASCADE")
+            .execute(&store.pool)
+            .await
+            .unwrap();
+
+        let tenant = TenantId(Uuid::new_v4());
+        let ref_id = format!("concurrent-{}", Uuid::new_v4());
+        let created_at = now_unix();
+        let amount: i64 = 1_000_000;
+
+        // N 个并发请求,同 reference_id、同 tenant,各自生成不同 txn id。
+        let mut handles = Vec::new();
+        for i in 0..16 {
+            let store = store.clone();
+            let ref_id = ref_id.clone();
+            handles.push(tokio::spawn(async move {
+                let txn = CreditTransaction {
+                    id: Uuid::new_v4(),
+                    tenant_id: tenant,
+                    txn_type: CreditTransactionType::Grant,
+                    amount_units: amount,
+                    pricing_version: None,
+                    reference_id: Some(ref_id),
+                    description: Some(format!("concurrent-{i}")),
+                    created_at,
+                    balance_after: None,
+                };
+                store.append_credit_transaction(txn).await.unwrap();
+            }));
+        }
+        for h in handles {
+            h.await.unwrap();
+        }
+
+        // 余额只累加一次(双花回归的判定点)
+        let account: CreditAccount = store.get_credit_account(tenant).await.unwrap();
+        assert_eq!(
+            account.balance_units, amount,
+            "并发同 reference_id 入账必须只累加一次,got {}",
+            account.balance_units
+        );
+        // 账本只有一条记录(幂等引用唯一)
+        let list = store
+            .list_credit_transactions(tenant, 100, None)
+            .await
+            .unwrap();
+        assert_eq!(list.len(), 1, "账本必须只有一条记录");
+        assert_eq!(list[0].reference_id.as_deref(), Some(ref_id.as_str()));
+        // 注:balance_after 只在入账返回对象上设置(append 返回),数据库行恒为 NULL(既有设计)。
+
+        // 顺序(非并发)重复入账同样幂等:返回既有条目,余额不重复累加。
+        let ref2 = format!("dup-{}", Uuid::new_v4());
+        let make = |i: u32| CreditTransaction {
+            id: Uuid::new_v4(),
+            tenant_id: tenant,
+            txn_type: CreditTransactionType::Grant,
+            amount_units: 500,
+            pricing_version: None,
+            reference_id: Some(ref2.clone()),
+            description: Some(format!("seq-{i}")),
+            created_at,
+            balance_after: None,
+        };
+        let first = store.append_credit_transaction(make(1)).await.unwrap();
+        let second = store.append_credit_transaction(make(2)).await.unwrap();
+        assert_eq!(first.id, second.id, "重复 reference 应返回既有条目");
+        let account = store.get_credit_account(tenant).await.unwrap();
+        assert_eq!(
+            account.balance_units,
+            amount + 500,
+            "顺序幂等:第二次不累加(1M + 500)"
+        );
+    }
 }
