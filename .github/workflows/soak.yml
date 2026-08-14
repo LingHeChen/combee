@@ -1,0 +1,52 @@
+# Combee 12h Soak Test(定时):混合 workload 下检查内存/延迟趋势。
+#
+# 计划(RELEASE_READINESS §8 / Hardening §5):定时跑 12h soak,
+# 判定:无内存单调增长、无延迟恶化。默认每周末跑一次;可手动触发。
+# 注意:12h soak 占满 runner 12 小时,按需开启(移除本文件或设 cron 为空)。
+
+name: soak
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 2 * * 6" # 每周六 02:00 UTC
+
+jobs:
+  soak:
+    runs-on: ubuntu-latest
+    timeout-minutes: 780 # 13h
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            .docker-target
+          key: ${{ runner.os }}-cargo-soak-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-soak-
+
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install 1.97 --profile minimal
+          rustup default 1.97
+
+      - name: Build release binaries
+        run: |
+          cargo build --release -p combee-api-server -p combee-data-node
+          mkdir -p .docker-target/release
+          cp target/release/combee-api-server target/release/combee-data-node .docker-target/release/
+
+      - name: Soak 12h
+        run: ./scripts/soak-test.sh 720
+
+      - name: Upload soak report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: soak-report
+          path: /tmp/soak-report.txt
+          retention-days: 14

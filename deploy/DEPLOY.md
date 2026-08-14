@@ -127,6 +127,25 @@ docker compose -f docker-compose.cloud.yml up -d
 > 提示:更新前先 `docker compose -f docker-compose.cloud.yml exec api-server ...`
 > 或直接 `docker compose ... exec data-node` 触发一次备份;备份也可用 API `POST /v1/databases/{id}/backup`。
 
+### 8.1 数据保护(RPO / RTO)
+
+Cloud 生产默认开启三层数据保护(`deploy/.env.example` 可覆盖,**勿设 0**):
+
+| 保护 | 机制 | 默认周期 |
+|---|---|---|
+| WAL 增量归档 | 每周期把 WAL 增量上传 COS(对象存储),是 restore 恢复到"最近"的依据 | `COMBEE_WAL_BACKUP_INTERVAL_SECS=15` |
+| 副本同步 | 每周期把主节点归档拉到副本节点,是 failover 提升的前提 | `COMBEE_REPLICA_INTERVAL_SECS=30` |
+| 自动 failover | 主节点心跳丢失且有副本时自动提升副本 | `COMBEE_FAILOVER_INTERVAL_SECS=30` |
+
+**RPO(恢复点目标)**:≤ 2 × `COMBEE_WAL_BACKUP_INTERVAL_SECS` = **≤ 30s**(极端情况:主节点在两次归档之间崩溃,丢失最近一次归档到崩溃之间的写;正常情况 ≤ 15s)。
+
+**RTO(恢复时间目标)**:分场景:
+- 主节点进程崩溃、副本存在 → 自动 failover 提升,**秒级**(依赖 `COMBEE_FAILOVER_INTERVAL_SECS` 扫描 + 副本追平时间);
+- 本地数据卷损坏/丢失 → 从 COS restore:全量快照 + WAL 增量重放,**分钟级**(取决于 Cell 数据量与 COS 带宽);
+- 验证:首次部署后建议跑一次 `scripts/fault/kill-node.sh` 与删卷恢复,记录实测 RPO/RTO 并填入此表。
+
+**承诺口径(Cloud Alpha)**:可容忍"少量数据新鲜度损失"(RPO ≤ 30s),不接受静默丢失 —— 写失败/节点不可用一律返回明确错误,不伪装成功。
+
 ## 9. 常见问题
 
 | 现象 | 处理 |

@@ -7,16 +7,31 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
+# soak 专用凭据(postgres 模式下必须 Key 认证 + control token)
+GATE_KEY="cmb_sk_release_gate_0000000000000000"
+GATE_TOKEN="release-gate-ctrl-token"
+GATE_HASH=$(python3 -c 'import hashlib;print(hashlib.sha256(b"cmb_sk_release_gate_0000000000000000").hexdigest())')
+KEYH=(-H "x-api-key: $GATE_KEY")
+
 DURATION_MIN=${1:-15}
 ROUNDS=$((DURATION_MIN * 2))   # 每 30s 一轮
 
 # ---- 起单节点栈 ----
 docker compose up -d postgres minio minio-init >/dev/null 2>&1
+# 等 postgres healthy
+for i in $(seq 1 30); do
+  H=$(docker inspect --format '{{.State.Health.Status}}' combee-postgres-1 2>/dev/null || echo starting)
+  [ "$H" = "healthy" ] && break; sleep 2
+done
+# 预置 gate 专用 API key(Key 模式:sha256 查 api_keys 表)
+docker exec combee-postgres-1 psql -U combee -d combee -c \
+  "INSERT INTO api_keys (id, tenant_id, name, key_hash, created_at) VALUES (gen_random_uuid(), '00000000-0000-0000-0000-000000000001', 'soak', '$GATE_HASH', extract(epoch from now())::bigint) ON CONFLICT (key_hash) DO NOTHING" >/dev/null 2>&1
 sleep 8
 docker rm -f soak-dn soak-api >/dev/null 2>&1
 docker run -d --name soak-dn --network combee_default \
   -e COMBEE_DATA_NODE_ADDR=0.0.0.0:9000 -e COMBEE_DATA_DIR=/data \
   -e COMBEE_API_SERVER_URL=http://soak-api:8080 -e COMBEE_NODE_ADVERTISE_URL=http://soak-dn:9000 \
+  -e COMBEE_CONTROL_PLANE_TOKEN=$GATE_TOKEN \
   -e COMBEE_S3_ENDPOINT=http://minio:9000 -e COMBEE_S3_ACCESS_KEY=combee \
   -e COMBEE_S3_SECRET_KEY=combee123456 -e COMBEE_S3_BUCKET=combee-backups \
   -e COMBEE_SQL_TIMEOUT_SECS=5 \
@@ -24,6 +39,7 @@ docker run -d --name soak-dn --network combee_default \
   rust:1.97-bookworm bash -c "/app/bin/combee-data-node" >/dev/null 2>&1
 docker run -d --name soak-api --network combee_default -p 18081:8080 \
   -e COMBEE_BIND_ADDR=0.0.0.0:8080 -e COMBEE_METADATA=postgres -e COMBEE_MULTI_NODE=1 \
+  -e COMBEE_AUTH=key -e COMBEE_CONTROL_PLANE_TOKEN=$GATE_TOKEN \
   -e COMBEE_DATABASE_URL=postgres://combee:combee@postgres:5432/combee -e COMBEE_DATA_DIR=/data \
   -v "$PWD/.docker-target/release":/app/bin -w / \
   rust:1.97-bookworm bash -c "/app/bin/combee-api-server" >/dev/null 2>&1
@@ -31,7 +47,7 @@ sleep 10
 
 API=http://127.0.0.1:18081
 for i in $(seq 1 30); do
-  code=$(curl -s -o /dev/null -w "%{http_code}" $API/v1/databases 2>/dev/null || true)
+  code=$(curl -s -o /dev/null -w "%{http_code}" $API/v1/databases "${KEYH[@]}" 2>/dev/null || true)
   [ "$code" = "200" ] && break; sleep 2
 done
 
@@ -46,14 +62,14 @@ for r in $(seq 1 $ROUNDS); do
     (
       for i in $(seq 1 30); do
         case $((RANDOM % 8)) in
-          0) curl -s -X POST $API/v1/databases >/dev/null 2>&1 ;;
-          1) curl -s -X DELETE $API/v1/databases/$(cat /tmp/soak-db 2>/dev/null) >/dev/null 2>&1 ;;
-          2) curl -s -X POST $API/v1/databases/$(cat /tmp/soak-db 2>/dev/null)/sql -H 'content-type: application/json' -d '{"sql":"SELECT count(*) FROM t"}' >/dev/null 2>&1 ;;
-          3) curl -s -X POST $API/v1/databases/$(cat /tmp/soak-db 2>/dev/null)/sql -H 'content-type: application/json' -d '{"sql":"INSERT INTO t (x) VALUES (random()%1000)"}' >/dev/null 2>&1 ;;
-          4) curl -s -X PUT $API/v1/databases/$(cat /tmp/soak-db 2>/dev/null)/kv/k -H 'content-type: application/json' -d '{"value":"v"}' >/dev/null 2>&1 ;;
-          5) curl -s $API/v1/databases/$(cat /tmp/soak-db 2>/dev/null)/kv/k >/dev/null 2>&1 ;;
-          6) curl -s -X POST $API/v1/databases/$(cat /tmp/soak-db 2>/dev/null)/kv/ops/incr -H 'content-type: application/json' -d '{"key":"c","delta":1}' >/dev/null 2>&1 ;;
-          7) curl -s -X PUT $API/v1/databases/$(cat /tmp/soak-db 2>/dev/null)/kv/exp -H 'content-type: application/json' -d '{"value":"e","ttl_seconds":1}' >/dev/null 2>&1 ;;
+          0) curl -s -X POST $API/v1/databases "${KEYH[@]}" >/dev/null 2>&1 ;;
+          1) curl -s -X DELETE $API/v1/databases/$(cat /tmp/soak-db 2>/dev/null) "${KEYH[@]}" >/dev/null 2>&1 ;;
+          2) curl -s -X POST $API/v1/databases/$(cat /tmp/soak-db 2>/dev/null)/sql "${KEYH[@]}" -H 'content-type: application/json' -d '{"sql":"SELECT count(*) FROM t"}' >/dev/null 2>&1 ;;
+          3) curl -s -X POST $API/v1/databases/$(cat /tmp/soak-db 2>/dev/null)/sql "${KEYH[@]}" -H 'content-type: application/json' -d '{"sql":"INSERT INTO t (x) VALUES (random()%1000)"}' >/dev/null 2>&1 ;;
+          4) curl -s -X PUT $API/v1/databases/$(cat /tmp/soak-db 2>/dev/null)/kv/k "${KEYH[@]}" -H 'content-type: application/json' -d '{"value":"v"}' >/dev/null 2>&1 ;;
+          5) curl -s $API/v1/databases/$(cat /tmp/soak-db 2>/dev/null)/kv/k "${KEYH[@]}" >/dev/null 2>&1 ;;
+          6) curl -s -X POST $API/v1/databases/$(cat /tmp/soak-db 2>/dev/null)/kv/ops/incr "${KEYH[@]}" -H 'content-type: application/json' -d '{"key":"c","delta":1}' >/dev/null 2>&1 ;;
+          7) curl -s -X PUT $API/v1/databases/$(cat /tmp/soak-db 2>/dev/null)/kv/exp "${KEYH[@]}" -H 'content-type: application/json' -d '{"value":"e","ttl_seconds":1}' >/dev/null 2>&1 ;;
         esac
       done
     ) &
@@ -65,17 +81,17 @@ for r in $(seq 1 $ROUNDS); do
   DN_MEM=$(docker stats --no-stream --format "{{.MemUsage}}" soak-dn 2>/dev/null | awk -F'/' '{print $1}' | grep -oE '^[0-9.]+' || echo 0)
   # 延迟采样:50 次 GET
   LAT=$(for i in $(seq 1 50); do
-    s=$(curl -s -o /dev/null -w "%{time_total}" $API/v1/databases/$(cat /tmp/soak-db 2>/dev/null)/kv/k 2>/dev/null)
+    s=$(curl -s -o /dev/null -w "%{time_total}" $API/v1/databases/$(cat /tmp/soak-db 2>/dev/null)/kv/k "${KEYH[@]}" 2>/dev/null)
     echo "$s"; done | sort -n)
   P50=$(echo "$LAT" | awk 'NR==25{print $1*1000000}')
   P99=$(echo "$LAT" | awk 'NR==50{print $1*1000000}')
-  CELLS=$(curl -s $API/v1/databases 2>/dev/null | python3 -c 'import sys,json;print(len(json.load(sys.stdin)))' 2>/dev/null || echo 0)
+  CELLS=$(curl -s $API/v1/databases "${KEYH[@]}" 2>/dev/null | python3 -c 'import sys,json;print(len(json.load(sys.stdin)))' 2>/dev/null || echo 0)
   echo "$r api=${API_MEM}MB dn=${DN_MEM}MB p50=${P50}us p99=${P99}us cells=$CELLS"
   echo "$r $API_MEM $DN_MEM $P50 $P99 $CELLS" >> /tmp/soak-report.txt
   # 若尚无 db,创建(soak-db)
   if [ ! -f /tmp/soak-db ]; then
-    DB=$(curl -s -X POST $API/v1/databases | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])' 2>/dev/null)
-    [ -n "$DB" ] && { echo "$DB" > /tmp/soak-db; curl -s -X POST $API/v1/databases/$DB/sql -H 'content-type: application/json' -d '{"sql":"CREATE TABLE t (x INTEGER)"}' >/dev/null 2>&1; }
+    DB=$(curl -s -X POST $API/v1/databases "${KEYH[@]}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])' 2>/dev/null)
+    [ -n "$DB" ] && { echo "$DB" > /tmp/soak-db; curl -s -X POST $API/v1/databases/$DB/sql "${KEYH[@]}" -H 'content-type: application/json' -d '{"sql":"CREATE TABLE t (x INTEGER)"}' >/dev/null 2>&1; }
   fi
   # 对齐 30s 周期
   ELAPSED=$(( $(date +%s) - T0 ))

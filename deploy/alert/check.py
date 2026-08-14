@@ -223,7 +223,7 @@ def _grep_logs(cfg, service, pattern):
 
 
 def error_rate(cfg):
-    stack, svc, win, since_str = _recent_logs(cfg, "api-server")
+    stack, svc, win, since_str, _since_ts = _recent_logs(cfg, "api-server")
     out = run(
         "docker service logs --since %s %s_api-server --no-trunc 2>&1 "
         "| grep -oE '\"status\":[0-9]+' | grep -oE '[0-9]+'" % (since_str, stack)
@@ -312,6 +312,30 @@ def backup_failures(cfg):
     return None
 
 
+def readonly_cells(cfg):
+    """Cell 进入只读保护(完整性校验失败):数据完整性事件,任何一次都 P0。"""
+    n = _grep_logs(cfg, "data-node", 'cell.readonly')
+    if n >= 1:
+        return ("P0", "最近 5 分钟 %s 个 Cell 进入只读保护(cell.readonly,integrity check 失败)" % n)
+    return None
+
+
+def failover_events(cfg):
+    """Failover 触发或失败:手动/自动 failover 都是控制面关键事件,任何一次都 P1。"""
+    n = _grep_logs(cfg, "api-server", 'failover')
+    if n >= 1:
+        return ("P1", "最近 5 分钟 %s 条 failover 事件(failover triggered/failed)" % n)
+    return None
+
+
+def background_job_failures(cfg):
+    """usage flush / credits settlement 持续失败:计费链路受损,任何失败都 P1。"""
+    n = _grep_logs(cfg, "api-server", 'usage flush failed|credits.settlement.failed')
+    if n >= 1:
+        return ("P1", "最近 5 分钟 %s 次后台任务失败(usage flush / credits settlement)" % n)
+    return None
+
+
 def slow_requests(cfg):
     n = _grep_logs(cfg, "api-server", 'request.slow')
     if n >= 5:
@@ -376,6 +400,9 @@ def main():
         handle("cert-" + msg[:24], lvl, "证书预警", msg, "FEISHU_ALERT_WEBHOOK", (lvl, msg))
     handle("err5", None, "5xx 错误率", None, "FEISHU_ALERT_WEBHOOK", error_rate(cfg))
     handle("apih", None, "API 可用性", None, "FEISHU_ALERT_WEBHOOK", api_health(cfg))
+    handle("readonly", None, "Cell 只读保护(数据完整性)", None, "FEISHU_ALERT_WEBHOOK", readonly_cells(cfg))
+    handle("failover", None, "Failover 事件", None, "FEISHU_ALERT_WEBHOOK", failover_events(cfg))
+    handle("bgjob", None, "后台任务失败(usage/settlement)", None, "FEISHU_ALERT_WEBHOOK", background_job_failures(cfg))
     handle("errvol", None, "服务错误量", None, "FEISHU_ALERT_WEBHOOK", error_volume(cfg))
     handle("auth", None, "认证失败突增", None, "FEISHU_ALERT_WEBHOOK", auth_failures(cfg))
     bf = backup_failures(cfg)

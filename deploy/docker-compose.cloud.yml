@@ -127,6 +127,11 @@ services:
       COMBEE_S3_BUCKET: ${COS_BUCKET:?COS_BUCKET required}
       COMBEE_S3_REGION: ${COS_REGION:-ap-guangzhou}
       COMBEE_S3_VIRTUAL_HOSTED: ${COMBEE_S3_VIRTUAL_HOSTED:-true}
+      # 数据保护(Cloud 生产默认开启,勿设 0;RPO 由 WAL 归档周期约束,见 DEPLOY.md):
+      # WAL 增量归档周期(秒) — 决定 RPO 上界
+      COMBEE_WAL_BACKUP_INTERVAL_SECS: ${COMBEE_WAL_BACKUP_INTERVAL_SECS:-15}
+      # 副本同步周期(秒) — 决定 failover 前副本滞后窗口
+      COMBEE_REPLICA_INTERVAL_SECS: ${COMBEE_REPLICA_INTERVAL_SECS:-30}
       # 控制面令牌:与 api-server 共享;设置后 /internal/* 与 /rpc/* 需令牌
       COMBEE_CONTROL_PLANE_TOKEN: ${COMBEE_CONTROL_PLANE_TOKEN:-}
     volumes:
@@ -155,6 +160,8 @@ services:
       COMBEE_API_KEYS: ${COMBEE_API_KEYS:-}
       # API key 认证
       COMBEE_AUTH: ${COMBEE_AUTH:-key}
+      # 自动 failover 扫描周期(秒);>0 时主节点心跳丢失且存在副本 → 自动提升(Cloud 生产默认开启)
+      COMBEE_FAILOVER_INTERVAL_SECS: ${COMBEE_FAILOVER_INTERVAL_SECS:-30}
     volumes:
       - api-data:/data
     depends_on:

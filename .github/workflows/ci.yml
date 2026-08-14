@@ -1,0 +1,56 @@
+# Combee Release Gate(CI):clean Ubuntu 全量验证。
+#
+# 覆盖:clippy/fmt → cargo test --workspace → release-test.sh(含 docker 场景
+# fresh install / 重启持久性 / kill-9 / 删卷恢复 / ENOSPC / credits 并发幂等)。
+#
+# 依赖:runner 需可用 Docker;仓库需有 secrets 或使用默认(脚本默认值即可)。
+# 定时 12h soak 另见 .github/workflows/soak.yml(可选启用)。
+
+name: release-gate
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            .docker-target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install 1.97 --profile minimal
+          rustup default 1.97
+
+      - name: Release Gate
+        run: ./scripts/release-test.sh
+
+      - name: Upload gate report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-report
+          path: |
+            /tmp/combee-release-db
+            /tmp/pg-idem-test.log
+          retention-days: 7
