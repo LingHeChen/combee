@@ -39,11 +39,10 @@ async function ensureRegistrationCell(): Promise<string> {
   return r.cell.id;
 }
 
-/** BFF 服务账号 key:dev(auth=off)可空;生产必填(用于建表/建用户 key)。 */
 /** 平台服务账号 key(COMBEE_BFF_SERVICE_KEY):BFF 所有请求统一用它,
  *  Combee 侧匹配该 key 即 internal(不计费)。兼容旧 env 名(COMBEE_BFF_API_KEY)。 */
 export function bffKey(): string {
-  return process.env.COMBEE_BFF_SERVICE_KEY ?? "";
+  return process.env.COMBEE_BFF_SERVICE_KEY ?? process.env.COMBEE_BFF_API_KEY ?? "";
 }
 
 function sessionKey(sid: string): string {
