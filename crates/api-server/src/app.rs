@@ -4,6 +4,7 @@ use axum::Router;
 use axum::extract::DefaultBodyLimit;
 use axum::middleware;
 use axum::routing::{delete, get, post, put};
+use tower_http::classify::ServerErrorsFailureClass;
 use tower_http::trace::TraceLayer;
 
 use crate::AppState;
@@ -161,5 +162,18 @@ pub fn build_app(state: AppState) -> Router {
         .merge(health_routes)
         .with_state(state)
         .layer(middleware::from_fn(auth::request_id))
-        .layer(TraceLayer::new_for_http())
+        .layer(TraceLayer::new_for_http().on_failure(
+            |err: ServerErrorsFailureClass, _lat: std::time::Duration, _span: &tracing::Span| {
+                match err {
+                    // 应用真的返回 5xx:保留可见(WARN;详情已由 request.failed 在 ERROR 记录,带 error_code)。
+                    ServerErrorsFailureClass::StatusCode(s) => {
+                        tracing::warn!(status = s.as_u16(), "response failed (server error)");
+                    }
+                    // status=None:客户端在响应发完前断开(reset / 取消 / 超时)——传输层噪音,非服务故障,降到 DEBUG。
+                    ServerErrorsFailureClass::Error(_) => {
+                        tracing::debug!("client disconnected before response completed");
+                    }
+                }
+            },
+        ))
 }

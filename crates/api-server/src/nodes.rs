@@ -266,7 +266,7 @@ mod tests {
     async fn register_heartbeat_pick_and_unregister() {
         let reg = NodeRegistry::new();
         let a = reg.register("http://a:9000".into(), 10).await;
-        let b = reg.register("http://b:9000".into(), 10).await;
+        let _b = reg.register("http://b:9000".into(), 10).await;
 
         // 心跳
         assert!(reg.heartbeat(a, 3).await);

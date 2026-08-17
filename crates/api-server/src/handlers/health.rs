@@ -2,7 +2,6 @@
 //! - `/health`:进程存活(不做依赖检查);
 //! - `/ready`:本实例能否服务真实流量(PostgreSQL 可达;注册表无健康节点时也返回 503)。
 
-use axum::Json;
 use axum::extract::State;
 use combee_common::CombeeError;
 

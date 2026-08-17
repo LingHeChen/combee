@@ -42,8 +42,6 @@ pub use manager::{ActiveDbManager, DataNodeConfig, LockStats};
 pub struct DataNode {
     manager: Arc<ActiveDbManager>,
     cache: Arc<KvCache>,
-    /// 上次上报的缓存命中/未命中累计值(指标增量用)。
-    cache_metrics_last: (std::sync::atomic::AtomicU64, std::sync::atomic::AtomicU64),
     /// 单条 SQL 执行超时。
     sql_timeout: Option<std::time::Duration>,
     /// 对象存储(备份/恢复);未启用时为 None。
@@ -81,14 +79,9 @@ impl DataNode {
         let quota = config.quota.clone();
         let manager = Arc::new(ActiveDbManager::new(config));
         let maintenance = manager.spawn_maintenance();
-        let cache_metrics_last = (
-            std::sync::atomic::AtomicU64::new(0),
-            std::sync::atomic::AtomicU64::new(0),
-        );
         Self {
             manager,
             cache,
-            cache_metrics_last,
             sql_timeout,
             store: None,
             generations: std::sync::Mutex::new(std::collections::HashMap::new()),

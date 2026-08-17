@@ -268,10 +268,20 @@ def api_health(cfg):
     return None
 
 
+def _is_transport_noise(r):
+    """tower on_failure 的传输层失败(status=None):客户端提前断开,非服务故障,不计入错误量。"""
+    _, _op, status, target = _err_fields(r)
+    return target == "tower_http::trace::on_failure" and status is None
+
+
 def error_volume(cfg):
     win = int(cfg.get("LOG_WINDOW_MIN", 5))
     rows = _raw_logs(cfg, "api-server")
-    errs = [r for r in rows if str(r.get("level", "")).upper() == "ERROR"]
+    errs = [
+        r
+        for r in rows
+        if str(r.get("level", "")).upper() == "ERROR" and not _is_transport_noise(r)
+    ]
     if len(errs) >= 5:
         samples = []
         for r in _sample_errs(errs):
