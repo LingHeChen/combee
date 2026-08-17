@@ -16,7 +16,9 @@ const COOKIE = "combee_session";
 const SESSION_TTL = 86_400; // 24h
 
 export interface BffSession {
-  /** console 用户名 */
+  /** 稳定用户 id(UUID;与 username 解耦,username 可改) */
+  uid: string | null;
+  /** console 用户名(登录名) */
   username: string;
   /** 该用户专属的 Combee API key(登录回填/兼容;业务请求不再用它代理) */
   api_key: string;
@@ -69,6 +71,8 @@ function verifyPassword(password: string, stored: string): boolean {
 // ---- console_users 表(Combee SQL)----
 
 interface ConsoleUserRow {
+  /** 稳定用户 id(UUID;与 username 解耦)。老行 null,由 backfill 脚本刷。 */
+  uid: string | null;
   username: string;
   password_hash: string;
   api_key: string;
@@ -78,13 +82,17 @@ interface ConsoleUserRow {
 
 const CREATE_TABLE_SQL = `CREATE TABLE IF NOT EXISTS console_users (
   username TEXT PRIMARY KEY,
+  uid TEXT,
   password_hash TEXT NOT NULL,
   api_key TEXT NOT NULL,
   tenant_id TEXT,
   created_at INTEGER NOT NULL
 )`;
-/** 兼容旧表:补 tenant_id 列(ALTER 失败忽略——已存在)。 */
+/** 兼容旧表:补列(ALTER 失败忽略——已存在)。 */
 const ALTER_ADD_TENANT_SQL = `ALTER TABLE console_users ADD COLUMN tenant_id TEXT`;
+/** uid:与 username 解耦的稳定用户 id(UUID);老行 NULL,由 backfill 脚本刷。 */
+const ALTER_ADD_UID_SQL = `ALTER TABLE console_users ADD COLUMN uid TEXT`;
+const CREATE_UID_INDEX_SQL = `CREATE UNIQUE INDEX IF NOT EXISTS idx_console_users_uid ON console_users(uid)`;
 
 export async function ensureUsersTable(): Promise<string> {
   // 所有新数据(用户/会话/用户辅助数据)统一写入固定 combee-bff cell;
@@ -100,6 +108,16 @@ export async function ensureUsersTable(): Promise<string> {
     body: { sql: ALTER_ADD_TENANT_SQL },
     apiKey: bffKey(),
   }).catch(() => undefined); // 旧表已有该列时忽略
+  await combeeRequest(`/v1/databases/${cell}/sql`, {
+    method: "POST",
+    body: { sql: ALTER_ADD_UID_SQL },
+    apiKey: bffKey(),
+  }).catch(() => undefined); // 旧表已有该列时忽略
+  await combeeRequest(`/v1/databases/${cell}/sql`, {
+    method: "POST",
+    body: { sql: CREATE_UID_INDEX_SQL },
+    apiKey: bffKey(),
+  }).catch(() => undefined);
   return cell;
 }
 
@@ -109,7 +127,7 @@ async function findUserInCell(cell: string, username: string): Promise<ConsoleUs
     {
       method: "POST",
       body: {
-        sql: "SELECT username, password_hash, api_key, tenant_id, created_at FROM console_users WHERE username = ?",
+        sql: "SELECT uid, username, password_hash, api_key, tenant_id, created_at FROM console_users WHERE username = ?",
         params: [username],
       },
       apiKey: bffKey(),
@@ -117,8 +135,15 @@ async function findUserInCell(cell: string, username: string): Promise<ConsoleUs
   ).catch(() => null);
   const rows = res?.rows ?? [];
   if (rows.length === 0) return null;
-  const r = rows[0] as [string, string, string, string | null, number];
-  return { username: r[0], password_hash: r[1], api_key: r[2], tenant_id: r[3], created_at: r[4] };
+  const r = rows[0] as [string | null, string, string, string, string | null, number];
+  return {
+    uid: r[0],
+    username: r[1],
+    password_hash: r[2],
+    api_key: r[3],
+    tenant_id: r[4],
+    created_at: r[5],
+  };
 }
 
 async function findUser(username: string): Promise<ConsoleUserRow | null> {
@@ -212,17 +237,26 @@ export async function registerUser(
     }
   }
 
+  const uid = randomUUID();
   const cell = await ensureUsersTable(); // 新注册:固定 combee-bff cell
   await combeeRequest(`/v1/databases/${cell}/sql`, {
     method: "POST",
     body: {
-      sql: "INSERT INTO console_users (username, password_hash, api_key, tenant_id, created_at) VALUES (?, ?, ?, ?, ?)",
-      params: [username, hashPassword(password), created.key, created.tenant_id, Math.floor(Date.now() / 1000)],
+      sql: "INSERT INTO console_users (username, uid, password_hash, api_key, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+      params: [
+        username,
+        uid,
+        hashPassword(password),
+        created.key,
+        created.tenant_id,
+        Math.floor(Date.now() / 1000),
+      ],
     },
     apiKey: bffKey(),
   });
 
   const row: ConsoleUserRow = {
+    uid,
     username,
     password_hash: "",
     api_key: created.key,
@@ -254,6 +288,7 @@ export async function login(rawUsername: string, password: string): Promise<stri
     }
   }
   const session: BffSession = {
+    uid: user.uid,
     username: user.username,
     api_key: user.api_key,
     tenant_id: tenantId,

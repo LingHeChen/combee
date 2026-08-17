@@ -1,9 +1,9 @@
 //! Database lifecycle:CREATE / LIST / DELETE。
 
 use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use combee_common::DatabaseId;
+use combee_common::{DatabaseId, TenantId};
 use combee_metadata::DatabaseRecord;
 use serde::{Deserialize, Serialize};
 
@@ -118,6 +118,14 @@ pub async fn create_database(
     ))
 }
 
+/// GET /v1/databases 查询参数。
+#[derive(serde::Deserialize)]
+pub struct ListDatabasesQuery {
+    /// 仅 internal(平台服务账号 / BFF)可用:代表指定租户列举 Cell。
+    /// 租户 key 携带此参数无效(只会看到自己),防越权。
+    pub tenant_id: Option<String>,
+}
+
 /// GET /v1/databases —— 列出当前租户全部 Cell。
 /// 列出当前租户全部 Cell。
 #[utoipa::path(
@@ -129,10 +137,24 @@ pub async fn create_database(
 pub async fn list_databases(
     State(state): State<AppState>,
     auth: combee_common::AuthContext,
+    Query(q): Query<ListDatabasesQuery>,
 ) -> Result<Json<Vec<DatabaseRecord>>, ApiError> {
     let records = if auth.internal {
-        state.metadata.list_databases_all().await?
+        // 平台服务账号(BFF)必须显式指定代表哪个租户;不指定则返回空。
+        // 绝不返回全量 —— 跨租户隔离在此强制,避免把别人的 Cell 泄露给 console。
+        match q.tenant_id.as_deref() {
+            Some(t) => {
+                let tenant: TenantId = t.parse().map_err(|_| {
+                    ApiError(combee_common::CombeeError::InvalidRequest(
+                        "invalid tenant_id".into(),
+                    ))
+                })?;
+                state.metadata.list_databases(tenant).await?
+            }
+            None => Vec::new(),
+        }
     } else {
+        // 租户 key:只看自己(忽略 tenant_id 参数)。
         state.metadata.list_databases(auth.tenant_id).await?
     };
     Ok(Json(records))

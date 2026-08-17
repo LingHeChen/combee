@@ -340,8 +340,9 @@ fn _assert_auth_context_is_copy(_: AuthContext) -> AuthContext {
     }
 }
 
-/// 目的:平台 admin key(BFF 代理)能看到全部租户 Cell(供 BFF 按用户租户过滤);
-/// 普通租户 key 看不到别的租户 Cell;admin key 的请求标记 internal 不计费。
+/// 目的:平台 admin key(BFF 代理)必须显式指定 tenant_id 才能列举该租户 Cell
+/// (不带 tenant_id 返回空,防跨租户泄露);普通租户 key 看不到别的租户 Cell;
+/// admin key 的请求标记 internal 不计费。
 #[tokio::test]
 async fn admin_key_platform_view_and_internal_billing() {
     let (app, _dir, _tb) = make_app().await;
@@ -370,8 +371,35 @@ async fn admin_key_platform_view_and_internal_billing() {
     assert_eq!(status, StatusCode::CREATED);
     let id_b = body_b["id"].as_str().unwrap().to_string();
 
-    // admin key:列表看到全部(平台视角,供 BFF 过滤)
+    // A 的 tenant_id(经详情端点取得,供 admin 代表某租户列举)
+    let (status, det) = send(
+        &app,
+        Method::GET,
+        &format!("/v1/databases/{id}"),
+        None,
+        Some(KEY_A),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let tenant_a = det["tenant_id"].as_str().unwrap().to_string();
+
+    // admin key 不带 tenant_id:不再返回全量(跨租户隔离在平台层强制,防泄露)
     let (status, body) = send(&app, Method::GET, "/v1/databases", None, Some(KEY_ADMIN)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        body.as_array().unwrap().is_empty(),
+        "admin key 不带 tenant_id 不应看到任何 Cell(防跨租户泄露)"
+    );
+
+    // admin key 带 tenant_id=A:只看到 A 的 Cell,不含 B 的
+    let (status, body) = send(
+        &app,
+        Method::GET,
+        &format!("/v1/databases?tenant_id={tenant_a}"),
+        None,
+        Some(KEY_ADMIN),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     let ids: Vec<String> = body
         .as_array()
@@ -379,8 +407,14 @@ async fn admin_key_platform_view_and_internal_billing() {
         .iter()
         .map(|c| c["id"].as_str().unwrap().to_string())
         .collect();
-    assert!(ids.contains(&id), "admin key 应看到 A 的 Cell");
-    assert!(ids.contains(&id_b), "admin key 应看到 B 的 Cell");
+    assert!(
+        ids.contains(&id),
+        "admin key 带 tenant_id=A 应看到 A 的 Cell"
+    );
+    assert!(
+        !ids.contains(&id_b),
+        "admin key 带 tenant_id=A 不应看到 B 的 Cell"
+    );
 
     // admin key 访问任意 Cell 数据成功(平台代理)
     let (status, _) = send(

@@ -254,14 +254,18 @@ async function proxy(req: NextRequest, target: string) {
   // 列表请求(GET /v1/databases,无 cell id):admin key 拉全量 → 按用户租户过滤。
   // 这是 cells 列表页的入口;不做过滤会把平台 cell(combee-bff)与所有租户 cell 暴露给用户。
   if (method === "GET" && (target === "v1/databases" || target === "v1/databases/")) {
-    const all = await combeeRequest<Array<{ tenant_id?: string }>>(
-      `/v1/databases${query}`,
+    // 用服务 key(不计费)+ 显式 tenant_id 让平台按租户过滤;不再拉全量到 BFF。
+    // session.tenant_id 缺失(极老用户未回填)→ 直接返回空,绝不泄露。
+    if (!session.tenant_id) return NextResponse.json([]);
+    const qs = new URLSearchParams(req.nextUrl.searchParams);
+    qs.set("tenant_id", session.tenant_id);
+    const scoped = await combeeRequest<Array<{ tenant_id?: string }>>(
+      `/v1/databases?${qs.toString()}`,
       { apiKey: bffKey() },
     ).catch(() => []);
-    const list = Array.isArray(all) ? all : [];
-    const filtered = session.tenant_id
-      ? list.filter((c) => c.tenant_id === session.tenant_id)
-      : [];
+    const list = Array.isArray(scoped) ? scoped : [];
+    // 纵深防御:平台已按租户过滤,这里再按 tenant_id 兜底过滤一次。
+    const filtered = list.filter((c) => c.tenant_id === session.tenant_id);
     return NextResponse.json(filtered);
   }
   let body: unknown;

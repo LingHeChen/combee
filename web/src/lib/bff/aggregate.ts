@@ -14,14 +14,19 @@ interface ApiCell {
 }
 
 export async function aggregateOverview(session: BffSession): Promise<OverviewData> {
-  // cells 用平台 key 拉全量,再按用户租户过滤(BFF 负责归属隔离,不计费);
+  // cells 用平台 key + 显式 tenant_id 让平台按租户过滤(不再拉全量到 BFF);
   // usage/credits 用用户 key 查(租户聚合正确,且 Combee 对查询自身用量不计费)。
   const [cells, usage, credits] = await Promise.all([
-    combeeRequest<ApiCell[]>("/v1/databases?limit=1000", { apiKey: bffKey() }),
+    session.tenant_id
+      ? combeeRequest<ApiCell[]>(`/v1/databases?limit=1000&tenant_id=${session.tenant_id}`, {
+          apiKey: bffKey(),
+        })
+      : Promise.resolve([] as ApiCell[]),
     combeeRequest<UsageSummary>("/v1/usage/summary", { apiKey: session.api_key }).catch(() => null),
     combeeRequest<{ available: string }>("/v1/credits/balance", { apiKey: session.api_key }).catch(() => null),
   ]);
 
+  // 纵深防御:平台已按租户过滤,这里再按 tenant_id 兜底过滤一次。
   const list = (Array.isArray(cells) ? cells : []).filter(
     (c) => !!session.tenant_id && c.tenant_id === session.tenant_id,
   );

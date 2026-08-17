@@ -180,12 +180,15 @@ export interface OnboardingState {
 }
 
 export async function getOnboarding(session: BffSession): Promise<OnboardingState> {
-  // cells 用平台 key + 租户过滤;注册即创建了用户 key(api_key_created 恒为注册状态);
-  // usage 用用户 key 查(Combee 对查询自身用量不计费)。
+  // cells 用平台 key + 显式 tenant_id 让平台按租户过滤(不再拉全量到 BFF);
+  // 注册即创建了用户 key(api_key_created 恒为注册状态);usage 用用户 key 查(不计费)。
   const [cells, usage] = await Promise.all([
-    combeeRequest<Array<{ tenant_id?: string }> | null>("/v1/databases?limit=1000", {
-      apiKey: bffKey(),
-    }).catch(() => null),
+    session.tenant_id
+      ? combeeRequest<Array<{ tenant_id?: string }> | null>(
+          `/v1/databases?limit=1000&tenant_id=${session.tenant_id}`,
+          { apiKey: bffKey() },
+        ).catch(() => null)
+      : Promise.resolve(null),
     combeeRequest<{ request_count?: number } | null>("/v1/usage/summary", {
       apiKey: session.api_key,
     }).catch(() => null),
