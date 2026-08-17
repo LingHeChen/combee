@@ -20,7 +20,7 @@ pub struct UsageQuery {
     /// ISO8601(RFC3339),缺省为最近 24 小时。
     pub from: Option<String>,
     pub to: Option<String>,
-    /// timeseries 专用:metrics 之一(kv_read/kv_write/sql_read/sql_write/requests/bytes_in/bytes_out/storage_bytes)。
+    /// timeseries 专用:metrics 之一(kv_read/kv_write/sql_read/sql_write/requests/bytes_in/bytes_out/storage_bytes/storage_byte_secs)。
     pub metric: Option<String>,
     /// timeseries 专用:minute(默认)/hour/day。
     pub interval: Option<String>,
@@ -49,6 +49,8 @@ pub struct UsageSummary {
     pub bytes_out: u64,
     /// 当前存储字节(仅单 Cell 查询时精确统计;租户汇总为各 Cell 之和)。
     pub current_storage_bytes: u64,
+    /// 本周期存储用量(GB·h = 字节·秒 ÷ 3.6e12),来自 `StorageByteSecs` 采样积分。
+    pub storage_gb_hours: f64,
 }
 
 #[derive(Debug, Serialize)]
@@ -80,6 +82,7 @@ fn summarize(buckets: &[UsageBucket], from: i64, to: i64) -> UsageSummary {
     let mut requests = 0u64;
     let mut bytes_in = 0u64;
     let mut bytes_out = 0u64;
+    let mut storage_byte_secs = 0u64;
     for b in buckets {
         match b.metric {
             UsageMetric::KvRead => ops.kv_reads += b.value,
@@ -89,9 +92,14 @@ fn summarize(buckets: &[UsageBucket], from: i64, to: i64) -> UsageSummary {
             UsageMetric::Requests => requests += b.value,
             UsageMetric::BytesIn => bytes_in += b.value,
             UsageMetric::BytesOut => bytes_out += b.value,
+            // 快照类 gauge:仅展示当前存储,不计入周期用量。
             UsageMetric::StorageBytes => {}
+            // 存储计费积分:字节·秒 → GB·h。
+            UsageMetric::StorageByteSecs => storage_byte_secs += b.value,
         }
     }
+    let storage_gb_hours =
+        storage_byte_secs as f64 / combee_common::credit::BYTE_SECS_PER_GB_HOUR as f64;
     UsageSummary {
         period: UsagePeriod {
             from: DateTime::from_timestamp(from, 0)
@@ -106,6 +114,7 @@ fn summarize(buckets: &[UsageBucket], from: i64, to: i64) -> UsageSummary {
         bytes_in,
         bytes_out,
         current_storage_bytes: 0,
+        storage_gb_hours,
     }
 }
 

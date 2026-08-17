@@ -24,6 +24,7 @@ use http_body::Body as HttpBody;
 use tracing::warn;
 
 use crate::AppState;
+use crate::client::DataNodeProvider;
 
 /// 聚合器:计数在内存,周期批量 flush。
 pub struct UsageMeter {
@@ -162,6 +163,75 @@ impl UsageMeter {
     pub async fn set_snapshot(&self, key: &UsageKey, value: u64) -> Result<()> {
         self.metadata.usage_set(key, value).await
     }
+}
+
+/// 启动存储采样器:每 `interval` 遍历 metadata 全部 Cell,把「当前字节数」在采样点
+/// 转成 `StorageByteSecs` 加法计数(字节 × interval),喂进现有 metering → flush →
+/// settlement 流水线,实现 GB·h 计费(见 COMBEE_STORAGE_BILLING.md)。
+///
+/// 遍历的是 `list_all_databases`(含冷 Cell):冷/空/懒创建未落盘的 Cell 读文件返回 0,
+/// `record` 对 `delta=0` 短路,天然零计费。
+pub fn spawn_storage_sampler(
+    metadata: Arc<dyn MetadataStore>,
+    data_node: Arc<dyn DataNodeProvider>,
+    meter: Arc<UsageMeter>,
+    interval: Duration,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(interval);
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            ticker.tick().await;
+            if let Err(e) = sample_storage_once(&metadata, &data_node, &meter, interval).await {
+                warn!(
+                    service = "combee-api",
+                    event = "storage.sample.failed",
+                    error = %e,
+                );
+            }
+        }
+    })
+}
+
+/// 采样一轮:返回本次采样到非零字节的 Cell 数。
+async fn sample_storage_once(
+    metadata: &Arc<dyn MetadataStore>,
+    data_node: &Arc<dyn DataNodeProvider>,
+    meter: &Arc<UsageMeter>,
+    interval: Duration,
+) -> Result<usize> {
+    let interval_secs = interval.as_secs();
+    if interval_secs == 0 {
+        return Ok(0);
+    }
+    let cells = metadata.list_all_databases().await?;
+    let mut sampled = 0usize;
+    for cell in cells {
+        let bytes = match data_node.client_for(cell.id).await {
+            Ok(client) => match client.storage_bytes(cell.id).await {
+                Ok(b) => b,
+                Err(e) => {
+                    warn!(cell = %cell.id, "storage sample: storage_bytes failed: {e}");
+                    continue;
+                }
+            },
+            Err(e) => {
+                warn!(cell = %cell.id, "storage sample: client_for failed: {e}");
+                continue;
+            }
+        };
+        if bytes == 0 {
+            continue; // 冷/空 Cell 零计费
+        }
+        meter.record(
+            cell.tenant_id,
+            Some(cell.id),
+            UsageMetric::StorageByteSecs,
+            bytes.saturating_mul(interval_secs),
+        );
+        sampled += 1;
+    }
+    Ok(sampled)
 }
 
 fn now_unix() -> i64 {
@@ -383,5 +453,60 @@ mod tests {
         assert!(!is_read_sql("UPDATE t SET x = 1"));
         assert!(!is_read_sql("CREATE TABLE t (x)"));
         assert!(!is_read_sql("DELETE FROM t"));
+    }
+
+    /// 采样器把「当前字节数」转成 `StorageByteSecs = bytes × interval`(GB·h 积分)。
+    #[tokio::test]
+    async fn storage_sampler_records_byte_secs() {
+        use crate::client::{LocalDataNodeClient, LocalProvider};
+        use combee_common::config::KvDurability;
+        use combee_data_node::{DataNode, DataNodeConfig};
+
+        let dir = tempfile::tempdir().unwrap();
+        let metadata: Arc<dyn MetadataStore> = Arc::new(InMemoryStore::new());
+        let tenant = TenantId::new();
+        let cell = DatabaseId::new();
+        metadata
+            .create_database(tenant, cell, None, None)
+            .await
+            .unwrap();
+
+        let node = Arc::new(DataNode::new(DataNodeConfig {
+            data_dir: dir.path().to_path_buf(),
+            max_active_dbs: 8,
+            db_idle_timeout: Duration::from_secs(3600),
+            ttl_gc_interval: Duration::from_secs(3600),
+            kv_cache_capacity: 10_000,
+            kv_durability: KvDurability::Normal,
+            sql_timeout: Some(Duration::from_secs(5)),
+            quota: Default::default(),
+        }));
+        // 写入数据,让磁盘字节 > 0
+        node.kv_set(cell, "k".into(), "v".into(), None, false, false, 0)
+            .await
+            .unwrap();
+        let expected_bytes = node.storage_bytes(cell).await.unwrap();
+        assert!(expected_bytes > 0, "写入后应有非零磁盘占用");
+
+        let provider: Arc<dyn DataNodeProvider> =
+            Arc::new(LocalProvider::new(Arc::new(LocalDataNodeClient::new(node))));
+        let meter = UsageMeter::new(metadata.clone(), Duration::from_secs(3600));
+        let interval = Duration::from_secs(300);
+
+        let sampled = sample_storage_once(&metadata, &provider, &meter, interval)
+            .await
+            .unwrap();
+        assert_eq!(sampled, 1, "只有一个有数据的 Cell 被采样");
+
+        meter.flush_once().await.unwrap();
+        let buckets = meter
+            .query(tenant, Some(cell), None, 0, i64::MAX)
+            .await
+            .unwrap();
+        let secs = buckets
+            .iter()
+            .find(|b| b.metric == UsageMetric::StorageByteSecs)
+            .unwrap();
+        assert_eq!(secs.value, expected_bytes * 300, "bytes × interval 计入 byte·secs");
     }
 }

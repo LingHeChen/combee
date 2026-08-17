@@ -6,6 +6,7 @@
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
+use combee_common::credit::PricingRule;
 use combee_common::usage::UsageMetric;
 use combee_common::{PricingConfig, PricingStatus};
 use combee_metadata::MetadataStore;
@@ -81,6 +82,38 @@ impl PricingManager {
             }
         })
     }
+}
+
+/// 播种默认定价:仅当尚无 active 定价(version == 0)时,为 `StorageByteSecs` 配一条
+/// GB·h 计费规则,让新部署无需手工建规则即可对存储计费(见 COMBEE_STORAGE_BILLING.md)。
+/// 已通过 admin API 配置定价的部署不受影响。
+pub async fn seed_default_pricing(
+    metadata: &Arc<dyn MetadataStore>,
+) -> Result<(), combee_common::CombeeError> {
+    let (version, _) = metadata.get_active_pricing().await?;
+    if version.version > 0 {
+        return Ok(());
+    }
+    let price_units = std::env::var("COMBEE_STORAGE_PRICE_MICROCREDITS_PER_GB_HOUR")
+        .ok()
+        .and_then(|v| v.parse::<i64>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(combee_common::credit::DEFAULT_STORAGE_PRICE_UNITS_PER_GB_HOUR);
+    metadata
+        .create_pricing_version(vec![PricingRule {
+            pricing_version: 0,
+            metric: UsageMetric::StorageByteSecs,
+            unit_size: combee_common::credit::BYTE_SECS_PER_GB_HOUR,
+            price_units,
+        }])
+        .await?;
+    tracing::info!(
+        service = "combee-api",
+        event = "pricing.seed.storage",
+        price_units = price_units,
+        "seeded default storage pricing (GB·h)"
+    );
+    Ok(())
 }
 
 #[cfg(test)]

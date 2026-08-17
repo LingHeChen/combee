@@ -152,10 +152,21 @@ async fn main() {
     let usage_meter =
         combee_api_server::usage::UsageMeter::new(metadata.clone(), config.usage_flush_interval);
     let _usage_flusher = usage_meter.spawn_flusher();
+    // 存储计费采样器(GB·h):gauge → byte·secs 加法计数,进入同一条计费流水线。
+    let _storage_sampler = combee_api_server::usage::spawn_storage_sampler(
+        metadata.clone(),
+        provider.clone(),
+        usage_meter.clone(),
+        config.storage_sample_interval,
+    );
     let pricing_manager = combee_api_server::pricing::PricingManager::new(
         metadata.clone(),
         config.pricing_refresh_interval,
     );
+    // 播种默认定价(含 StorageByteSecs 的 GB·h 规则);已有定价时跳过。
+    if let Err(e) = combee_api_server::pricing::seed_default_pricing(&metadata).await {
+        tracing::warn!("seed default pricing failed: {e}");
+    }
     let _pricing_refresher = pricing_manager.spawn_refresher();
     let settlement = combee_api_server::settlement::Settlement::new(
         metadata.clone(),

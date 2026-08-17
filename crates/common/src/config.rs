@@ -97,6 +97,9 @@ pub struct Config {
     pub control_plane_token: Option<String>,
     /// Usage 聚合 flush 周期。
     pub usage_flush_interval: Duration,
+    /// 存储采样周期:每 `COMBEE_STORAGE_SAMPLE_INTERVAL_SECS` 秒把各 Cell 当前字节数
+    /// 转成 `StorageByteSecs` 加法计数,用于 GB·h 计费。默认 300s。
+    pub storage_sample_interval: Duration,
     /// Pricing 热更新轮询周期。
     pub pricing_refresh_interval: Duration,
     /// Credits 结算周期。
@@ -185,6 +188,8 @@ impl Config {
         };
         let usage_flush_interval =
             Duration::from_secs(env_parse("COMBEE_USAGE_FLUSH_INTERVAL_SECS", 5));
+        let storage_sample_interval =
+            Duration::from_secs(env_parse("COMBEE_STORAGE_SAMPLE_INTERVAL_SECS", 300));
         let pricing_refresh_interval =
             Duration::from_secs(env_parse("COMBEE_PRICING_REFRESH_INTERVAL_SECS", 5));
         let settlement_interval =
@@ -244,6 +249,7 @@ impl Config {
             sql_timeout_secs,
             control_plane_token,
             usage_flush_interval,
+            storage_sample_interval,
             pricing_refresh_interval,
             settlement_interval,
             admin_token,

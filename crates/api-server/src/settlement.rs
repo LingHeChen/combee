@@ -265,4 +265,89 @@ mod tests {
         assert_eq!(spent, 100 * 100, "100 请求 × 100 microcredits 应从租户扣减");
         assert!(account.balance_units < 10 * CREDIT_UNITS_PER_CREDIT);
     }
+
+    /// 存储计费:StorageByteSecs 走既有 settlement 按 GB·h 扣费;
+    /// 旧的 StorageBytes(gauge)必须继续被跳过、不计费。
+    #[tokio::test]
+    async fn storage_byte_secs_settled_but_storage_gauge_skipped() {
+        use combee_common::credit::BYTE_SECS_PER_GB_HOUR;
+        let metadata: Arc<dyn MetadataStore> = Arc::new(InMemoryStore::new());
+        let t = TenantId::new();
+
+        // 定价:StorageByteSecs 每 1 GB·h(=3.6e12 字节·秒)计 10_000 microcredits
+        metadata
+            .create_pricing_version(vec![PricingRule {
+                pricing_version: 0,
+                metric: UsageMetric::StorageByteSecs,
+                unit_size: BYTE_SECS_PER_GB_HOUR,
+                price_units: 10_000,
+            }])
+            .await
+            .unwrap();
+
+        metadata.create_tenant(t).await.unwrap();
+        metadata
+            .append_credit_transaction(CreditTransaction {
+                id: uuid::Uuid::new_v4(),
+                tenant_id: t,
+                txn_type: CreditTransactionType::Grant,
+                amount_units: 1_000_000_000,
+                pricing_version: None,
+                reference_id: Some("grant:storage".into()),
+                description: None,
+                created_at: 100,
+                balance_after: None,
+            })
+            .await
+            .unwrap();
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+        let past_bucket = bucket_start(now - 180);
+        // 2 GB·h 的字节·秒积分
+        metadata
+            .usage_add(
+                &UsageKey {
+                    tenant_id: t,
+                    cell_id: None,
+                    metric: UsageMetric::StorageByteSecs,
+                    bucket_start: past_bucket,
+                },
+                (2 * BYTE_SECS_PER_GB_HOUR) as u64,
+            )
+            .await
+            .unwrap();
+        // 旧 gauge:应被跳过,不计费
+        metadata
+            .usage_add(
+                &UsageKey {
+                    tenant_id: t,
+                    cell_id: None,
+                    metric: UsageMetric::StorageBytes,
+                    bucket_start: past_bucket,
+                },
+                999_999_999,
+            )
+            .await
+            .unwrap();
+
+        let pricing = PricingManager::new(metadata.clone(), Duration::from_secs(3600));
+        pricing.refresh().await.unwrap();
+        let settlement = Settlement::new(metadata.clone(), pricing, Duration::from_secs(60));
+        settlement
+            .last_settled_bucket
+            .store(past_bucket - 60, Ordering::Relaxed);
+
+        let written = settlement.settle_once().await.unwrap();
+        assert_eq!(
+            written, 1,
+            "仅 StorageByteSecs 结算;StorageBytes gauge 应被跳过"
+        );
+
+        let account = metadata.get_credit_account(t).await.unwrap();
+        let spent = 1_000_000_000 - account.balance_units;
+        assert_eq!(spent, 2 * 10_000, "2 GB·h × 10_000 microcredits 扣费");
+    }
 }

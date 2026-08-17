@@ -26,6 +26,9 @@ pub enum UsageMetric {
     BytesOut,
     /// 当前存储字节数(快照类指标,用 set 而非 add)。
     StorageBytes,
+    /// 存储的「字节·秒」积分:采样器在采样点把 gauge 转成可加计数器,
+    /// 用于 GB·h 计费(1 GB·h = 1e9 字节 × 3600 秒 = 3.6e12 字节·秒)。
+    StorageByteSecs,
 }
 
 impl UsageMetric {
@@ -39,6 +42,7 @@ impl UsageMetric {
             UsageMetric::BytesIn => "bytes_in",
             UsageMetric::BytesOut => "bytes_out",
             UsageMetric::StorageBytes => "storage_bytes",
+            UsageMetric::StorageByteSecs => "storage_byte_secs",
         }
     }
 
@@ -52,6 +56,7 @@ impl UsageMetric {
             "bytes_in" => UsageMetric::BytesIn,
             "bytes_out" => UsageMetric::BytesOut,
             "storage_bytes" => UsageMetric::StorageBytes,
+            "storage_byte_secs" => UsageMetric::StorageByteSecs,
             _ => return None,
         })
     }
@@ -99,6 +104,7 @@ mod tests {
             UsageMetric::BytesIn,
             UsageMetric::BytesOut,
             UsageMetric::StorageBytes,
+            UsageMetric::StorageByteSecs,
         ] {
             assert_eq!(UsageMetric::parse(m.as_str()), Some(m));
         }

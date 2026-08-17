@@ -13,6 +13,14 @@ use crate::{TenantId, usage::UsageMetric};
 /// 1 Credit = 1_000_000 microcredits。
 pub const CREDIT_UNITS_PER_CREDIT: i64 = 1_000_000;
 
+/// 1 GB·h 对应的「字节·秒」数:1e9 字节 × 3600 秒(十进制 GB,计费展示口径)。
+/// 用作 `StorageByteSecs` 定价规则的 `unit_size`。
+pub const BYTE_SECS_PER_GB_HOUR: i64 = 3_600_000_000_000;
+
+/// 存储计费默认单价:0.01 credit / GB·h(= 10_000 microcredits)。
+/// 可用 `COMBEE_STORAGE_PRICE_MICROCREDITS_PER_GB_HOUR` 覆盖;仅在新部署播种默认定价时生效。
+pub const DEFAULT_STORAGE_PRICE_UNITS_PER_GB_HOUR: i64 = 10_000;
+
 /// 账本条目类型。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -239,6 +247,31 @@ mod tests {
             0,
             "未配置的 metric 计 0"
         );
+    }
+
+    #[test]
+    fn storage_gb_hour_rate_rounds_up() {
+        let mut rules = std::collections::HashMap::new();
+        rules.insert(
+            UsageMetric::StorageByteSecs,
+            (BYTE_SECS_PER_GB_HOUR, 10_000),
+        );
+        let cfg = PricingConfig {
+            version: 1,
+            effective_at: 0,
+            rules,
+        };
+        assert_eq!(
+            cfg.rate(UsageMetric::StorageByteSecs, BYTE_SECS_PER_GB_HOUR as u64),
+            10_000,
+            "3.6e12 字节·秒 = 1 GB·h"
+        );
+        assert_eq!(
+            cfg.rate(UsageMetric::StorageByteSecs, BYTE_SECS_PER_GB_HOUR as u64 + 1),
+            20_000,
+            "多 1 字节·秒向上取整到 2 GB·h"
+        );
+        assert_eq!(cfg.rate(UsageMetric::StorageByteSecs, 0), 0);
     }
 
     #[test]
