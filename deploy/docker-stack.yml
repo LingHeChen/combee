@@ -211,9 +211,9 @@ services:
       restart_policy:
         condition: any
 
-  # ---- API Server(2 副本)----
-  # 注意:NodeRegistry 在进程内存,data-node 只注册到被 DNS 命中的那个副本,
-  # 另一副本可能暂时路由不到节点(2s 心跳后重注册缓解);registry 落 PG 后可完全消除。
+  # ---- API Server(单副本;见下方 deploy 注释)----
+  # 注意:NodeRegistry 在进程内存,多副本会让 data-node 只注册到被 DNS 命中的那个副本、
+  # 另一副本路由不到节点 —— 故单机部署固定单副本;多机集群恢复多副本时需 registry 落 PG。
   api-server:
     stop_grace_period: 30s
     image: ccr.ccs.tencentyun.com/combee/api-server:latest
@@ -229,6 +229,9 @@ services:
       COMBEE_BFF_SERVICE_KEY: ${COMBEE_BFF_SERVICE_KEY:-}
       COMBEE_API_KEYS: ${COMBEE_API_KEYS:-}
       COMBEE_AUTH: ${COMBEE_AUTH:-key}
+      # 存储 GB·h 计费:默认单价 4800 microcredits/GB·h = ¥3.5/GB·月(对齐 COMBEE_PRICING.md)。
+      COMBEE_STORAGE_PRICE_MICROCREDITS_PER_GB_HOUR: ${COMBEE_STORAGE_PRICE_MICROCREDITS_PER_GB_HOUR:-4800}
+      COMBEE_STORAGE_SAMPLE_INTERVAL_SECS: ${COMBEE_STORAGE_SAMPLE_INTERVAL_SECS:-300}
     volumes:
       - api-data:/data
     networks:
@@ -242,9 +245,11 @@ services:
       retries: 3
       start_period: 20s
     deploy:
-      replicas: 2
+      # 单副本:单机部署 2 副本不提供真正 HA,反而(a)让存储采样器双倍计费、
+      # (b)触发进程内 NodeRegistry 分裂(见上方注释)。多机集群时再恢复多副本 + 采样器 leader 锁。
+      replicas: 1
       update_config:
-        order: start-first
+        order: stop-first
         parallelism: 1
         delay: 5s
         monitor: 10s
