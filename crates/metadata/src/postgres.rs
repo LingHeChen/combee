@@ -108,6 +108,11 @@ CREATE TABLE IF NOT EXISTS idempotency_keys (
     payload TEXT NOT NULL,
     created_at BIGINT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS leader_leases (
+    name TEXT PRIMARY KEY,
+    owner UUID NOT NULL,
+    expires_at BIGINT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS databases (
     id UUID PRIMARY KEY,
     tenant_id UUID NOT NULL,
@@ -764,6 +769,33 @@ impl MetadataStore for PostgresStore {
         .await
         .map_err(PostgresStore::internal)?;
         Ok(())
+    }
+
+    async fn try_acquire_lease(
+        &self,
+        name: &str,
+        owner: Uuid,
+        now: i64,
+        ttl_secs: i64,
+    ) -> Result<bool> {
+        // 原子 upsert:仅当无租约 / 已过期 / owner 为自己时才写入并返回 RETURNING;
+        // 否则 ON CONFLICT 的 WHERE 不满足 → 不更新 → 无返回行 → 本副本非 leader。
+        let row = sqlx::query_scalar::<_, Uuid>(
+            "INSERT INTO leader_leases (name, owner, expires_at)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (name) DO UPDATE
+               SET owner = EXCLUDED.owner, expires_at = EXCLUDED.expires_at
+               WHERE leader_leases.expires_at < $4 OR leader_leases.owner = $2
+             RETURNING owner",
+        )
+        .bind(name)
+        .bind(owner)
+        .bind(now + ttl_secs)
+        .bind(now)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(PostgresStore::internal)?;
+        Ok(row.is_some())
     }
 
     async fn query_usage(

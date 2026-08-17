@@ -211,9 +211,9 @@ services:
       restart_policy:
         condition: any
 
-  # ---- API Server(单副本;见下方 deploy 注释)----
-  # 注意:NodeRegistry 在进程内存,多副本会让 data-node 只注册到被 DNS 命中的那个副本、
-  # 另一副本路由不到节点 —— 故单机部署固定单副本;多机集群恢复多副本时需 registry 落 PG。
+  # ---- API Server(多副本)----
+  # NodeRegistry 以 PG 为 authority(本地 TTL 缓存),多副本路由一致;
+  # 存储采样器用 leader 租约(仅一个副本采样),避免重复计费。
   api-server:
     stop_grace_period: 30s
     image: ccr.ccs.tencentyun.com/combee/api-server:latest
@@ -245,11 +245,9 @@ services:
       retries: 3
       start_period: 20s
     deploy:
-      # 单副本:单机部署 2 副本不提供真正 HA,反而(a)让存储采样器双倍计费、
-      # (b)触发进程内 NodeRegistry 分裂(见上方注释)。多机集群时再恢复多副本 + 采样器 leader 锁。
-      replicas: 1
+      replicas: 2
       update_config:
-        order: stop-first
+        order: start-first
         parallelism: 1
         delay: 5s
         monitor: 10s

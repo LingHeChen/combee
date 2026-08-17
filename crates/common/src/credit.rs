@@ -267,7 +267,10 @@ mod tests {
             "3.6e12 字节·秒 = 1 GB·h"
         );
         assert_eq!(
-            cfg.rate(UsageMetric::StorageByteSecs, BYTE_SECS_PER_GB_HOUR as u64 + 1),
+            cfg.rate(
+                UsageMetric::StorageByteSecs,
+                BYTE_SECS_PER_GB_HOUR as u64 + 1
+            ),
             20_000,
             "多 1 字节·秒向上取整到 2 GB·h"
         );

@@ -177,11 +177,31 @@ pub fn spawn_storage_sampler(
     meter: Arc<UsageMeter>,
     interval: Duration,
 ) -> tokio::task::JoinHandle<()> {
+    // 本副本身份 + 租约 TTL(> 采样周期,leader 每 tick 续约;leader 挂掉后至多 ttl 秒另一副本接管)。
+    let owner = uuid::Uuid::new_v4();
+    let ttl_secs = (interval.as_secs() as i64).saturating_mul(2).max(1) + 60;
     tokio::spawn(async move {
         let mut ticker = tokio::time::interval(interval);
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
             ticker.tick().await;
+            // leader 租约:多副本中仅持有者采样,避免同一 Cell 被多副本重复累加(双倍计费)。
+            // 拿不准是否 leader(DB 异常)时保守跳过 —— 宁可漏计一轮,绝不重复计。
+            match metadata
+                .try_acquire_lease("storage_sampler", owner, now_unix(), ttl_secs)
+                .await
+            {
+                Ok(true) => {}
+                Ok(false) => continue,
+                Err(e) => {
+                    warn!(
+                        service = "combee-api",
+                        event = "storage.sample.lease_failed",
+                        error = %e,
+                    );
+                    continue;
+                }
+            }
             if let Err(e) = sample_storage_once(&metadata, &data_node, &meter, interval).await {
                 warn!(
                     service = "combee-api",
@@ -507,6 +527,10 @@ mod tests {
             .iter()
             .find(|b| b.metric == UsageMetric::StorageByteSecs)
             .unwrap();
-        assert_eq!(secs.value, expected_bytes * 300, "bytes × interval 计入 byte·secs");
+        assert_eq!(
+            secs.value,
+            expected_bytes * 300,
+            "bytes × interval 计入 byte·secs"
+        );
     }
 }

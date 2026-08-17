@@ -250,6 +250,17 @@ pub trait MetadataStore: Send + Sync {
     /// 覆盖快照类指标(如 storage_bytes):同键写入新值。
     async fn usage_set(&self, key: &UsageKey, value: u64) -> Result<()>;
 
+    /// Leader 租约:尝试成为/续约名为 `name` 的租约(owner 持有,过期时刻 = now + ttl_secs)。
+    /// 返回本 owner 是否持有。多副本中仅一个持有,用于让后台任务(如存储采样)只在一个副本执行,
+    /// 避免同一 Cell 被多副本重复累加导致双倍计费。
+    async fn try_acquire_lease(
+        &self,
+        name: &str,
+        owner: Uuid,
+        now: i64,
+        ttl_secs: i64,
+    ) -> Result<bool>;
+
     /// 查询用量桶(时间闭区间,按 bucket_start 升序)。
     async fn query_usage(
         &self,
@@ -367,6 +378,8 @@ struct InMemoryInner {
     waitlist: Vec<WaitlistEntry>,
     /// (tenant, name) → id;保证租户内名字唯一。
     name_index: HashMap<(TenantId, String), DatabaseId>,
+    /// leader 租约:name → (owner, expires_at)。
+    leases: HashMap<String, (Uuid, i64)>,
 }
 
 impl Default for InMemoryStore {
@@ -782,6 +795,26 @@ impl MetadataStore for InMemoryStore {
         Ok(())
     }
 
+    async fn try_acquire_lease(
+        &self,
+        name: &str,
+        owner: Uuid,
+        now: i64,
+        ttl_secs: i64,
+    ) -> Result<bool> {
+        let mut inner = self.inner.lock().unwrap();
+        let held = match inner.leases.get(name) {
+            Some((cur, exp)) => *cur == owner || *exp < now,
+            None => true,
+        };
+        if held {
+            inner
+                .leases
+                .insert(name.to_string(), (owner, now + ttl_secs));
+        }
+        Ok(held)
+    }
+
     async fn query_usage(
         &self,
         tenant: TenantId,
@@ -1076,6 +1109,48 @@ mod tests {
 
     fn tenant(n: u128) -> TenantId {
         TenantId::from_u128(n)
+    }
+
+    #[tokio::test]
+    async fn lease_single_owner_then_expiry_takeover() {
+        let store = InMemoryStore::new();
+        let a = Uuid::new_v4();
+        let b = Uuid::new_v4();
+        // a 先拿到租约(ttl=30s,now=100 → 过期 130)
+        assert!(
+            store
+                .try_acquire_lease("storage_sampler", a, 100, 30)
+                .await
+                .unwrap()
+        );
+        // 有效期内 b 拿不到
+        assert!(
+            !store
+                .try_acquire_lease("storage_sampler", b, 105, 30)
+                .await
+                .unwrap()
+        );
+        // a 续约(仍是自己)→ 过期推到 140
+        assert!(
+            store
+                .try_acquire_lease("storage_sampler", a, 110, 30)
+                .await
+                .unwrap()
+        );
+        // now=200 > 140,过期 → b 接管
+        assert!(
+            store
+                .try_acquire_lease("storage_sampler", b, 200, 30)
+                .await
+                .unwrap()
+        );
+        // 现在归 b,a 拿不到
+        assert!(
+            !store
+                .try_acquire_lease("storage_sampler", a, 205, 30)
+                .await
+                .unwrap()
+        );
     }
 
     #[tokio::test]
