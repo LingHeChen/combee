@@ -211,7 +211,6 @@ export async function registerUser(
   // Closed Alpha:兑换邀请码(voucher)→ 用户获得初始 Alpha Credits(默认 1000)
   if (mode === "code") {
     try {
-      try { require("node:fs").appendFileSync("/tmp/auth-debug.log", `${new Date().toISOString()} key-len=${created?.key?.length ?? -1}\n`); } catch {}
       const r = await combeeRequest<{ credits_added: string; already_redeemed: boolean }>(
         "/v1/credits/redeem",
         { method: "POST", body: { code: accessCode!.trim() }, apiKey: created.key },
@@ -220,7 +219,6 @@ export async function registerUser(
         throw new Error("Alpha access code already used by another account");
       }
     } catch (err) {
-      try { require("node:fs").appendFileSync("/tmp/auth-debug.log", `${new Date().toISOString()} redeem-err msg=${(err as Error).message} code=${(err as { code?: string }).code} status=${(err as { status?: number }).status}\n`); } catch {}
       // 邀请码无效/已用:清理刚建的用户,报错(与写入同一固定 cell)
       const cell = await ensureUsersTable();
       await combeeRequest(`/v1/databases/${cell}/sql`, {
