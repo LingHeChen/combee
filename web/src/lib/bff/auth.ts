@@ -230,7 +230,9 @@ export async function registerUser(
       }).catch(() => undefined);
       await combeeRequest(`/v1/api-keys/${created.key_id}`, {
         method: "DELETE",
-        apiKey: bffKey(),
+        // 用刚创建的用户 key 撤销(该 key 归属 created.tenant_id);
+        // 用平台 key 会命中错误的平台租户,导致撤销 404、遗留孤儿 key。
+        apiKey: created.key,
       }).catch(() => undefined);
       throw new Error(`invalid or already-used Alpha access code: ${(err as Error).message}`);
     }

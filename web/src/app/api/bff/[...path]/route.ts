@@ -276,17 +276,16 @@ async function proxy(req: NextRequest, target: string) {
       body = undefined;
     }
   }
-  // 创建 Cell(by-name ensure)是用户资源行为:用用户 key,使 Cell 归属用户租户
-  // (admin key 创建会归到平台租户,导致归属隔离失效)。其余 console 操作统一
-  // admin key 代理(不计费),权限已在上方校验。
-  const isCellCreate =
-    method === "PUT" && target.match(/^v1\/databases\/by-name\//) !== null;
-  // credits/usage 查询是"用户自己的数据":用用户 key(租户聚合正确;admin key 会
-  // 查到平台租户的余额/用量,导致 credits 页面显示 0)。
-  const isUserScopedQuery =
-    method === "GET" &&
-    (/^v1\/(credits|usage)\//.test(target) || /^v1\/cells\/[^/]+\/usage/.test(target));
-  const apiKey = isCellCreate || isUserScopedQuery ? session.api_key : bffKey();
+  // 数据面(SQL/KV/事务/reset/backup/restore):internal-aware,平台 key 代理(不计费),
+  // 归属已在上方 cellBelongsTo 校验。其余用户资源(api-keys/credits/usage/rename/
+  // delete/replication/failover/create)一律用用户 key,租户隔离交给 api-server 的
+  // auth.tenant_id —— 否则会被平台 key 命中错误的平台租户(api-keys 页空/401、
+  // redeem 入错账户、delete/replication 404 等)。
+  const isCellPath = m !== null && m[1] !== "by-name";
+  const isInternalDataPlane =
+    isCellPath &&
+    /^v1\/databases\/[^/]+\/(sql|transaction|kv|reset|backup|restore)(\/|$)/.test(target);
+  const apiKey = isInternalDataPlane ? bffKey() : session.api_key;
   try {
     const data = await combeeRequest(`/${target}${query}`, { method, body, apiKey });
     if (data === undefined) return NextResponse.json({ ok: true });
