@@ -187,8 +187,11 @@ impl PricingConfig {
         }
     }
 
-    /// 把用量折算为 microcredits(向上取整到整数计费单位)。
-    /// 未配置的 metric 计 0。
+    /// 把用量按比例折算为 microcredits(floor,不向上取整)。未配置的 metric 计 0。
+    ///
+    /// 必须用比例/floor,不能 div_ceil:存储等细粒度指标每次结算的用量远小于一个计费单位,
+    /// 向上取整会把每次结算都凑成一整个单位 → 空 Cell 一下午被凑出好几积分(严重超收)。
+    /// floor 下:大用量按比例准确计费,亚单位的极小用量趋近 0(可忽略)。
     pub fn rate(&self, metric: UsageMetric, units: u64) -> i64 {
         let Some((unit_size, price_units)) = self.rules.get(&metric).copied() else {
             return 0;
@@ -196,8 +199,8 @@ impl PricingConfig {
         if unit_size <= 0 || price_units <= 0 || units == 0 {
             return 0;
         }
-        let groups = units.div_ceil(unit_size as u64);
-        (groups as i64).saturating_mul(price_units)
+        let micro = (units as u128) * (price_units as u128) / (unit_size as u128);
+        micro.min(i64::MAX as u128) as i64
     }
 }
 
@@ -230,7 +233,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn pricing_rate_rounds_up_and_missing_is_zero() {
+    fn pricing_rate_is_proportional_floor_and_missing_is_zero() {
         let mut rules = std::collections::HashMap::new();
         rules.insert(UsageMetric::KvRead, (1_000, 10));
         let cfg = PricingConfig {
@@ -240,8 +243,14 @@ mod tests {
         };
         assert_eq!(cfg.rate(UsageMetric::KvRead, 0), 0);
         assert_eq!(cfg.rate(UsageMetric::KvRead, 1_000), 10);
-        assert_eq!(cfg.rate(UsageMetric::KvRead, 1_001), 20, "向上取整");
-        assert_eq!(cfg.rate(UsageMetric::KvRead, 500), 10);
+        assert_eq!(cfg.rate(UsageMetric::KvRead, 1_001), 10, "floor:不向上取整");
+        assert_eq!(cfg.rate(UsageMetric::KvRead, 2_000), 20);
+        assert_eq!(cfg.rate(UsageMetric::KvRead, 500), 5, "按比例:500/1000×10");
+        assert_eq!(
+            cfg.rate(UsageMetric::KvRead, 99),
+            0,
+            "亚单位极小量 floor 到 0"
+        );
         assert_eq!(
             cfg.rate(UsageMetric::SqlWrite, 99),
             0,
@@ -250,7 +259,7 @@ mod tests {
     }
 
     #[test]
-    fn storage_gb_hour_rate_rounds_up() {
+    fn storage_gb_hour_rate_is_proportional_floor() {
         let mut rules = std::collections::HashMap::new();
         rules.insert(
             UsageMetric::StorageByteSecs,
@@ -271,8 +280,16 @@ mod tests {
                 UsageMetric::StorageByteSecs,
                 BYTE_SECS_PER_GB_HOUR as u64 + 1
             ),
-            20_000,
-            "多 1 字节·秒向上取整到 2 GB·h"
+            10_000,
+            "floor:多 1 字节·秒仍是 1 GB·h(不向上取整)"
+        );
+        assert_eq!(
+            cfg.rate(
+                UsageMetric::StorageByteSecs,
+                BYTE_SECS_PER_GB_HOUR as u64 / 2
+            ),
+            5_000,
+            "半个 GB·h 按比例 5000"
         );
         assert_eq!(cfg.rate(UsageMetric::StorageByteSecs, 0), 0);
     }
