@@ -54,6 +54,10 @@ fn registry() -> &'static Registry {
     })
 }
 
+/// 每个 map 的 series 数上限:防高基数 label(如把 KV key 当 label)无限增长撑爆内存。
+/// 超限后不再新增 series(已有 series 继续更新);正常低基数指标远达不到此值。
+const MAX_SERIES: usize = 5000;
+
 /// 把 name + 有序标签编码为内部键(`name{l="v",...}`)。
 fn key(name: &str, labels: &[(&str, &str)]) -> String {
     if labels.is_empty() {
@@ -87,26 +91,37 @@ pub fn counter_add(name: &str, labels: &[(&str, &str)], delta: u64) {
     }
     let k = key(name, labels);
     let mut c = registry().counters.lock().unwrap();
-    *c.entry(k).or_insert(0) += delta;
+    if let Some(v) = c.get_mut(&k) {
+        *v += delta;
+    } else if c.len() < MAX_SERIES {
+        c.insert(k, delta);
+    }
 }
 
 /// 仪表:设置当前值(连接数、lag 等)。
 pub fn gauge_set(name: &str, labels: &[(&str, &str)], v: i64) {
     let k = key(name, labels);
-    registry().gauges.lock().unwrap().insert(k, v);
+    let mut g = registry().gauges.lock().unwrap();
+    if g.contains_key(&k) || g.len() < MAX_SERIES {
+        g.insert(k, v);
+    }
 }
 
 /// 直方图:记录一次观测(延迟秒等)。
 pub fn histogram_observe(name: &str, labels: &[(&str, &str)], v: f64) {
     let k = key(name, labels);
     let mut h = registry().histograms.lock().unwrap();
-    h.entry(k)
-        .or_insert_with(|| Histogram {
-            buckets: vec![0; DURATION_BUCKETS.len()],
-            count: 0,
-            sum: 0.0,
-        })
-        .observe(v);
+    if let Some(hist) = h.get_mut(&k) {
+        hist.observe(v);
+    } else if h.len() < MAX_SERIES {
+        h.entry(k)
+            .or_insert_with(|| Histogram {
+                buckets: vec![0; DURATION_BUCKETS.len()],
+                count: 0,
+                sum: 0.0,
+            })
+            .observe(v);
+    }
 }
 
 fn escape_meta(s: &str) -> String {

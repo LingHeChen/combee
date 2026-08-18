@@ -133,15 +133,58 @@ pub async fn request_logging(State(state): State<AppState>, req: Request, next: 
 }
 
 fn operation_name(path: &str) -> String {
-    // /v1/databases/{id}/sql → databases.{id}.sql;聚合端点为资源名
-    let parts: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+    // /v1/databases/{id}/kv/session:abc → databases.{id}.kv.{key}
+    // 必须归一化所有高基数段(UUID / KV key / by-name 名),否则每个不同值都会成为
+    // 一个 metrics label → 内存里 series 无限增长(观测泄露:KV key 一夜撑爆内存)。
     let mut out = Vec::new();
-    for p in parts {
-        if p.parse::<uuid::Uuid>().is_ok() {
-            out.push("{id}".to_string());
+    let mut prev = "";
+    for p in path.split('/').filter(|s| !s.is_empty()) {
+        let seg = if p.parse::<uuid::Uuid>().is_ok() {
+            "{id}"
+        } else if prev == "kv" && p != "ops" {
+            // /kv/{key} 的 key 是任意值;/kv/ops/* 是静态子路由,保留。
+            "{key}"
+        } else if prev == "by-name" {
+            "{name}"
         } else {
-            out.push(p.to_string());
-        }
+            p
+        };
+        out.push(seg.to_string());
+        prev = p;
     }
     out.join(".")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::operation_name;
+
+    #[test]
+    fn normalizes_high_cardinality_segments() {
+        let uuid = "00000000-0000-0000-0000-000000000001";
+        // KV key(高基数)→ {key};不同 key 归一到同一 operation
+        assert_eq!(
+            operation_name(&format!("/v1/databases/{uuid}/kv/session:abc")),
+            "v1.databases.{id}.kv.{key}"
+        );
+        assert_eq!(
+            operation_name(&format!("/v1/databases/{uuid}/kv/other-key-xyz")),
+            "v1.databases.{id}.kv.{key}"
+        );
+        // kv/ops/* 是静态子路由,保留
+        assert_eq!(
+            operation_name(&format!("/v1/databases/{uuid}/kv/ops/incr")),
+            "v1.databases.{id}.kv.ops.incr"
+        );
+        // by-name/{name} → {name}
+        assert_eq!(
+            operation_name("/v1/databases/by-name/combee-bff"),
+            "v1.databases.by-name.{name}"
+        );
+        // 普通静态路径不变
+        assert_eq!(
+            operation_name(&format!("/v1/databases/{uuid}/sql")),
+            "v1.databases.{id}.sql"
+        );
+    }
 }
