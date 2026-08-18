@@ -115,6 +115,8 @@ services:
   web:
     image: ccr.ccs.tencentyun.com/combee/console:latest
     environment:
+      # Next standalone 绑 0.0.0.0(否则绑容器 hostname → healthcheck 127.0.0.1 连不上 → unhealthy)
+      HOSTNAME: "0.0.0.0"
       COMBEE_API_URL: ${COMBEE_API_URL:-http://api-server:8080}
       COMBEE_API_KEY: ${COMBEE_API_KEY:-}
       COMBEE_BFF_API_KEY: ${COMBEE_BFF_API_KEY:-}
