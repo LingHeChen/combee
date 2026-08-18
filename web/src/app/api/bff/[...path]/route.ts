@@ -240,6 +240,14 @@ async function proxy(req: NextRequest, target: string) {
   if (!session) {
     return NextResponse.json({ code: "unauthorized", error: "not authenticated" }, { status: 401 });
   }
+  // 涉权操作必须能确定用户租户,才能用 on-behalf 安全代表其访问(fail closed);
+  // session.tenant_id 缺失(极老用户未回填)→ 拒绝,提示重新登录。
+  if (!session.tenant_id) {
+    return NextResponse.json(
+      { code: "unauthorized", error: "session missing tenant; please re-login" },
+      { status: 401 },
+    );
+  }
   // 归属校验:cell 数据操作(/v1/databases/{id}/…)必须属于当前用户;
   // by-name 与列表/创建(无 cell id)不走校验。
   const m = target.match(/^v1\/databases\/([^/]+)/);
@@ -251,23 +259,6 @@ async function proxy(req: NextRequest, target: string) {
   }
   const query = req.nextUrl.search;
   const method = req.method;
-  // 列表请求(GET /v1/databases,无 cell id):admin key 拉全量 → 按用户租户过滤。
-  // 这是 cells 列表页的入口;不做过滤会把平台 cell(combee-bff)与所有租户 cell 暴露给用户。
-  if (method === "GET" && (target === "v1/databases" || target === "v1/databases/")) {
-    // 用服务 key(不计费)+ 显式 tenant_id 让平台按租户过滤;不再拉全量到 BFF。
-    // session.tenant_id 缺失(极老用户未回填)→ 直接返回空,绝不泄露。
-    if (!session.tenant_id) return NextResponse.json([]);
-    const qs = new URLSearchParams(req.nextUrl.searchParams);
-    qs.set("tenant_id", session.tenant_id);
-    const scoped = await combeeRequest<Array<{ tenant_id?: string }>>(
-      `/v1/databases?${qs.toString()}`,
-      { apiKey: bffKey() },
-    ).catch(() => []);
-    const list = Array.isArray(scoped) ? scoped : [];
-    // 纵深防御:平台已按租户过滤,这里再按 tenant_id 兜底过滤一次。
-    const filtered = list.filter((c) => c.tenant_id === session.tenant_id);
-    return NextResponse.json(filtered);
-  }
   let body: unknown;
   if (method !== "GET" && method !== "DELETE") {
     try {
@@ -276,18 +267,16 @@ async function proxy(req: NextRequest, target: string) {
       body = undefined;
     }
   }
-  // 数据面(SQL/KV/事务/reset/backup/restore):internal-aware,平台 key 代理(不计费),
-  // 归属已在上方 cellBelongsTo 校验。其余用户资源(api-keys/credits/usage/rename/
-  // delete/replication/failover/create)一律用用户 key,租户隔离交给 api-server 的
-  // auth.tenant_id —— 否则会被平台 key 命中错误的平台租户(api-keys 页空/401、
-  // redeem 入错账户、delete/replication 404 等)。
-  const isCellPath = m !== null && m[1] !== "by-name";
-  const isInternalDataPlane =
-    isCellPath &&
-    /^v1\/databases\/[^/]+\/(sql|transaction|kv|reset|backup|restore)(\/|$)/.test(target);
-  const apiKey = isInternalDataPlane ? bffKey() : session.api_key;
+  // 统一:服务 key(internal → 不计费)+ on-behalf 租户头。api-server 据此按目标用户租户
+  // scope(list/delete/api-keys/credits 等直接对上;数据面 SQL/KV 的归属已由 cellBelongsTo 校验)。
+  // console 所有涉权操作都走这条 —— 既对租户、又不计费;带 tenant_id 的请求仅 internal 生效。
   try {
-    const data = await combeeRequest(`/${target}${query}`, { method, body, apiKey });
+    const data = await combeeRequest(`/${target}${query}`, {
+      method,
+      body,
+      apiKey: bffKey(),
+      onBehalfTenant: session.tenant_id,
+    });
     if (data === undefined) return NextResponse.json({ ok: true });
     return NextResponse.json(data);
   } catch (err) {

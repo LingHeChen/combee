@@ -208,7 +208,7 @@ pub async fn auth_middleware(
     // 平台服务账号(COMBEE_BFF_SERVICE_KEY):key 明文匹配 → internal,不计费。
     // BFF/console 平台请求统一用它;租户 API key 直连(SDK/curl)不计 internal。
     // 仅比对明文避免伪造;该 key 仍需在 metadata 中有效(admin_auth 也校验)。
-    let tenant: TenantId = if state.auth_mode == AuthMode::Key {
+    let mut tenant: TenantId = if state.auth_mode == AuthMode::Key {
         match req.headers().get("x-api-key").and_then(|v| v.to_str().ok()) {
             Some(key) => {
                 if state
@@ -248,6 +248,30 @@ pub async fn auth_middleware(
     } else {
         DEFAULT_TENANT
     };
+    // on-behalf:仅 internal(平台服务账号 / BFF)可携带 x-combee-on-behalf-tenant 代表指定租户。
+    // console 所有涉权操作据此拿到"目标用户"的数据,且因走服务 key → internal → 不计费。
+    // 安全铁律:外部租户 key 携带此头一律无效(仅在 internal 分支读取)→ 不能越权访问他人租户。
+    if internal {
+        if let Some(raw) = req
+            .headers()
+            .get("x-combee-on-behalf-tenant")
+            .and_then(|v| v.to_str().ok())
+        {
+            match raw.parse::<TenantId>() {
+                Ok(t) => tenant = t,
+                Err(_) => {
+                    return (
+                        StatusCode::BAD_REQUEST,
+                        Json(ErrorBody {
+                            code: "invalid_request".into(),
+                            error: "invalid x-combee-on-behalf-tenant".into(),
+                        }),
+                    )
+                        .into_response();
+                }
+            }
+        }
+    }
     req.extensions_mut().insert(AuthContext {
         tenant_id: tenant,
         internal,

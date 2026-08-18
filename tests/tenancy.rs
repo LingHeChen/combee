@@ -58,6 +58,41 @@ async fn send(
     (status, value)
 }
 
+/// 带 on-behalf 租户头的请求(测试 internal 代表指定租户;外部 key 带此头应无效)。
+async fn send_on_behalf(
+    app: &Router,
+    method: Method,
+    uri: &str,
+    api_key: &str,
+    on_behalf_tenant: &str,
+) -> (StatusCode, Value) {
+    let req = axum::http::Request::builder()
+        .method(method)
+        .uri(uri)
+        .header("content-type", "application/json")
+        .header("x-api-key", api_key)
+        .header("x-combee-on-behalf-tenant", on_behalf_tenant);
+    let resp = app
+        .clone()
+        .oneshot(req.body("{}".to_string()).unwrap())
+        .await
+        .unwrap();
+    let status = resp.status();
+    let bytes = axum::body::to_bytes(resp.into_body(), 1024 * 1024)
+        .await
+        .unwrap();
+    let value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+    (status, value)
+}
+
+fn ids_of(body: &Value) -> Vec<String> {
+    body.as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["id"].as_str().unwrap().to_string())
+        .collect()
+}
+
 /// 构造 key 模式 app:key-a ∈ DEFAULT_TENANT,key-b ∈ tenant_b。
 async fn make_app() -> (Router, TempDir, TenantId) {
     let dir = tempfile::tempdir().unwrap();
@@ -371,49 +406,44 @@ async fn admin_key_platform_view_and_internal_billing() {
     assert_eq!(status, StatusCode::CREATED);
     let id_b = body_b["id"].as_str().unwrap().to_string();
 
-    // A 的 tenant_id(经详情端点取得,供 admin 代表某租户列举)
-    let (status, det) = send(
+    // B 的 tenant_id(tenant_b —— 与 admin/A 的 DEFAULT 租户不同,用作跨租户对照)
+    let (status, det_b) = send(
         &app,
         Method::GET,
-        &format!("/v1/databases/{id}"),
+        &format!("/v1/databases/{id_b}"),
         None,
-        Some(KEY_A),
+        Some(KEY_B),
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    let tenant_a = det["tenant_id"].as_str().unwrap().to_string();
+    let tenant_b_id = det_b["tenant_id"].as_str().unwrap().to_string();
 
-    // admin key 不带 tenant_id:不再返回全量(跨租户隔离在平台层强制,防泄露)
+    // admin(internal)不带 on-behalf:只看自身租户(DEFAULT),看不到他租户 B —— 绝不返回全量
     let (status, body) = send(&app, Method::GET, "/v1/databases", None, Some(KEY_ADMIN)).await;
     assert_eq!(status, StatusCode::OK);
-    assert!(
-        body.as_array().unwrap().is_empty(),
-        "admin key 不带 tenant_id 不应看到任何 Cell(防跨租户泄露)"
-    );
-
-    // admin key 带 tenant_id=A:只看到 A 的 Cell,不含 B 的
-    let (status, body) = send(
-        &app,
-        Method::GET,
-        &format!("/v1/databases?tenant_id={tenant_a}"),
-        None,
-        Some(KEY_ADMIN),
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK);
-    let ids: Vec<String> = body
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|c| c["id"].as_str().unwrap().to_string())
-        .collect();
-    assert!(
-        ids.contains(&id),
-        "admin key 带 tenant_id=A 应看到 A 的 Cell"
-    );
+    let ids = ids_of(&body);
     assert!(
         !ids.contains(&id_b),
-        "admin key 带 tenant_id=A 不应看到 B 的 Cell"
+        "admin 不带 on-behalf 不应看到他租户(B)的 Cell(不返回全量)"
+    );
+
+    // admin(internal)带 on-behalf=B:代表 B 租户,看到 B 的 Cell
+    let (status, body) =
+        send_on_behalf(&app, Method::GET, "/v1/databases", KEY_ADMIN, &tenant_b_id).await;
+    assert_eq!(status, StatusCode::OK);
+    let ids = ids_of(&body);
+    assert!(ids.contains(&id_b), "admin on-behalf=B 应看到 B 的 Cell");
+
+    // 安全铁律:租户 key(非 internal,KEY_A ∈ DEFAULT)携带 on-behalf=B 头一律无效 ——
+    // 只看到自己(DEFAULT/A)的 Cell,拿不到 B 的(外部不可用此头越权提权)。
+    let (status, body) =
+        send_on_behalf(&app, Method::GET, "/v1/databases", KEY_A, &tenant_b_id).await;
+    assert_eq!(status, StatusCode::OK);
+    let ids = ids_of(&body);
+    assert!(ids.contains(&id), "A 应看到自己(DEFAULT)的 Cell");
+    assert!(
+        !ids.contains(&id_b),
+        "租户 key 带 on-behalf 头不得越权看到 B 的 Cell"
     );
 
     // admin key 访问任意 Cell 数据成功(平台代理)

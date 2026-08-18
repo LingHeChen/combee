@@ -14,16 +14,24 @@ interface ApiCell {
 }
 
 export async function aggregateOverview(session: BffSession): Promise<OverviewData> {
-  // cells 用平台 key + 显式 tenant_id 让平台按租户过滤(不再拉全量到 BFF);
-  // usage/credits 用用户 key 查(租户聚合正确,且 Combee 对查询自身用量不计费)。
+  // 统一:服务 key(internal → 不计费)+ on-behalf 租户,api-server 按目标租户 scope。
+  // tenant_id 缺失(未回填)→ 不带 on-behalf 会命中平台租户,故直接返回空,绝不泄露。
+  const onBehalfTenant = session.tenant_id ?? undefined;
   const [cells, usage, credits] = await Promise.all([
-    session.tenant_id
-      ? combeeRequest<ApiCell[]>(`/v1/databases?limit=1000&tenant_id=${session.tenant_id}`, {
-          apiKey: bffKey(),
-        })
+    onBehalfTenant
+      ? combeeRequest<ApiCell[]>("/v1/databases?limit=1000", { apiKey: bffKey(), onBehalfTenant })
       : Promise.resolve([] as ApiCell[]),
-    combeeRequest<UsageSummary>("/v1/usage/summary", { apiKey: session.api_key }).catch(() => null),
-    combeeRequest<{ available: string }>("/v1/credits/balance", { apiKey: session.api_key }).catch(() => null),
+    onBehalfTenant
+      ? combeeRequest<UsageSummary>("/v1/usage/summary", { apiKey: bffKey(), onBehalfTenant }).catch(
+          () => null,
+        )
+      : Promise.resolve(null),
+    onBehalfTenant
+      ? combeeRequest<{ available: string }>("/v1/credits/balance", {
+          apiKey: bffKey(),
+          onBehalfTenant,
+        }).catch(() => null)
+      : Promise.resolve(null),
   ]);
 
   // 纵深防御:平台已按租户过滤,这里再按 tenant_id 兜底过滤一次。

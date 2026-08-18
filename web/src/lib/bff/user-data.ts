@@ -180,18 +180,21 @@ export interface OnboardingState {
 }
 
 export async function getOnboarding(session: BffSession): Promise<OnboardingState> {
-  // cells 用平台 key + 显式 tenant_id 让平台按租户过滤(不再拉全量到 BFF);
-  // 注册即创建了用户 key(api_key_created 恒为注册状态);usage 用用户 key 查(不计费)。
+  // 统一:服务 key(internal → 不计费)+ on-behalf 租户,api-server 按目标租户 scope。
+  const onBehalfTenant = session.tenant_id ?? undefined;
   const [cells, usage] = await Promise.all([
-    session.tenant_id
-      ? combeeRequest<Array<{ tenant_id?: string }> | null>(
-          `/v1/databases?limit=1000&tenant_id=${session.tenant_id}`,
-          { apiKey: bffKey() },
-        ).catch(() => null)
+    onBehalfTenant
+      ? combeeRequest<Array<{ tenant_id?: string }> | null>("/v1/databases?limit=1000", {
+          apiKey: bffKey(),
+          onBehalfTenant,
+        }).catch(() => null)
       : Promise.resolve(null),
-    combeeRequest<{ request_count?: number } | null>("/v1/usage/summary", {
-      apiKey: session.api_key,
-    }).catch(() => null),
+    onBehalfTenant
+      ? combeeRequest<{ request_count?: number } | null>("/v1/usage/summary", {
+          apiKey: bffKey(),
+          onBehalfTenant,
+        }).catch(() => null)
+      : Promise.resolve(null),
   ]);
   const firstCell = Array.isArray(cells)
     ? cells.some((c) => !!session.tenant_id && c.tenant_id === session.tenant_id)

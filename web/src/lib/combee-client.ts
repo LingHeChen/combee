@@ -36,12 +36,21 @@ function needUrl(): string {
 /** 服务端调用 Combee API(带 x-api-key;key 为空时 dev 模式放行)。 */
 export async function combeeRequest<T = unknown>(
   path: string,
-  opts: { method?: string; body?: unknown; apiKey?: string; idempotencyKey?: string } = {},
+  opts: {
+    method?: string;
+    body?: unknown;
+    apiKey?: string;
+    idempotencyKey?: string;
+    /** on-behalf 租户:仅 internal(服务 key)请求有效,让 api-server 代表该租户 scope
+     *  (不计费)。BFF 涉权操作用它把 session→user→tenant 传给平台。 */
+    onBehalfTenant?: string;
+  } = {},
 ): Promise<T> {
   const base = needUrl();
   const headers: Record<string, string> = { "content-type": "application/json" };
   if (opts.apiKey) headers["x-api-key"] = opts.apiKey;
   if (opts.idempotencyKey) headers["idempotency-key"] = opts.idempotencyKey;
+  if (opts.onBehalfTenant) headers["x-combee-on-behalf-tenant"] = opts.onBehalfTenant;
   // request_id 贯穿:从 BFF 上下文读并透传 Combee API
   const rid = (await import("@/lib/bff/context")).currentRequestId();
   if (rid) headers["x-request-id"] = rid;

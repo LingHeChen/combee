@@ -36,7 +36,7 @@ describe("BFF 权限: cells 归属过滤", () => {
     // BFF 现在带 tenant_id 请求;即便平台(异常地)返回了含他人 cell 的列表,
     // BFF 也必须按 tenant_id 兜底过滤,绝不把平台/他人 cell 暴露给用户。
     mockCombeeRequest.mockImplementation((path: string) => {
-      if (path === "/v1/databases?limit=1000&tenant_id=tenant-alice") {
+      if (path === "/v1/databases?limit=1000") {
         return Promise.resolve([
           { id: "cell-combee-bff", tenant_id: "tenant-platform", state: "active", created_at: 1 },
           { id: "cell-bob", tenant_id: "tenant-bob", state: "active", created_at: 2 },
@@ -73,7 +73,7 @@ describe("BFF 权限: cells 归属过滤", () => {
 
   it("空列表(新注册未建 cell)→ 正常返回 0,不报错", async () => {
     mockCombeeRequest.mockImplementation((path: string) => {
-      if (path === "/v1/databases?limit=1000&tenant_id=tenant-alice") return Promise.resolve([]);
+      if (path === "/v1/databases?limit=1000") return Promise.resolve([]);
       if (path === "/v1/usage/summary") return Promise.resolve({ request_count: 0, current_storage_bytes: 0 });
       if (path === "/v1/credits/balance") return Promise.resolve({ available: "0" });
       return Promise.resolve(null);
