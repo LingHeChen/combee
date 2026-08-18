@@ -261,6 +261,10 @@ pub trait MetadataStore: Send + Sync {
         ttl_secs: i64,
     ) -> Result<bool>;
 
+    /// 运营配置(pgsql `config` 表)读写:如 `new_user_grant_units`(新用户自动发放额度)。
+    async fn get_config(&self, key: &str) -> Result<Option<String>>;
+    async fn set_config(&self, key: &str, value: &str) -> Result<()>;
+
     /// 查询用量桶(时间闭区间,按 bucket_start 升序)。
     async fn query_usage(
         &self,
@@ -380,6 +384,8 @@ struct InMemoryInner {
     name_index: HashMap<(TenantId, String), DatabaseId>,
     /// leader 租约:name → (owner, expires_at)。
     leases: HashMap<String, (Uuid, i64)>,
+    /// 运营配置:key → value。
+    config: HashMap<String, String>,
 }
 
 impl Default for InMemoryStore {
@@ -813,6 +819,19 @@ impl MetadataStore for InMemoryStore {
                 .insert(name.to_string(), (owner, now + ttl_secs));
         }
         Ok(held)
+    }
+
+    async fn get_config(&self, key: &str) -> Result<Option<String>> {
+        Ok(self.inner.lock().unwrap().config.get(key).cloned())
+    }
+
+    async fn set_config(&self, key: &str, value: &str) -> Result<()> {
+        self.inner
+            .lock()
+            .unwrap()
+            .config
+            .insert(key.to_string(), value.to_string());
+        Ok(())
     }
 
     async fn query_usage(

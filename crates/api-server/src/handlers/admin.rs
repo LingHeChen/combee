@@ -292,6 +292,33 @@ pub async fn admin_create_tenant(
         .metadata
         .create_api_key(tenant, hash, "console-user")
         .await?;
+    // 新用户自动发放:读运营配置 new_user_grant_units(microcredits),>0 则发一笔 Grant。
+    // 额度配置存 pgsql config 表;未配置则用默认。幂等 reference_id = signup_grant:{tenant}。
+    const DEFAULT_NEW_USER_GRANT_UNITS: i64 = 1000 * combee_common::credit::CREDIT_UNITS_PER_CREDIT;
+    let grant_units = state
+        .metadata
+        .get_config("new_user_grant_units")
+        .await?
+        .and_then(|s| s.trim().parse::<i64>().ok())
+        .unwrap_or(DEFAULT_NEW_USER_GRANT_UNITS);
+    if grant_units > 0 {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        let txn = CreditTransaction {
+            id: Uuid::new_v4(),
+            tenant_id: tenant,
+            txn_type: CreditTransactionType::Grant,
+            amount_units: grant_units,
+            pricing_version: None,
+            reference_id: Some(format!("signup_grant:{}", tenant.0)),
+            description: Some("new user signup grant".into()),
+            created_at: now,
+            balance_after: None,
+        };
+        let _ = state.metadata.append_credit_transaction(txn).await;
+    }
     Ok(Json(CreateTenantKeyResponse {
         tenant_id: tenant,
         key,

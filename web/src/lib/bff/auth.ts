@@ -117,6 +117,14 @@ export async function ensureUsersTable(): Promise<string> {
     body: { sql: CREATE_UID_INDEX_SQL },
     apiKey: bffKey(),
   }).catch(() => undefined);
+  // 单次邀请码表(与 credit voucher 解耦:只管能否注册,不给 credits)。
+  await combeeRequest(`/v1/databases/${cell}/sql`, {
+    method: "POST",
+    body: {
+      sql: "CREATE TABLE IF NOT EXISTS invite_codes (code TEXT PRIMARY KEY, used_by TEXT, used_at INTEGER)",
+    },
+    apiKey: bffKey(),
+  }).catch(() => undefined);
   return cell;
 }
 
@@ -203,41 +211,38 @@ export async function registerUser(
   const existing = await findUser(username);
   if (existing) throw new Error("username already taken");
 
-  // 为用户创建专属 Combee key(服务账号;dev off 模式 bffKey 可空)
+  const cell = await ensureUsersTable(); // 固定 combee-bff cell(用户表 + 邀请码表)
+  // Closed Alpha:校验并消费单次邀请码(与 credit voucher 解耦;只管能否注册,不给 credits)。
+  if (mode === "code") {
+    const code = accessCode!.trim();
+    const found = await combeeRequest<{ rows?: unknown[][] }>(`/v1/databases/${cell}/sql`, {
+      method: "POST",
+      body: {
+        sql: "SELECT code FROM invite_codes WHERE code = ? AND used_by IS NULL",
+        params: [code],
+      },
+      apiKey: bffKey(),
+    }).catch(() => null);
+    if (!found?.rows || found.rows.length === 0) {
+      throw new Error("invalid or already-used invite code");
+    }
+    // 标记消费(单次;并发/重复由 used_by IS NULL 兜底)。
+    await combeeRequest(`/v1/databases/${cell}/sql`, {
+      method: "POST",
+      body: {
+        sql: "UPDATE invite_codes SET used_by = ?, used_at = ? WHERE code = ? AND used_by IS NULL",
+        params: [username, Math.floor(Date.now() / 1000), code],
+      },
+      apiKey: bffKey(),
+    });
+  }
+  // 创建专属租户 + key;api-server 在创建租户时自动发放新用户 credits
+  // (额度见 pgsql config.new_user_grant_units,不再 redeem voucher)。
   const created = await combeeRequest<{ tenant_id: string; key: string; key_id: string }>(
     "/admin/tenants",
     { method: "POST", body: {}, apiKey: bffKey() },
-  )
-  // Closed Alpha:兑换邀请码(voucher)→ 用户获得初始 Alpha Credits(默认 1000)
-  if (mode === "code") {
-    try {
-      const r = await combeeRequest<{ credits_added: string; already_redeemed: boolean }>(
-        "/v1/credits/redeem",
-        { method: "POST", body: { code: accessCode!.trim() }, apiKey: created.key },
-      );
-      if (r.already_redeemed) {
-        throw new Error("Alpha access code already used by another account");
-      }
-    } catch (err) {
-      // 邀请码无效/已用:清理刚建的用户,报错(与写入同一固定 cell)
-      const cell = await ensureUsersTable();
-      await combeeRequest(`/v1/databases/${cell}/sql`, {
-        method: "POST",
-        body: { sql: "DELETE FROM console_users WHERE username = ?", params: [username] },
-        apiKey: bffKey(),
-      }).catch(() => undefined);
-      await combeeRequest(`/v1/api-keys/${created.key_id}`, {
-        method: "DELETE",
-        // 用刚创建的用户 key 撤销(该 key 归属 created.tenant_id);
-        // 用平台 key 会命中错误的平台租户,导致撤销 404、遗留孤儿 key。
-        apiKey: created.key,
-      }).catch(() => undefined);
-      throw new Error(`invalid or already-used Alpha access code: ${(err as Error).message}`);
-    }
-  }
-
+  );
   const uid = randomUUID();
-  const cell = await ensureUsersTable(); // 新注册:固定 combee-bff cell
   await combeeRequest(`/v1/databases/${cell}/sql`, {
     method: "POST",
     body: {

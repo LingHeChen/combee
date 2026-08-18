@@ -113,6 +113,10 @@ CREATE TABLE IF NOT EXISTS leader_leases (
     owner UUID NOT NULL,
     expires_at BIGINT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS config (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS databases (
     id UUID PRIMARY KEY,
     tenant_id UUID NOT NULL,
@@ -796,6 +800,28 @@ impl MetadataStore for PostgresStore {
         .await
         .map_err(PostgresStore::internal)?;
         Ok(row.is_some())
+    }
+
+    async fn get_config(&self, key: &str) -> Result<Option<String>> {
+        let v = sqlx::query_scalar::<_, String>("SELECT value FROM config WHERE key = $1")
+            .bind(key)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(PostgresStore::internal)?;
+        Ok(v)
+    }
+
+    async fn set_config(&self, key: &str, value: &str) -> Result<()> {
+        sqlx::query(
+            "INSERT INTO config (key, value) VALUES ($1, $2)
+             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+        )
+        .bind(key)
+        .bind(value)
+        .execute(&self.pool)
+        .await
+        .map_err(PostgresStore::internal)?;
+        Ok(())
     }
 
     async fn query_usage(
