@@ -37,7 +37,7 @@ export interface Dict {
     error: string;
     hint: string;
   };
-  footer: { tagline: string; sub: string };
+  footer: { tagline: string; sub: string; docs: string; icp: string };
 }
 
 export const dict: Record<Locale, Dict> = {
@@ -192,6 +192,8 @@ export const dict: Record<Locale, Dict> = {
     footer: {
       tagline: "One app, one Cell.",
       sub: "sql + kv included · no database instances",
+      docs: "Documentation",
+      icp: "冀ICP备2024088698号-2",
     },
   },
 
@@ -346,6 +348,8 @@ export const dict: Record<Locale, Dict> = {
     footer: {
       tagline: "一个应用,一个 Cell。",
       sub: "sql + kv 齐备 · 无需数据库实例",
+      docs: "文档",
+      icp: "冀ICP备2024088698号-2",
     },
   },
 };

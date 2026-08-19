@@ -4,6 +4,7 @@
  * |---|---|---|
  * | `NEXT_PUBLIC_CONSOLE_URL` | Combee Cloud 控制台基地址(不含路径) | `https://console.combee.cloud` |
  * | `NEXT_PUBLIC_CONSOLE_REGISTER_PATH` | 控制台注册路径(相对 CONSOLE_URL) | `/zh/register` |
+ * | `NEXT_PUBLIC_DOCS_URL` | 文档站地址(不含路径) | `https://docs.combee.cloud` |
  * | `NEXT_PUBLIC_ALPHA_EMAIL` | Public Beta 候补邮箱 | `alpha@combee.cloud` |
  */
 
@@ -19,6 +20,13 @@ export const CONSOLE_REGISTER_URL = `${CONSOLE_URL}${CONSOLE_REGISTER_PATH.start
 export const ALPHA_EMAIL = process.env.NEXT_PUBLIC_ALPHA_EMAIL ?? "alpha@combee.cloud";
 
 export const ALPHA_MAILTO = `mailto:${ALPHA_EMAIL}`;
+
+/** 文档站基地址(footer 链接)。 */
+export const DOCS_URL =
+  process.env.NEXT_PUBLIC_DOCS_URL?.replace(/\/+$/, "") ?? "https://docs.combee.cloud";
+
+/** 工信部 ICP 备案查询页(备案号链接目标)。 */
+export const BEIAN_URL = "https://beian.miit.gov.cn/";
 
 /** Combee API 基地址(Public Beta 候补登记用)。 */
 export const COMBEE_API_URL =

@@ -1,7 +1,7 @@
 import CodeBlock from "./code-block";
 import { TS_CODE, HTTP_CODE } from "@/lib/data";
 import { type Dict } from "@/lib/i18n";
-import { CONSOLE_REGISTER_URL } from "@/lib/config";
+import { CONSOLE_REGISTER_URL, DOCS_URL, BEIAN_URL } from "@/lib/config";
 import { WaitlistForm } from "./waitlist-form";
 
 /* ============ Benchmark ============ */
@@ -162,7 +162,25 @@ export function Footer({ t }: { t: Dict }) {
           <img src="/combee-96.png" alt="" width={16} height={16} className="h-4 w-4 rounded-[4px] object-contain" />
           <span className="text-sm font-medium text-[#c4c7c7]">Combee — {t.footer.tagline}</span>
         </div>
-        <div className="mono-label">{t.footer.sub}</div>
+        <div className="flex flex-col items-center gap-3 md:flex-row md:gap-6">
+          <a
+            href={DOCS_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm text-[#9ca3af] transition-colors hover:text-[#c4c7c7]"
+          >
+            {t.footer.docs}
+          </a>
+          <a
+            href={BEIAN_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm text-[#9ca3af] transition-colors hover:text-[#c4c7c7]"
+          >
+            {t.footer.icp}
+          </a>
+          <div className="mono-label">{t.footer.sub}</div>
+        </div>
       </div>
     </footer>
   );
